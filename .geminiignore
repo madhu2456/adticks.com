@@ -1,0 +1,10 @@
+node_modules/
+.next/
+backend/.venv312/
+backend/.pytest_cache/
+backend/.ruff_cache/
+backend/htmlcov/
+frontend/tsconfig.tsbuildinfo
+frontend/jest-results.json
+frontend/audit*.json
+*.log
