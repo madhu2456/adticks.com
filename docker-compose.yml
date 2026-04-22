@@ -37,7 +37,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "6380:6379"
     networks:
       - adticks-network
     healthcheck:
@@ -54,6 +54,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-adticks}
       REDIS_URL: redis://:${REDIS_PASSWORD:-password}@redis:6379/0
+      DEBUG: "true"
     ports:
       - "8002:8000"
     volumes:

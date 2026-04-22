@@ -9,24 +9,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Install DigitalOcean CLI
-        uses: digitalocean/action-doctl@v2
-        with:
-          token: ${{ secrets.DO_ACCESS_TOKEN }}
-
-      - name: Log in to DigitalOcean Container Registry
-        run: doctl registry login --expiry-seconds 600
-
-      - name: Build and Push Images
-        run: |
-          docker build -t registry.digitalocean.com/adticks/backend:latest ./backend
-          docker build -t registry.digitalocean.com/adticks/frontend:latest ./frontend
-          docker push registry.digitalocean.com/adticks/backend:latest
-          docker push registry.digitalocean.com/adticks/frontend:latest
-
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -37,22 +19,34 @@ jobs:
           script: |
             set -e
             echo "🚀 Starting AdTicks deployment..."
+            
+            # Navigate to the project directory
             cd /opt/adticks
             
             echo "📥 Pulling latest code..."
             git pull origin main
             
-            echo "🐳 Restarting containers..."
-            # We use the prod file logic you provided
+            echo "🐳 Rebuilding and starting containers..."
+            # Build on server to avoid registry issues
             docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml up -d --build
             
-            echo "🔄 Reloading Host Nginx..."
+            echo "🔎 Privilege diagnostics & Nginx Sync..."
+            # Diagnostic and Nginx sync/reload logic similar to your example
             if [ -f "./nginx/nginx.conf" ]; then
+              echo "⚙️ Updating Host Nginx configuration..."
               sudo -n cp ./nginx/nginx.conf /etc/nginx/sites-available/adticks
               sudo -n ln -sf /etc/nginx/sites-available/adticks /etc/nginx/sites-enabled/adticks
-              sudo -n /usr/sbin/nginx -t && sudo -n /bin/systemctl reload nginx
-              echo "✅ Nginx reloaded"
+              
+              if command -v nginx >/dev/null 2>&1; then
+                echo "🔄 Testing and Reloading Nginx..."
+                sudo -n /usr/sbin/nginx -t
+                sudo -n /bin/systemctl reload nginx
+                echo "✅ Nginx reloaded successfully!"
+              fi
             fi
+
+            echo "🧹 Cleaning up old Docker images..."
+            docker image prune -f
             
-            echo "✅ Deployment completed!"
+            echo "✅ AdTicks Deployment completed!"
