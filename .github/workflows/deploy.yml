@@ -57,11 +57,11 @@ jobs:
             
             echo "⚙️ Syncing Nginx configuration..."
             if [ -f "./nginx/nginx.conf" ]; then
-              sudo -n cp ./nginx/nginx.conf /etc/nginx/sites-available/adticks
-              sudo -n ln -sf /etc/nginx/sites-available/adticks /etc/nginx/sites-enabled/adticks
+              sudo -n /usr/bin/cp ./nginx/nginx.conf /etc/nginx/sites-available/adticks
+              sudo -n /usr/bin/ln -sf /etc/nginx/sites-available/adticks /etc/nginx/sites-enabled/adticks
               
               if command -v nginx >/dev/null 2>&1; then
-                sudo -n /usr/sbin/nginx -t && sudo -n /bin/systemctl reload nginx
+                sudo -n /usr/sbin/nginx -t && sudo -n /usr/bin/systemctl reload nginx
                 echo "✅ Nginx reloaded"
               fi
             fi
