@@ -20,33 +20,47 @@ jobs:
             set -e
             echo "🚀 Starting AdTicks deployment..."
             
-            # Navigate to the project directory
+            # Ensure the directory exists
+            if [ ! -d "/opt/adticks" ]; then
+              echo "📂 Creating /opt/adticks..."
+              sudo mkdir -p /opt/adticks
+              sudo chown madhu:madhu /opt/adticks
+            fi
+
             cd /opt/adticks
             
-            echo "📥 Pulling latest code..."
-            git pull origin main
+            # Robust check for git repository
+            if [ ! -d ".git" ]; then
+              echo "🚀 Not a repository. Initializing..."
+              # If directory is not empty, we might need to handle that, 
+              # but for now we'll try to clone into current dir
+              # NOTE: This may fail if repo is private and no token/key is set on server
+              git clone https://github.com/${{ github.repository }}.git . || {
+                echo "❌ Clone failed. If the repo is private, please clone it manually once on the server."
+                exit 1
+              }
+            else
+              echo "📥 Pulling latest code..."
+              git fetch origin main
+              git reset --hard origin/main
+            fi
             
             echo "🐳 Rebuilding and starting containers..."
-            # Build on server to avoid registry issues
             docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml up -d --build
             
-            echo "🔎 Privilege diagnostics & Nginx Sync..."
-            # Diagnostic and Nginx sync/reload logic similar to your example
+            echo "⚙️ Syncing Nginx configuration..."
             if [ -f "./nginx/nginx.conf" ]; then
-              echo "⚙️ Updating Host Nginx configuration..."
               sudo -n cp ./nginx/nginx.conf /etc/nginx/sites-available/adticks
               sudo -n ln -sf /etc/nginx/sites-available/adticks /etc/nginx/sites-enabled/adticks
               
               if command -v nginx >/dev/null 2>&1; then
-                echo "🔄 Testing and Reloading Nginx..."
-                sudo -n /usr/sbin/nginx -t
-                sudo -n /bin/systemctl reload nginx
-                echo "✅ Nginx reloaded successfully!"
+                sudo -n /usr/sbin/nginx -t && sudo -n /bin/systemctl reload nginx
+                echo "✅ Nginx reloaded"
               fi
             fi
 
-            echo "🧹 Cleaning up old Docker images..."
+            echo "🧹 Cleaning up..."
             docker image prune -f
             
             echo "✅ AdTicks Deployment completed!"
