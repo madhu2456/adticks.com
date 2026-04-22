@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   nginx_sync:
     image: alpine:3.20
