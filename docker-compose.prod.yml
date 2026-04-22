@@ -1,5 +1,153 @@
 version: "3.9"
 
+services:
+  nginx_sync:
+    image: alpine:3.20
+    container_name: adticks-nginx-sync
+    restart: "no"
+    volumes:
+      - /etc/nginx/sites-enabled:/host_nginx_sites_enabled:ro
+      - /etc/nginx/sites-available:/host_nginx_sites_available:ro
+      - ./nginx:/sync_target
+    command: >
+      sh -c "mkdir -p /sync_target &&
+      if [ -f /host_nginx_sites_enabled/adticks ]; then
+        cp /host_nginx_sites_enabled/adticks /sync_target/adticks.conf &&
+        echo 'Synced /etc/nginx/sites-enabled/adticks -> nginx/adticks.conf';
+      elif [ -f /host_nginx_sites_available/adticks ]; then
+        cp /host_nginx_sites_available/adticks /sync_target/adticks.conf &&
+        echo 'Synced /etc/nginx/sites-available/adticks -> nginx/adticks.conf';
+      else
+        echo 'Skip sync: adticks config not found';
+      fi"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "1"
+
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: adticks-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-adticks}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - adticks-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: adticks-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      --loglevel warning
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - adticks-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: adticks-backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-adticks}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+    ports:
+      - "8002:8000"
+    depends_on:
+      nginx_sync:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - adticks-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${SITE_URL:?SITE_URL is required}/api
+    container_name: adticks-frontend
+    restart: unless-stopped
+    env_file: ./frontend/.env.local
+    environment:
+      NEXT_PUBLIC_API_URL: ${SITE_URL}/api
+    ports:
+      - "3002:3000"
+    depends_on:
+      nginx_sync:
+        condition: service_completed_successfully
+      backend:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - adticks-network
+
 networks:
   adticks-network:
     driver: bridge
@@ -7,168 +155,3 @@ networks:
 volumes:
   postgres_data:
   redis_data:
-
-services:
-  postgres:
-    image: postgres:15-alpine
-    container_name: adticks-postgres
-    restart: always
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - adticks-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-  redis:
-    image: redis:7-alpine
-    container_name: adticks-redis
-    restart: always
-    volumes:
-      - redis_data:/data
-    networks:
-      - adticks-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  backend:
-    image: registry.digitalocean.com/adticks/backend:${IMAGE_TAG:-latest}
-    container_name: adticks-backend
-    restart: always
-    ports:
-      - "8002:8002"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    env_file:
-      - .env
-    networks:
-      - adticks-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "20m"
-        max-file: "5"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  celery_worker:
-    image: registry.digitalocean.com/adticks/backend:${IMAGE_TAG:-latest}
-    container_name: adticks-celery-worker
-    restart: always
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    env_file:
-      - .env
-    command: celery -A app.core.celery_app worker --loglevel=info --concurrency=4
-    networks:
-      - adticks-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "20m"
-        max-file: "5"
-    healthcheck:
-      test: ["CMD", "celery", "-A", "app.core.celery_app", "inspect", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  celery_beat:
-    image: registry.digitalocean.com/adticks/backend:${IMAGE_TAG:-latest}
-    container_name: adticks-celery-beat
-    restart: always
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    env_file:
-      - .env
-    command: celery -A app.core.celery_app beat --loglevel=info
-    networks:
-      - adticks-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  flower:
-    image: mher/flower
-    container_name: adticks-flower
-    restart: always
-    ports:
-      - "5555:5555"
-    depends_on:
-      - redis
-      - celery_worker
-    env_file:
-      - .env
-    environment:
-      - CELERY_BROKER_URL=${REDIS_URL}
-      - FLOWER_PORT=5555
-      - FLOWER_BASIC_AUTH=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-changeme}
-    networks:
-      - adticks-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  frontend:
-    image: registry.digitalocean.com/adticks/frontend:${IMAGE_TAG:-latest}
-    container_name: adticks-frontend
-    restart: always
-    ports:
-      - "3002:3002"
-    depends_on:
-      - backend
-    env_file:
-      - frontend/.env.local
-    networks:
-      - adticks-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3002"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s

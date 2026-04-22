@@ -9,23 +9,23 @@ volumes:
   redis_data:
 
 services:
-  postgres:
-    image: postgres:15-alpine
-    container_name: adticks-postgres
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: adticks-db
     restart: unless-stopped
-    ports:
-      - "5432:5432"
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-adticks}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
       POSTGRES_DB: ${POSTGRES_DB:-adticks}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
     networks:
       - adticks-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-adticks} -d ${POSTGRES_DB:-adticks}"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
       timeout: 5s
       retries: 5
 
@@ -33,105 +33,71 @@ services:
     image: redis:7-alpine
     container_name: adticks-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    command: redis-server --appendonly yes --loglevel warning --requirepass ${REDIS_PASSWORD:-password}
     volumes:
       - redis_data:/data
+    ports:
+      - "6379:6379"
     networks:
       - adticks-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-password}", "ping"]
+      interval: 5s
       timeout: 5s
       retries: 5
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: ./backend
     container_name: adticks-backend
     restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-adticks}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-password}@redis:6379/0
     ports:
-      - "8002:8002"
+      - "8002:8000"
+    volumes:
+      - ./backend:/app
     depends_on:
-      postgres:
+      db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    env_file:
-      - .env
-    volumes:
-      - ./backend:/app
-    command: uvicorn main:app --reload --host 0.0.0.0 --port 8002
+    command: >
+      sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
     networks:
       - adticks-network
 
   celery_worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: ./backend
     container_name: adticks-celery-worker
     restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    env_file:
-      - .env
-    volumes:
-      - ./backend:/app
-    command: celery -A app.core.celery_app worker --loglevel=info --concurrency=4
-    networks:
-      - adticks-network
-
-  celery_beat:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: adticks-celery-beat
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    env_file:
-      - .env
-    volumes:
-      - ./backend:/app
-    command: celery -A app.core.celery_app beat --loglevel=info
-    networks:
-      - adticks-network
-
-  flower:
-    image: mher/flower
-    container_name: adticks-flower
-    restart: unless-stopped
-    ports:
-      - "5555:5555"
-    depends_on:
-      - redis
-      - celery_worker
-    env_file:
-      - .env
+    env_file: ./backend/.env
     environment:
-      - CELERY_BROKER_URL=${REDIS_URL:-redis://redis:6379/0}
-      - FLOWER_PORT=5555
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-adticks}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-password}@redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.core.celery_app worker --loglevel=info --concurrency=4
     networks:
       - adticks-network
 
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8002/api
     container_name: adticks-frontend
     restart: unless-stopped
+    env_file: ./frontend/.env.local
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8002/api
     ports:
-      - "3002:3002"
+      - "3002:3000"
     depends_on:
       - backend
-    env_file:
-      - frontend/.env.local
     networks:
       - adticks-network

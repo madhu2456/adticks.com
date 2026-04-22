@@ -1,8 +1,9 @@
-name: AdTicks Production Deployment
+name: Deploy AdTicks to DigitalOcean
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   deploy:
@@ -19,44 +20,39 @@ jobs:
       - name: Log in to DigitalOcean Container Registry
         run: doctl registry login --expiry-seconds 600
 
-      - name: Build and Push Backend Image
+      - name: Build and Push Images
         run: |
-          docker build -t registry.digitalocean.com/adticks/backend:${{ github.sha }} -t registry.digitalocean.com/adticks/backend:latest ./backend
-          docker push registry.digitalocean.com/adticks/backend:${{ github.sha }}
+          docker build -t registry.digitalocean.com/adticks/backend:latest ./backend
+          docker build -t registry.digitalocean.com/adticks/frontend:latest ./frontend
           docker push registry.digitalocean.com/adticks/backend:latest
-
-      - name: Build and Push Frontend Image
-        run: |
-          docker build -t registry.digitalocean.com/adticks/frontend:${{ github.sha }} -t registry.digitalocean.com/adticks/frontend:latest ./frontend
-          docker push registry.digitalocean.com/adticks/frontend:${{ github.sha }}
           docker push registry.digitalocean.com/adticks/frontend:latest
 
-      - name: Deploy to Droplet via SSH
-        uses: appleboy/ssh-action@master
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DO_ACCESS_TOKEN,GITHUB_SHA
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 22
           script: |
-            export DO_ACCESS_TOKEN=${{ secrets.DO_ACCESS_TOKEN }}
-            export IMAGE_TAG=${{ github.sha }}
+            set -e
+            echo "🚀 Starting AdTicks deployment..."
             cd /opt/adticks
             
-            # Use the deployment script logic directly
-            echo "$DO_ACCESS_TOKEN" | docker login registry.digitalocean.com --username token --password-stdin
+            echo "📥 Pulling latest code..."
+            git pull origin main
             
-            # Update docker-compose with new tags
-            IMAGE_TAG=$IMAGE_TAG docker-compose -f docker-compose.prod.yml pull
+            echo "🐳 Restarting containers..."
+            # We use the prod file logic you provided
+            docker compose -f docker-compose.prod.yml down
+            docker compose -f docker-compose.prod.yml up -d --build
             
-            # Run migrations
-            IMAGE_TAG=$IMAGE_TAG docker-compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
+            echo "🔄 Reloading Host Nginx..."
+            if [ -f "./nginx/nginx.conf" ]; then
+              sudo -n cp ./nginx/nginx.conf /etc/nginx/sites-available/adticks
+              sudo -n ln -sf /etc/nginx/sites-available/adticks /etc/nginx/sites-enabled/adticks
+              sudo -n /usr/sbin/nginx -t && sudo -n /bin/systemctl reload nginx
+              echo "✅ Nginx reloaded"
+            fi
             
-            # Restart services
-            IMAGE_TAG=$IMAGE_TAG docker-compose -f docker-compose.prod.yml up -d --no-deps backend celery_worker celery_beat frontend
-            
-            # Handle Nginx (since we are using host Nginx)
-            # We assume the repo on the server is kept in sync or we use a temp file
-            # For simplicity, we trigger the local deploy logic if scripts/deploy.sh exists on server
-            chmod +x ./scripts/deploy.sh
-            DEPLOY_HOST=localhost ./scripts/deploy.sh
+            echo "✅ Deployment completed!"
