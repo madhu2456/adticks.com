@@ -1,0 +1,17 @@
+.git
+.gitignore
+.vscode
+.idea
+README.md
+docs/
+*.log
+.github/
+.dockerignore
+docker-compose.yml
+docker-compose.prod.yml
+scripts/
+AEO_*.md
+GEO_*.md
+PHASE_*.md
+*.txt
+*.pdf

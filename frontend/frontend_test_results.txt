@@ -1,0 +1,33 @@
+
+> adticks-frontend@0.1.0 test
+> jest __tests__/components/seo/seo-suite.test.tsx
+
+PASS __tests__/components/seo/seo-suite.test.tsx
+  RankHistoryChart
+    ÔêÜ renders rank history chart with time range buttons (36 ms)
+    ÔêÜ loads rank history data on mount (7 ms)
+    ÔêÜ handles error gracefully (18 ms)
+    ÔêÜ changes time range when button clicked (98 ms)
+    ÔêÜ includes device filter when provided (6 ms)
+  CompetitorAnalysis
+    ÔêÜ renders competitor analysis component (5 ms)
+    ÔêÜ displays competitor domains (32 ms)
+    ÔêÜ shows total competitor count (31 ms)
+    ÔêÜ expands competitor details on Show click (99 ms)
+    ÔêÜ handles empty data state (31 ms)
+    ÔêÜ disables next button on last page (31 ms)
+  BacklinkDashboard
+    ÔêÜ renders backlink dashboard (16 ms)
+    ÔêÜ displays backlink statistics (34 ms)
+    ÔêÜ displays referring domains (12 ms)
+    ÔêÜ filters by minimum authority (69 ms)
+    ÔêÜ clears authority filter (44 ms)
+    ÔêÜ handles pagination (80 ms)
+    ÔêÜ disables previous button on first page (30 ms)
+    ÔêÜ shows empty state message (27 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       19 passed, 19 total
+Snapshots:   0 total
+Time:        2.232 s
+Ran all test suites matching __tests__/components/seo/seo-suite.test.tsx.

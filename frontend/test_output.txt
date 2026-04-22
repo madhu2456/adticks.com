@@ -1,0 +1,25 @@
+
+> adticks-frontend@0.1.0 test
+> jest --passWithNoTests
+
+PASS __tests__/phase1-improvements.test.ts
+PASS __tests__/hooks/useInsights.test.ts
+PASS __tests__/components/layout/Sidebar.test.tsx
+PASS __tests__/hooks/useProject.test.ts
+PASS __tests__/components/seo/KeywordTable.test.tsx
+PASS __tests__/components/gsc/QueryTable.test.tsx
+PASS __tests__/components/insights/RecommendationPanel.test.tsx
+PASS __tests__/components/dashboard/TopInsights.test.tsx
+PASS __tests__/components/dashboard/VisibilityScore.test.tsx
+PASS __tests__/components/insights/InsightList.test.tsx
+PASS __tests__/components/insights/InsightCard.test.tsx
+PASS __tests__/components/ui/button.test.tsx
+PASS __tests__/components/ui/badge.test.tsx
+PASS __tests__/lib/utils.test.ts
+PASS __tests__/lib/auth.test.ts
+
+Test Suites: 15 passed, 15 total
+Tests:       231 passed, 231 total
+Snapshots:   0 total
+Time:        5.37 s
+Ran all test suites.

@@ -1,0 +1,72 @@
+"""
+AdTicks — Project model.
+"""
+
+import uuid
+from datetime import datetime, timezone
+
+from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.database import Base
+
+
+class Project(Base):
+    """An AdTicks visibility project belonging to a user."""
+
+    __tablename__ = "projects"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    brand_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    domain: Mapped[str] = mapped_column(String(255), nullable=False)
+    industry: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(tz=timezone.utc),
+        nullable=False,
+    )
+
+    # Relationships
+    owner = relationship("User", back_populates="projects")
+    competitors = relationship(
+        "Competitor", back_populates="project", cascade="all, delete-orphan"
+    )
+    keywords = relationship(
+        "Keyword", back_populates="project", cascade="all, delete-orphan"
+    )
+    prompts = relationship(
+        "Prompt", back_populates="project", cascade="all, delete-orphan"
+    )
+    clusters = relationship(
+        "Cluster", back_populates="project", cascade="all, delete-orphan"
+    )
+    scores = relationship(
+        "Score", back_populates="project", cascade="all, delete-orphan"
+    )
+    recommendations = relationship(
+        "Recommendation", back_populates="project", cascade="all, delete-orphan"
+    )
+    gsc_data = relationship(
+        "GSCData", back_populates="project", cascade="all, delete-orphan"
+    )
+    ads_data = relationship(
+        "AdsData", back_populates="project", cascade="all, delete-orphan"
+    )
+    competitor_keywords = relationship(
+        "CompetitorKeywords", back_populates="project", cascade="all, delete-orphan"
+    )
+    backlinks = relationship(
+        "Backlinks", back_populates="project", cascade="all, delete-orphan"
+    )
+    locations = relationship(
+        "Location", back_populates="project", cascade="all, delete-orphan"
+    )

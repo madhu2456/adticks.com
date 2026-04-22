@@ -1,0 +1,1 @@
+"""AdTicks application package."""

@@ -1,0 +1,14 @@
+.next/
+node_modules/
+build/
+dist/
+public/
+*.config.js
+*.config.mjs
+tsconfig.json
+jest.config.ts
+jest.setup.ts
+audit*.json
+*.txt
+jest-results.json
+tsconfig.tsbuildinfo

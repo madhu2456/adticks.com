@@ -1,0 +1,473 @@
+'use client'
+
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  ChevronDown, Zap, Bell, Settings, LogOut, Check,
+  Plus, Globe, User, Loader2, Search, Command, Moon, Sun,
+  TrendingUp, AlertTriangle, RefreshCw, ArrowUpRight,
+  Calendar, ChevronRight,
+} from 'lucide-react'
+import { useTheme } from 'next-themes'
+import { cn } from '@/lib/utils'
+import { formatRelativeTime } from '@/lib/utils'
+
+/* ── Data ─────────────────────────────────────────────────────────────── */
+const PROJECTS = [
+  { id: '1', name: 'Optivio',   domain: 'optivio.com',   color: '#6366f1', initials: 'OP', active: true  },
+  { id: '2', name: 'AdTicks',   domain: 'adticks.io',    color: '#8b5cf6', initials: 'AT', active: false },
+  { id: '3', name: 'TestBrand', domain: 'testbrand.co',  color: '#3b82f6', initials: 'TB', active: false },
+]
+
+const NOTIFICATIONS = [
+  {
+    id: '1',
+    type: 'scan',
+    icon: TrendingUp,
+    title: 'Full scan completed',
+    body: 'Visibility score improved 67 → 72 (+7.5%)',
+    time: new Date(Date.now() - 1000 * 60 * 23).toISOString(),
+    read: false,
+    accent: '#6366f1',
+  },
+  {
+    id: '2',
+    type: 'alert',
+    icon: AlertTriangle,
+    title: '3 critical insights found',
+    body: 'AI visibility and ads need immediate attention',
+    time: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+    read: false,
+    accent: '#ef4444',
+  },
+  {
+    id: '3',
+    type: 'sync',
+    icon: RefreshCw,
+    title: 'GSC data synced',
+    body: '28 days of performance data imported',
+    time: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
+    read: true,
+    accent: '#22c55e',
+  },
+]
+
+const USER = { name: 'Madhu Kumar', email: 'madhu.kumar245@gmail.com', initials: 'MK' }
+
+/* ── Hooks ────────────────────────────────────────────────────────────── */
+function useOutsideClick(ref: React.RefObject<HTMLElement>, cb: () => void) {
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) cb()
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [ref, cb])
+}
+
+/* ── Dropdown shell ───────────────────────────────────────────────────── */
+function Dropdown({ open, children, className }: { open: boolean; children: React.ReactNode; className?: string }) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0, y: 6, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 4, scale: 0.97 }}
+          transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
+          className={cn('absolute top-full mt-2 z-50 rounded-xl overflow-hidden', className)}
+          style={{
+            background: 'rgba(14,14,16,0.98)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)',
+          }}
+        >
+          {children}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+/* ── Props ────────────────────────────────────────────────────────────── */
+interface HeaderProps {
+  sidebarCollapsed: boolean
+  currentPage?: string
+}
+
+/* ── Component ────────────────────────────────────────────────────────── */
+function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
+  const [projectOpen,  setProjectOpen]  = useState(false)
+  const [notifOpen,    setNotifOpen]    = useState(false)
+  const [userOpen,     setUserOpen]     = useState(false)
+  const [scanning,     setScanning]     = useState(false)
+  const [activeProject, setActiveProject] = useState(PROJECTS[0])
+  const [notifications, setNotifications] = useState(NOTIFICATIONS)
+  const [scanProgress,  setScanProgress]  = useState(0)
+  const [mounted, setMounted] = useState(false)
+  const { theme, setTheme } = useTheme()
+
+  const projectRef = useRef<HTMLDivElement>(null!)
+  const notifRef   = useRef<HTMLDivElement>(null!)
+  const userRef    = useRef<HTMLDivElement>(null!)
+
+  useOutsideClick(projectRef, () => setProjectOpen(false))
+  useOutsideClick(notifRef,   () => setNotifOpen(false))
+  useOutsideClick(userRef,    () => setUserOpen(false))
+
+  const closeAll = () => { setProjectOpen(false); setNotifOpen(false); setUserOpen(false) }
+
+  const unreadCount = notifications.filter(n => !n.read).length
+
+  const handleScan = async () => {
+    if (scanning) return
+    setScanning(true)
+    setScanProgress(0)
+    for (let p = 0; p <= 100; p += 4) {
+      await new Promise(r => setTimeout(r, 55))
+      setScanProgress(p)
+    }
+    setScanning(false)
+    setScanProgress(0)
+  }
+
+  const markAllRead = () => setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // ⌘K trigger (UI-only for now)
+  const handleCommandPalette = useCallback(() => {
+    // Future: open command palette modal
+    console.log('⌘K command palette triggered')
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        handleCommandPalette()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [handleCommandPalette])
+
+  return (
+    <header
+      className="fixed top-0 right-0 z-30 flex items-center h-14 gap-2"
+      style={{
+        left: sidebarCollapsed ? 60 : 224,
+        paddingLeft: '16px',
+        paddingRight: '16px',
+        transition: 'left 0.22s cubic-bezier(0.4,0,0.2,1)',
+        background: 'rgba(9,9,11,0.88)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(255,255,255,0.055)',
+      }}
+    >
+      {/* ── Scan progress bar ────────────────────────────────────────── */}
+      <AnimatePresence>
+        {scanning && (
+          <motion.div
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: scanProgress / 100 }}
+            exit={{ opacity: 0 }}
+            className="absolute bottom-0 left-0 right-0 h-px origin-left"
+            style={{ background: 'linear-gradient(90deg, #6366f1, #8b5cf6, #ec4899)' }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Left: Project selector ───────────────────────────────────── */}
+      <div ref={projectRef} className="relative">
+        <button
+          onClick={() => { closeAll(); setProjectOpen(p => !p) }}
+          className="flex items-center gap-2 h-8 px-2.5 rounded-lg transition-all hover:bg-white/[0.05] group"
+          style={{ border: '1px solid rgba(255,255,255,0.07)' }}
+        >
+          {/* Project color dot */}
+          <div
+            className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 text-[9px] font-bold text-white"
+            style={{
+              background: `linear-gradient(135deg, ${activeProject.color}, ${activeProject.color}cc)`,
+              boxShadow: `0 0 8px ${activeProject.color}40`,
+            }}
+          >
+            {activeProject.initials}
+          </div>
+          <div className="text-left hidden sm:block">
+            <p className="text-[13px] font-semibold text-text-1 leading-none">{activeProject.name}</p>
+            <p className="text-[10px] text-text-3 mt-0.5 leading-none flex items-center gap-1">
+              <Globe size={9} />
+              {activeProject.domain}
+            </p>
+          </div>
+          <ChevronDown
+            size={12}
+            className={cn('text-text-3 transition-transform flex-shrink-0', projectOpen && 'rotate-180')}
+          />
+        </button>
+
+        <Dropdown open={projectOpen} className="left-0 w-64">
+          <div className="px-2 pt-2 pb-1">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-3 px-1.5 pb-1.5">Switch Project</p>
+            {PROJECTS.map(project => (
+              <button
+                key={project.id}
+                onClick={() => { setActiveProject(project); setProjectOpen(false) }}
+                className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-white/[0.05] transition-colors text-left group"
+              >
+                <div
+                  className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white"
+                  style={{ background: `linear-gradient(135deg, ${project.color}, ${project.color}cc)` }}
+                >
+                  {project.initials}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium text-text-1 truncate">{project.name}</p>
+                  <p className="text-[11px] text-text-3 truncate">{project.domain}</p>
+                </div>
+                {project.id === activeProject.id && (
+                  <Check size={13} className="text-primary flex-shrink-0" />
+                )}
+              </button>
+            ))}
+          </div>
+          <div className="p-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.05] transition-colors text-text-3 hover:text-text-2">
+              <div
+                className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ border: '1px dashed rgba(255,255,255,0.12)' }}
+              >
+                <Plus size={12} />
+              </div>
+              <span className="text-[13px] font-medium">Add new project</span>
+            </button>
+          </div>
+        </Dropdown>
+      </div>
+
+      {/* ── Breadcrumb ───────────────────────────────────────────────── */}
+      <div className="hidden md:flex items-center gap-1 text-[13px] text-text-3 ml-1">
+        <ChevronRight size={13} />
+        <span className="text-text-2 font-medium">{currentPage}</span>
+      </div>
+
+      {/* ── Command palette shortcut ─────────────────────────────────── */}
+      <button
+        onClick={handleCommandPalette}
+        className="hidden lg:flex items-center gap-2 ml-2 h-8 px-3 rounded-lg text-text-3 hover:text-text-2 hover:bg-white/[0.04] transition-all"
+        style={{ border: '1px solid rgba(255,255,255,0.06)' }}
+      >
+        <Search size={13} />
+        <span className="text-[12px]">Search anything...</span>
+        <div className="flex items-center gap-0.5 ml-2">
+          <kbd style={{ fontSize: '10px' }}>⌘</kbd>
+          <kbd style={{ fontSize: '10px' }}>K</kbd>
+        </div>
+      </button>
+
+      {/* ── Spacer ───────────────────────────────────────────────────── */}
+      <div className="flex-1" />
+
+      {/* ── Right actions ────────────────────────────────────────────── */}
+      <div className="flex items-center gap-1.5">
+
+        {/* Theme toggle */}
+        {mounted && (
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="flex items-center justify-center w-8 h-8 rounded-lg text-text-3 hover:text-text-2 hover:bg-white/[0.05] transition-all"
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
+        )}
+
+        {/* Live indicator */}
+        <div className="hidden sm:flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-medium text-success"
+          style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)' }}
+        >
+          <span className="live-dot" />
+          <span>Live</span>
+        </div>
+
+        {/* Run Full Scan */}
+        <button
+          onClick={handleScan}
+          disabled={scanning}
+          className={cn(
+            'flex items-center gap-1.5 h-8 px-3 rounded-lg text-[13px] font-semibold text-white transition-all',
+            'disabled:opacity-60',
+          )}
+          style={{
+            background: scanning
+              ? 'rgba(99,102,241,0.6)'
+              : 'linear-gradient(135deg, #6366f1, #7c3aed)',
+            boxShadow: scanning
+              ? '0 0 20px rgba(99,102,241,0.3)'
+              : '0 0 12px rgba(99,102,241,0.25), 0 2px 8px rgba(0,0,0,0.3)',
+          }}
+        >
+          {scanning ? (
+            <>
+              <Loader2 size={13} className="animate-spin" />
+              <span className="hidden sm:inline">Scanning…</span>
+            </>
+          ) : (
+            <>
+              <Zap size={13} />
+              <span className="hidden sm:inline">Run Scan</span>
+            </>
+          )}
+        </button>
+
+        {/* Notification bell */}
+        <div ref={notifRef} className="relative">
+          <button
+            onClick={() => { closeAll(); setNotifOpen(p => !p) }}
+            className="relative flex items-center justify-center w-8 h-8 rounded-lg text-text-3 hover:text-text-2 hover:bg-white/[0.05] transition-all"
+          >
+            <Bell size={15} />
+            {unreadCount > 0 && (
+              <span
+                className="absolute top-1 right-1 flex items-center justify-center w-3.5 h-3.5 rounded-full bg-danger text-[8px] font-bold text-white"
+                style={{ boxShadow: '0 0 6px rgba(239,68,68,0.5)' }}
+              >
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          <Dropdown open={notifOpen} className="right-0 w-[340px]">
+            <div
+              className="flex items-center justify-between px-3 py-2.5"
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+            >
+              <div className="flex items-center gap-2">
+                <p className="text-[13px] font-semibold text-text-1">Notifications</p>
+                {unreadCount > 0 && (
+                  <span className="h-5 px-1.5 rounded-full bg-danger/15 text-danger text-[10px] font-bold flex items-center">
+                    {unreadCount} new
+                  </span>
+                )}
+              </div>
+              {unreadCount > 0 && (
+                <button onClick={markAllRead} className="text-[11px] text-primary hover:text-primary/80 transition-colors">
+                  Mark all read
+                </button>
+              )}
+            </div>
+            <div className="max-h-80 overflow-y-auto custom-scroll">
+              {notifications.map((notif) => {
+                const Icon = notif.icon
+                return (
+                  <div
+                    key={notif.id}
+                    className={cn(
+                      'flex gap-3 px-3 py-3 hover:bg-white/[0.03] transition-colors cursor-pointer',
+                      !notif.read && 'bg-primary/[0.04]',
+                    )}
+                  >
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ background: `${notif.accent}15`, border: `1px solid ${notif.accent}20` }}
+                    >
+                      <Icon size={14} style={{ color: notif.accent }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={cn('text-[13px] font-medium leading-snug', notif.read ? 'text-text-2' : 'text-text-1')}>
+                          {notif.title}
+                        </p>
+                        {!notif.read && (
+                          <span
+                            className="mt-1 w-1.5 h-1.5 rounded-full flex-shrink-0"
+                            style={{ background: notif.accent }}
+                          />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-text-3 mt-0.5">{notif.body}</p>
+                      <p className="text-[10px] text-text-3 mt-1">{formatRelativeTime(notif.time)}</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <div
+              className="px-3 py-2"
+              style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
+            >
+              <button className="flex items-center gap-1 text-[11px] text-text-3 hover:text-text-2 transition-colors">
+                View all notifications <ArrowUpRight size={11} />
+              </button>
+            </div>
+          </Dropdown>
+        </div>
+
+        {/* User avatar */}
+        <div ref={userRef} className="relative">
+          <button
+            onClick={() => { closeAll(); setUserOpen(p => !p) }}
+            className="flex items-center justify-center w-8 h-8 rounded-full text-white text-[11px] font-bold hover:opacity-90 transition-all"
+            style={{
+              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              boxShadow: '0 0 0 2px rgba(99,102,241,0.25)',
+            }}
+          >
+            {USER.initials}
+          </button>
+
+          <Dropdown open={userOpen} className="right-0 w-56">
+            <div
+              className="px-3 py-2.5"
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+            >
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
+                  style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+                >
+                  {USER.initials}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-text-1 truncate">{USER.name}</p>
+                  <p className="text-[11px] text-text-3 truncate">{USER.email}</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-1.5">
+              {[
+                { icon: User,     label: 'Profile' },
+                { icon: Settings, label: 'Settings' },
+                { icon: Calendar, label: 'Usage & Billing' },
+              ].map(({ icon: Icon, label }) => (
+                <button
+                  key={label}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/[0.05] transition-colors text-text-2 hover:text-text-1 text-[13px] font-medium"
+                >
+                  <Icon size={13} className="text-text-3" />
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="p-1.5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <button className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-danger/10 transition-colors text-text-2 hover:text-danger text-[13px] font-medium">
+                <LogOut size={13} />
+                Sign out
+              </button>
+            </div>
+          </Dropdown>
+        </div>
+      </div>
+    </header>
+  )
+}
+
+export default Header;
+export { Header };

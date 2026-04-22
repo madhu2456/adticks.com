@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+.venv/
+venv/
+env/
+.venv312/
+.env
+*.log
+Dockerfile
+.dockerignore
+tests/
