@@ -83,7 +83,7 @@ frontend/
 
 **Check AI Visibility**
 ```bash
-curl -X POST http://localhost:8000/api/aeo/check-visibility \
+curl -X POST http://localhost:8002/api/aeo/check-visibility \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"keyword_id": "uuid", "ai_models": ["chatgpt", "perplexity", "claude"]}'
@@ -91,13 +91,13 @@ curl -X POST http://localhost:8000/api/aeo/check-visibility \
 
 **Get Visibility Summary**
 ```bash
-curl http://localhost:8000/api/aeo/projects/{project_id}/visibility/summary \
+curl http://localhost:8002/api/aeo/projects/{project_id}/visibility/summary \
   -H "Authorization: Bearer TOKEN"
 ```
 
 **Generate Recommendations**
 ```bash
-curl -X POST http://localhost:8000/api/aeo/content/generate-recommendations \
+curl -X POST http://localhost:8002/api/aeo/content/generate-recommendations \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"keyword_id": "uuid"}'

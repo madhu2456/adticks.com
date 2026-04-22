@@ -28,16 +28,15 @@ This guide covers deploying AdTicks to production on **DigitalOcean** using Dock
 
 ```
 DigitalOcean Droplet (Ubuntu 22.04, 4 vCPU / 8 GB RAM recommended)
-├── Docker Engine
+├── Host Nginx         (ports 80, 443)
 ├── Docker Compose (production stack)
-│   ├── nginx          (ports 80, 443)
-│   ├── frontend       (Next.js, port 3000 internal)
-│   ├── backend        (FastAPI, port 8000 internal)
+│   ├── frontend       (Next.js, port 3002 host, 3000 internal)
+│   ├── backend        (FastAPI, port 8002 host, 8000 internal)
 │   ├── celery_worker  (4 concurrent processes)
 │   ├── celery_beat    (scheduler)
 │   ├── flower         (port 5555 internal)
-│   ├── postgres       (port 5432 internal only)
-│   └── redis          (port 6379 internal only)
+│   ├── postgres       (pgvector, port 5433 host, 5432 internal)
+│   └── redis          (port 6380 host, 6379 internal)
 │
 DigitalOcean Container Registry
 ├── registry.digitalocean.com/adticks/backend:latest
@@ -47,7 +46,7 @@ DigitalOcean Spaces
 └── adticks-data  (JSON result files)
 ```
 
-Only ports **80** and **443** are exposed externally. All other service ports are internal to the Docker network. Postgres and Redis are never exposed to the public internet.
+Only ports **80**, **443**, **8002**, and **3002** are exposed on the host. Host Nginx acts as the primary entry point for 80/443. Postgres and Redis are accessible on the host for maintenance but restricted to localhost via Docker port mapping.
 
 ---
 
@@ -302,7 +301,7 @@ server {
     add_header Strict-Transport-Security "max-age=63072000; includeSubDomains";
 
     location /api/ {
-        proxy_pass         http://backend:8000/api/;
+        proxy_pass         http://127.0.0.1:8002/api/;
         proxy_set_header   Host $host;
         proxy_set_header   X-Real-IP $remote_addr;
         proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -311,7 +310,7 @@ server {
     }
 
     location / {
-        proxy_pass         http://frontend:3000/;
+        proxy_pass         http://127.0.0.1:3002/;
         proxy_set_header   Host $host;
         proxy_set_header   X-Real-IP $remote_addr;
     }
@@ -356,8 +355,8 @@ ssh root@$DEPLOY_HOST "
   docker compose -f docker-compose.prod.yml up -d --no-deps celery_worker celery_beat
   docker compose -f docker-compose.prod.yml up -d --no-deps frontend
 
-  # Reload Nginx (picks up any config changes)
-  docker compose -f docker-compose.prod.yml exec nginx nginx -s reload
+  # Reload Host Nginx (picks up any config changes)
+  sudo systemctl reload nginx
 
   echo 'Deployment complete: $SHA'
 "
@@ -443,7 +442,7 @@ docker compose -f docker-compose.prod.yml exec postgres \
 ### Health check
 
 ```bash
-curl https://yourdomain.com/api/auth/health
+curl http://localhost:8002/health
 # Expected: {"status":"ok","environment":"production"}
 ```
 

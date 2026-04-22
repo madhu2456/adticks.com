@@ -389,7 +389,7 @@ All errors are logged with comprehensive context:
   level: "page",
   timestamp: "2024-01-15T10:30:45.123Z",
   userAgent: "Mozilla/5.0...",
-  url: "http://localhost:3000/dashboard"
+  url: "http://localhost:3002/dashboard"
 }
 ```
 

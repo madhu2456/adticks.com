@@ -39,7 +39,7 @@ export default function ProjectPage() {
 #### Check AI Visibility
 
 ```bash
-curl -X POST http://localhost:8000/api/aeo/check-visibility \
+curl -X POST http://localhost:8002/api/aeo/check-visibility \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -59,7 +59,7 @@ curl -X POST http://localhost:8000/api/aeo/check-visibility \
 #### Get Visibility Data
 
 ```bash
-curl http://localhost:8000/api/aeo/projects/{project_id}/visibility/summary \
+curl http://localhost:8002/api/aeo/projects/{project_id}/visibility/summary \
   -H "Authorization: Bearer YOUR_TOKEN"
 
 # Response
@@ -79,7 +79,7 @@ curl http://localhost:8000/api/aeo/projects/{project_id}/visibility/summary \
 #### Get Snippet Data
 
 ```bash
-curl http://localhost:8000/api/aeo/keywords/{keyword_id}/snippets \
+curl http://localhost:8002/api/aeo/keywords/{keyword_id}/snippets \
   -H "Authorization: Bearer YOUR_TOKEN"
 
 # Response
@@ -101,7 +101,7 @@ curl http://localhost:8000/api/aeo/keywords/{keyword_id}/snippets \
 #### Generate Recommendations
 
 ```bash
-curl -X POST http://localhost:8000/api/aeo/content/generate-recommendations \
+curl -X POST http://localhost:8002/api/aeo/content/generate-recommendations \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -128,7 +128,7 @@ curl -X POST http://localhost:8000/api/aeo/content/generate-recommendations \
 #### Get Content Outline
 
 ```bash
-curl -X POST http://localhost:8000/api/aeo/content/generate-outline \
+curl -X POST http://localhost:8002/api/aeo/content/generate-outline \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

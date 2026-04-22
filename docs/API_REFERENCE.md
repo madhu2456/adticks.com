@@ -1,6 +1,6 @@
 # API Reference — AdTicks
 
-Base URL: `http://localhost:8000/api` (development)
+Base URL: `http://localhost:8002/api` (development)
 
 All endpoints that modify or read user data require a **Bearer token** in the `Authorization` header:
 
@@ -64,7 +64,7 @@ Create a new user account.
 **Example**
 
 ```bash
-curl -X POST http://localhost:8000/api/auth/register \
+curl -X POST http://localhost:8002/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"jane@example.com","password":"Pass123!","full_name":"Jane Doe"}'
 ```
@@ -103,7 +103,7 @@ Authenticate and receive a JWT access token.
 **Example**
 
 ```bash
-curl -X POST http://localhost:8000/api/auth/login \
+curl -X POST http://localhost:8002/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"jane@example.com","password":"Pass123!"}' \
   | jq '.access_token'
@@ -133,7 +133,7 @@ Return the currently authenticated user.
 **Example**
 
 ```bash
-curl http://localhost:8000/api/auth/me \
+curl http://localhost:8002/api/auth/me \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -874,13 +874,13 @@ X-Page-Size: 50
 
 When the backend is running, explore all endpoints interactively:
 
-- **Swagger UI** — http://localhost:8000/docs
+- **Swagger UI** — http://localhost:8002/docs
   - Full request/response schemas
   - Try-it-out functionality
   - Authentication via the "Authorize" button
 
-- **ReDoc** — http://localhost:8000/redoc
+- **ReDoc** — http://localhost:8002/redoc
   - Clean, readable reference format
 
-- **OpenAPI JSON** — http://localhost:8000/openapi.json
+- **OpenAPI JSON** — http://localhost:8002/openapi.json
   - Import into Postman, Insomnia, or other API clients

@@ -137,7 +137,7 @@ docker-compose up -d frontend
 # Locally with hot reload
 cd frontend
 npm install
-npm run dev        # http://localhost:3000
+npm run dev        # http://localhost:3002
 
 # Production build
 npm run build
@@ -787,9 +787,9 @@ Test files live in `__tests__/` with `*.test.tsx` naming.
 
 ```bash
 # Required
-NEXT_PUBLIC_API_URL=http://localhost:8000/api   # Backend API URL
+NEXT_PUBLIC_API_URL=http://localhost:8002/api   # Backend API URL
 NEXTAUTH_SECRET=your-secret-here               # NextAuth signing secret
-NEXTAUTH_URL=http://localhost:3000             # Canonical app URL
+NEXTAUTH_URL=http://localhost:3002             # Canonical app URL
 
 # Optional (for Google OAuth in frontend)
 GOOGLE_CLIENT_ID=...

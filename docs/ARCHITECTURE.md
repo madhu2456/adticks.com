@@ -44,21 +44,21 @@ This document describes the system architecture, service interactions, request l
                            │          │
               ┌────────────▼──┐  ┌────▼───────────────┐
               │  FastAPI      │  │   Next.js Server    │
-              │  Uvicorn      │  │   (port 3000)       │
-              │  (port 8000)  │  │   SSR + API Routes  │
+              │  Uvicorn      │  │   (port 3002)       │
+              │  (port 8002)  │  │   SSR + API Routes  │
               └──────┬────────┘  └────────────────────┘
                      │
-    ┌────────────────┼────────────────────┐
-    │                │                    │
-┌───▼──────┐  ┌──────▼──────┐  ┌─────────▼──────────┐
-│PostgreSQL│  │    Redis    │  │  Celery Workers (4) │
-│  (5432)  │  │   (6379)    │  │  + Beat Scheduler  │
-│          │  │  ┌────────┐ │  │                    │
-│  ORM:    │  │  │ Cache  │ │  │  SEO Tasks         │
-│ SQLAlch. │  │  ├────────┤ │  │  AI Scan Tasks     │
-│ asyncpg  │  │  │Broker  │ │  │  GSC Sync Tasks    │
-│  Alembic │  │  └────────┘ │  │  Ads Sync Tasks    │
-└──────────┘  └─────────────┘  │  Insight Gen Tasks │
+              ┌────────────────┼────────────────────┐
+              │                │                    │
+              ┌───▼──────┐  ┌──────▼──────┐  ┌─────────▼──────────┐
+              │PostgreSQL│  │    Redis    │  │  Celery Workers (4) │
+              │  (5432)  │  │   (6379)    │  │  + Beat Scheduler  │
+              │          │  │  ┌────────┐ │  │                    │
+              │  ORM:    │  │  │ Cache  │ │  │  SEO Tasks         │
+              │ SQLAlch. │  │  ├────────┤ │  │  AI Scan Tasks     │
+              │ asyncpg  │  │  │Broker  │ │  │  GSC Sync Tasks    │
+              │  Alembic │  │  └────────┘ │  │  Ads Sync Tasks    │
+              └──────────┘  └─────────────┘  │  Insight Gen Tasks │
                                 └──────────┬─────────┘
                                            │
                                ┌───────────▼───────────┐
@@ -74,47 +74,46 @@ This document describes the system architecture, service interactions, request l
                                │  │ JSON result store│ │
                                │  └──────────────────┘ │
                                └───────────────────────┘
-```
+              ```
 
----
+              ---
 
-## Service Responsibilities
+              ## Service Responsibilities
 
-### FastAPI Backend (port 8000)
+              ### FastAPI Backend (port 8002)
 
-The backend is a **thin orchestration layer** — it validates requests, checks auth, dispatches Celery tasks, and reads/writes the database. It does **not** perform any heavy I/O inline.
+              The backend is a **thin orchestration layer** — it validates requests, checks auth, dispatches Celery tasks, and reads/writes the database. It does **not** perform any heavy I/O inline.
 
-Responsibilities:
-- JWT authentication and user session management
-- Project CRUD operations
-- Immediate data reads (scores, recommendations, rankings from DB)
-- Task dispatch and status checks
-- Google OAuth flows
+              Responsibilities:
+              - JWT authentication and user session management
+              - Project CRUD operations
+              - Immediate data reads (scores, recommendations, rankings from DB)
+              - Task dispatch and status checks
+              - Google OAuth flows
 
-What it does NOT do:
-- Call LLM APIs directly from request handlers
-- Run long-running scraping or analysis inline
-- Block waiting for external APIs
+              What it does NOT do:
+              - Call LLM APIs directly from request handlers
+              - Run long-running scraping or analysis inline
+              - Block waiting for external APIs
 
-### Celery Workers (4 concurrent processes)
+              ### Celery Workers (4 concurrent processes)
 
-Workers handle all asynchronous heavy lifting:
-- LLM API calls (OpenAI, Anthropic)
-- Google Search Console data sync
-- Google Ads data sync
-- SEO analysis and rank checking
-- Score computation and insight generation
-- Storage uploads to DigitalOcean Spaces
+              Workers handle all asynchronous heavy lifting:
+              - LLM API calls (OpenAI, Anthropic)
+              - Google Search Console data sync
+              - Google Ads data sync
+              - SEO analysis and rank checking
+              - Score computation and insight generation
+              - Storage uploads to DigitalOcean Spaces
 
-### Celery Beat Scheduler
+              ### Celery Beat Scheduler
 
-Runs periodic tasks:
-- Daily full-scan for each active project
-- Weekly content gap refresh
-- Nightly score snapshot
+              Runs periodic tasks:
+              - Daily full-scan for each active project
+              - Weekly content gap refresh
+              - Nightly score snapshot
 
-### Next.js Frontend (port 3000)
-
+              ### Next.js Frontend (port 3002)
 A purely client-side data consumer:
 - Server-side rendering for initial page load (SEO-friendly auth pages)
 - Client-side React Query for all dashboard data

@@ -107,7 +107,7 @@ curl -X POST http://localhost:8002/api/auth/register \
                     └───┬───────────────┬───┘
                         │ /api/*        │ /*
                ┌────────▼────────┐  ┌───▼────────────┐
-               │  FastAPI (8000) │  │  Next.js (3000) │
+               │  FastAPI (8002) │  │  Next.js (3002) │
                │  + Uvicorn      │  │  App Router     │
                └────────┬────────┘  └────────────────┘
                         │

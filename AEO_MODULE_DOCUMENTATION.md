@@ -218,7 +218,7 @@ import { AEODashboard } from '@/components/aeo';
 ### 4. Environment Configuration
 Add to `.env.local`:
 ```
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8002
 ```
 
 ## Testing

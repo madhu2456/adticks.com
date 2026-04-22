@@ -94,6 +94,6 @@ python -m uvicorn main:app --reload
 ```
 
 Then visit:
-- **Interactive Swagger UI**: http://localhost:8000/docs
-- **ReDoc API documentation**: http://localhost:8000/redoc
-- **OpenAPI JSON schema**: http://localhost:8000/openapi.json
+- **Interactive Swagger UI**: http://localhost:8002/docs
+- **ReDoc API documentation**: http://localhost:8002/redoc
+- **OpenAPI JSON schema**: http://localhost:8002/openapi.json

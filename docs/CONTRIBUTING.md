@@ -67,12 +67,12 @@ Once `make dev` is running, open:
 
 | Service | URL |
 |---------|-----|
-| Frontend | http://localhost:3000 |
-| Backend API docs | http://localhost:8000/docs |
+| Frontend | http://localhost:3002 |
+| Backend API docs | http://localhost:8002/docs |
 | Celery Flower | http://localhost:5555 |
 | pgAdmin (optional) | http://localhost:5050 |
 
-Create an account at http://localhost:3000/signup and run a quick scan to confirm the Celery worker pipeline is functional.
+Create an account at http://localhost:3002/signup and run a quick scan to confirm the Celery worker pipeline is functional.
 
 ### Stopping and cleaning up
 
