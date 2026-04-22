@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Install dependencies first for better layer caching
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy source and build
 ARG NEXT_PUBLIC_API_URL
