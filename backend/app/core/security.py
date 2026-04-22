@@ -8,6 +8,7 @@ Provides:
 - Token blacklist for logout
 """
 
+import bcrypt
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID, uuid4
@@ -15,7 +16,6 @@ from uuid import UUID, uuid4
 from fastapi import Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,17 +29,23 @@ logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 # Password hashing
 # ---------------------------------------------------------------------------
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 def hash_password(plain: str) -> str:
     """Return the bcrypt hash of *plain*."""
-    return _pwd_context.hash(plain)
+    # bcrypt handles encoding to bytes. We use 12 rounds as standard.
+    # We must encode to utf-8 before passing to bcrypt.
+    pwd_bytes = plain.encode('utf-8')
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(pwd_bytes, salt)
+    return hashed.decode('utf-8')
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     """Return True if *plain* matches *hashed*."""
-    return _pwd_context.verify(plain, hashed)
+    try:
+        return bcrypt.checkpw(plain.encode('utf-8'), hashed.encode('utf-8'))
+    except Exception:
+        return False
 
 
 # ---------------------------------------------------------------------------
