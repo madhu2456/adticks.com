@@ -181,7 +181,7 @@ export default function AIVisibilityTracker({ projectId }: { projectId: string }
 
                 {item.context && (
                   <div className="p-2 bg-gray-50 rounded text-xs text-gray-600">
-                    "{item.context}"
+                    &quot;{item.context}&quot;
                   </div>
                 )}
               </CardContent>
