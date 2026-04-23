@@ -10,10 +10,10 @@ import {
   PaginatedResponse, ApiResponse,
 } from "./types";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8002";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8002/api";
 
 const axiosInstance: AxiosInstance = axios.create({
-  baseURL: `${BASE_URL}/api`,
+  baseURL: BASE_URL,
   headers: { "Content-Type": "application/json" },
   timeout: 30000,
 });
