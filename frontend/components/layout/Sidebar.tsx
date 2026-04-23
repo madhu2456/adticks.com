@@ -11,6 +11,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { getUser } from '@/lib/auth'
+import { useUsage } from '@/hooks/useUsage'
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 interface NavItem {
@@ -160,6 +161,7 @@ interface SidebarProps {
 function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const { data: usage } = useUsage()
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const [user, setUser] = useState<{ name: string; email: string; initials: string; plan?: string; avatarUrl?: string } | null>(null)
 
@@ -180,10 +182,20 @@ function Sidebar({ collapsed, onToggle }: SidebarProps) {
     }
   }, [])
 
+  // Sync user plan from usage data if available
+  useEffect(() => {
+    if (usage?.plan && user && usage.plan !== user.plan) {
+      setUser(prev => prev ? { ...prev, plan: usage.plan } : null)
+    }
+  }, [usage?.plan])
+
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/'
     return pathname.startsWith(href)
   }
+
+  const trialDaysRemaining = usage?.days_remaining || 0
+  const trialProgress = Math.min(100, Math.max(0, ((14 - trialDaysRemaining) / 14) * 100))
 
   return (
     <motion.aside
@@ -449,7 +461,7 @@ function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </nav>
 
       {/* ── Trial / Upgrade banner ───────────────────────────────────── */}
-      {user?.plan === 'free' && (
+      {usage?.plan === 'free' && (
         <div className="flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.055)' }}>
           <AnimatePresence>
             {!collapsed && (
@@ -474,7 +486,7 @@ function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   <div className="flex items-center justify-between relative">
                     <div>
                       <p className="text-[11px] font-semibold text-text-2">Trial Plan</p>
-                      <p className="text-xs font-semibold text-warning mt-0.5">14 days remaining</p>
+                      <p className="text-xs font-semibold text-warning mt-0.5">{trialDaysRemaining} days remaining</p>
                     </div>
                     <div
                       className="w-8 h-8 rounded-lg flex items-center justify-center"
@@ -491,15 +503,15 @@ function Sidebar({ collapsed, onToggle }: SidebarProps) {
                       style={{ background: 'rgba(255,255,255,0.06)' }}
                     >
                       <div
-                        className="h-full rounded-full"
+                        className="h-full rounded-full transition-all duration-500"
                         style={{
-                          width: '80%',
+                          width: `${trialProgress}%`,
                           background: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
                           boxShadow: '0 0 6px rgba(99,102,241,0.5)',
                         }}
                       />
                     </div>
-                    <p className="text-[10px] text-text-3">80% of trial period used</p>
+                    <p className="text-[10px] text-text-3">{Math.round(trialProgress)}% of trial period used</p>
                   </div>
 
                   <button
@@ -522,6 +534,7 @@ function Sidebar({ collapsed, onToggle }: SidebarProps) {
           {collapsed && (
             <div className="py-2 flex justify-center">
               <div
+                onClick={() => router.push('/settings?tab=plan')}
                 className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
                 style={{ background: 'rgba(234,179,8,0.10)' }}
                 title="Upgrade to Pro"

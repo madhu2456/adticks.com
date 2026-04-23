@@ -475,34 +475,36 @@ function PlanTab() {
       </div>
 
       {/* Trial card */}
-      <div className="bg-gradient-to-br from-[#6366f1]/20 to-[#8b5cf6]/10 border border-[#6366f1]/30 rounded-xl p-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Zap className="h-5 w-5 text-[#6366f1]" />
-              <span className="font-semibold text-[#f1f5f9]">{planName}</span>
-              <span className="text-xs bg-[#f59e0b]/20 text-[#f59e0b] border border-[#f59e0b]/30 px-2 py-0.5 rounded-md font-semibold">
-                {usage?.days_remaining || 0} days remaining
-              </span>
+      {!isPro && (
+        <div className="bg-gradient-to-br from-[#6366f1]/20 to-[#8b5cf6]/10 border border-[#6366f1]/30 rounded-xl p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="h-5 w-5 text-[#6366f1]" />
+                <span className="font-semibold text-[#f1f5f9]">{planName}</span>
+                <span className="text-xs bg-[#f59e0b]/20 text-[#f59e0b] border border-[#f59e0b]/30 px-2 py-0.5 rounded-md font-semibold">
+                  {usage?.days_remaining || 0} days remaining
+                </span>
+              </div>
+              <p className="text-sm text-[#94a3b8]">Your trial includes full access to all Pro features.</p>
             </div>
-            <p className="text-sm text-[#94a3b8]">Your trial includes full access to all Pro features.</p>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            {[
+              { label: "AI Scans Used", value: `${usage?.ai_scans_used || 0}/${usage?.ai_scans_limit || 50}` },
+              { label: "Keywords Tracked", value: `${usage?.keywords_used || 0}/${usage?.keywords_limit || 500}` },
+              { label: "Competitors", value: `${usage?.competitors_used || 0}/${usage?.competitors_limit || 3}` },
+              { label: "Days Remaining", value: `${usage?.days_remaining || 0}` },
+            ].map(({ label, value }) => (
+              <div key={label} className="bg-[#0f172a]/30 rounded-lg p-3">
+                <p className="text-xs text-[#94a3b8]">{label}</p>
+                <p className="text-lg font-bold text-[#f1f5f9] mt-0.5">{value}</p>
+              </div>
+            ))}
           </div>
         </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          {[
-            { label: "AI Scans Used", value: `${usage?.ai_scans_used || 0}/${usage?.ai_scans_limit || 50}` },
-            { label: "Keywords Tracked", value: `${usage?.keywords_used || 0}/${usage?.keywords_limit || 500}` },
-            { label: "Competitors", value: `${usage?.competitors_used || 0}/${usage?.competitors_limit || 3}` },
-            { label: "Days Remaining", value: `${usage?.days_remaining || 0}` },
-          ].map(({ label, value }) => (
-            <div key={label} className="bg-[#0f172a]/30 rounded-lg p-3">
-              <p className="text-xs text-[#94a3b8]">{label}</p>
-              <p className="text-lg font-bold text-[#f1f5f9] mt-0.5">{value}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
 
       {/* Feature comparison */}
       <div className="bg-[#0f172a]/30 border border-[#334155] rounded-xl overflow-hidden">

@@ -15,6 +15,7 @@ from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -45,11 +46,16 @@ if settings.SENTRY_DSN:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create all tables when the application starts (dev convenience)."""
+    """Create all tables and storage folders when the application starts."""
     # Setup logging
     setup_logging(settings.ENVIRONMENT)
     logger.info("application_startup", extra={"environment": settings.ENVIRONMENT})
     
+    # Ensure storage root exists
+    import os
+    os.makedirs(settings.STORAGE_ROOT, exist_ok=True)
+    logger.info("storage_initialized", extra={"path": settings.STORAGE_ROOT})
+
     # Import models so metadata is populated before create_all
     import app.models  # noqa: F401
     async with engine.begin() as conn:
@@ -250,6 +256,13 @@ app.include_router(ads.router, prefix=API_PREFIX)
 app.include_router(insights.router, prefix=API_PREFIX)
 app.include_router(scores.router, prefix=API_PREFIX)
 app.include_router(geo.router, prefix=API_PREFIX)
+
+
+# ---------------------------------------------------------------------------
+# Static Files (Storage)
+# ---------------------------------------------------------------------------
+# Mount the storage directory so uploaded files (avatars, etc.) are public
+app.mount(f"{API_PREFIX}/storage", StaticFiles(directory=settings.STORAGE_ROOT), name="storage")
 
 
 # ---------------------------------------------------------------------------

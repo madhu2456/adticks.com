@@ -45,12 +45,10 @@ class Settings(BaseSettings):
     )
 
     # ------------------------------------------------------------------
-    # DigitalOcean Spaces (S3-compatible)
+    # Storage Configuration
     # ------------------------------------------------------------------
-    DO_SPACES_KEY: str = ""
-    DO_SPACES_SECRET: str = ""
-    DO_SPACES_ENDPOINT: str = "https://nyc3.digitaloceanspaces.com"
-    DO_SPACES_BUCKET: str = "adticks-data"
+    STORAGE_ROOT: str = "data"
+    BASE_URL: str = "http://localhost:8002"
 
     # ------------------------------------------------------------------
     # AI providers
@@ -89,18 +87,6 @@ class Settings(BaseSettings):
             raise ValueError(
                 "SECRET_KEY must be at least 32 characters in production. "
                 "Generate one with: openssl rand -hex 32"
-            )
-        return v
-
-    @field_validator("DO_SPACES_KEY", "DO_SPACES_SECRET")
-    @classmethod
-    def validate_storage_credentials(cls, v: str, info):
-        """Warn if storage credentials are missing in production."""
-        environment = info.data.get("ENVIRONMENT", "development")
-        if environment == "production" and not v:
-            raise ValueError(
-                "DigitalOcean Spaces credentials must be set in production. "
-                "Set DO_SPACES_KEY and DO_SPACES_SECRET environment variables."
             )
         return v
 

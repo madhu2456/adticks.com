@@ -1,114 +1,81 @@
 """
-AdTicks — DigitalOcean Spaces storage service.
+AdTicks — Local filesystem storage service.
 
-Uses boto3 with an S3-compatible endpoint so the same code works for
-any S3-compatible object store.
-
-Folder conventions
-------------------
-adticks-data/
-  projects/{project_id}/
-    ai/
-    seo/
-    gsc/
-    ads/
-    exports/
+Replaces DigitalOcean Spaces with local folder storage.
+Files are saved to settings.STORAGE_ROOT and served by the API.
 """
 
 import json
 import logging
+import os
+from pathlib import Path
 from typing import Any
-
-import boto3
-from botocore.exceptions import ClientError
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
-def _get_client():
-    """Return a boto3 S3 client configured for DigitalOcean Spaces."""
-    return boto3.client(
-        "s3",
-        region_name="nyc3",
-        endpoint_url=settings.DO_SPACES_ENDPOINT,
-        aws_access_key_id=settings.DO_SPACES_KEY,
-        aws_secret_access_key=settings.DO_SPACES_SECRET,
-    )
-
-
 class StorageService:
-    """High-level wrapper around DigitalOcean Spaces / S3."""
+    """High-level wrapper around local filesystem storage."""
 
     def __init__(self) -> None:
-        self._bucket = settings.DO_SPACES_BUCKET
+        self.root = Path(settings.STORAGE_ROOT)
+        # Ensure root directory exists
+        self.root.mkdir(parents=True, exist_ok=True)
+
+    def _get_path(self, path: str) -> Path:
+        """Helper to get a full Path object and ensure parent directories exist."""
+        full_path = self.root / path
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        return full_path
 
     # ------------------------------------------------------------------
     # Public helpers
     # ------------------------------------------------------------------
 
     def upload_json(self, path: str, data: dict[str, Any]) -> str:
-        """
-        Serialize *data* to JSON and upload to *path* inside the bucket.
-
-        Returns the public URL of the uploaded object.
-        """
-        client = _get_client()
-        body = json.dumps(data, default=str).encode("utf-8")
+        """Serialize *data* to JSON and save to *path*."""
+        full_path = self._get_path(path)
         try:
-            client.put_object(
-                Bucket=self._bucket,
-                Key=path,
-                Body=body,
-                ContentType="application/json",
-            )
-        except ClientError as exc:
+            with open(full_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, default=str, indent=2)
+        except Exception as exc:
             logger.error("upload_json failed for %s: %s", path, exc)
             raise
         return self._public_url(path)
 
     def download_json(self, path: str) -> dict[str, Any]:
-        """
-        Download the object at *path* and deserialize it as JSON.
-
-        Returns an empty dict if the object does not exist.
-        """
-        client = _get_client()
+        """Read the JSON file at *path*."""
+        full_path = self.root / path
+        if not full_path.exists():
+            logger.warning("download_json: file not found: %s", path)
+            return {}
         try:
-            response = client.get_object(Bucket=self._bucket, Key=path)
-            return json.loads(response["Body"].read().decode("utf-8"))
-        except ClientError as exc:
-            if exc.response["Error"]["Code"] in ("NoSuchKey", "404"):
-                logger.warning("download_json: key not found: %s", path)
-                return {}
+            with open(full_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as exc:
             logger.error("download_json failed for %s: %s", path, exc)
             raise
 
     def upload_file(self, path: str, content: bytes) -> str:
-        """
-        Upload raw *content* bytes to *path* inside the bucket.
-
-        Returns the public URL of the uploaded object.
-        """
-        client = _get_client()
+        """Save raw *content* bytes to *path*."""
+        full_path = self._get_path(path)
         try:
-            client.put_object(
-                Bucket=self._bucket,
-                Key=path,
-                Body=content,
-            )
-        except ClientError as exc:
+            with open(full_path, "wb") as f:
+                f.write(content)
+        except Exception as exc:
             logger.error("upload_file failed for %s: %s", path, exc)
             raise
         return self._public_url(path)
 
     def delete_file(self, path: str) -> None:
-        """Delete the object at *path* from the bucket (no-op if missing)."""
-        client = _get_client()
+        """Delete the file at *path* (no-op if missing)."""
+        full_path = self.root / path
         try:
-            client.delete_object(Bucket=self._bucket, Key=path)
-        except ClientError as exc:
+            if full_path.exists():
+                full_path.unlink()
+        except Exception as exc:
             logger.error("delete_file failed for %s: %s", path, exc)
             raise
 
@@ -145,8 +112,10 @@ class StorageService:
     # ------------------------------------------------------------------
 
     def _public_url(self, path: str) -> str:
-        endpoint = settings.DO_SPACES_ENDPOINT.rstrip("/")
-        return f"{endpoint}/{self._bucket}/{path}"
+        """Return a public URL for the file served via FastAPI mount."""
+        base = settings.BASE_URL.rstrip("/")
+        # We'll mount it at /api/storage in main.py
+        return f"{base}/api/storage/{path}"
 
 
 # Singleton

@@ -87,6 +87,7 @@ celerybeat-schedule
 celerybeat.pid
 
 # --- Uploads & Media ---
+data/
 uploads/
 media/
 
