@@ -10,9 +10,12 @@ RUN npm install --legacy-peer-deps
 # Copy source and build
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# Limit Node memory to avoid OOM crashes on small servers
+ENV NODE_OPTIONS="--max-old-space-size=1536"
 
 COPY . .
-RUN npm run build
+# Skip linting and type checking during Docker build to save RAM
+RUN npm run build -- --no-lint
 
 # Stage 2: Production runner
 FROM node:20-alpine AS runner
