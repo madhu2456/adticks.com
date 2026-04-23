@@ -229,8 +229,9 @@ adticks/
 │   │       ├── layout.tsx
 │   │       ├── page.tsx            # Overview dashboard
 │   │       ├── seo/page.tsx
-│   │       ├── ai-visibility/page.tsx
-│   │       ├── gsc/page.tsx
+│       ├── aeo/page.tsx            # AEO Hub (LLM + Snippets)
+│       ├── gsc/page.tsx
+
 │   │       ├── ads/page.tsx
 │   │       ├── insights/page.tsx
 │   │       └── settings/page.tsx

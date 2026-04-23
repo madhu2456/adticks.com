@@ -23,6 +23,29 @@ export function useProject(id: string | null) {
   });
 }
 
+export function useCreateProject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name: string; domain: string; industry?: string }) =>
+      api.projects.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
+}
+
+export function useUpdateProject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Project> }) =>
+      api.projects.update(id, data),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["project", updated.id] });
+    },
+  });
+}
+
 export function useActiveProject() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const { data: projects = [] } = useProjects();

@@ -61,7 +61,7 @@ frontend/
 │       ├── layout.tsx             #   Wraps children in <DashboardLayout>
 │       ├── page.tsx               #   / → Overview
 │       ├── seo/page.tsx           #   /seo
-│       ├── ai-visibility/page.tsx #   /ai-visibility
+│       ├── aeo/page.tsx           #   /aeo
 │       ├── gsc/page.tsx           #   /gsc
 │       ├── ads/page.tsx           #   /ads
 │       ├── insights/page.tsx      #   /insights
@@ -193,13 +193,13 @@ Tabbed interface:
 - **Content Gaps** — Topic opportunities with volume, difficulty, competitor coverage
 - **Technical** — HTTPS, sitemap, Core Web Vitals, crawl errors
 
-### `/ai-visibility` — AI Visibility (`app/(dashboard)/ai-visibility/page.tsx`)
+### `/aeo` — AEO Hub (`app/(dashboard)/aeo/page.tsx`)
 
-- AI Score percentage gauge
-- Running scan animation with progress bar
-- Share of Voice chart (brand vs competitors across LLMs)
-- Category breakdown: brand awareness, comparison, problem-solving, feature
-- Prompt results table with per-model breakdown
+- AEO Dashboard with composite score
+- LLM Visibility tracker (ChatGPT, Claude, Perplexity)
+- Snippet & PAA (People Also Ask) history
+- AI Content Recommendations
+- FAQ Generator from PAA questions
 
 ### `/gsc` — Search Console (`app/(dashboard)/gsc/page.tsx`)
 

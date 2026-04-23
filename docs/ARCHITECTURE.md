@@ -12,7 +12,7 @@ This document describes the system architecture, service interactions, request l
 - [Async Task Pipeline](#async-task-pipeline)
 - [Authentication & Authorization Flow](#authentication--authorization-flow)
 - [Data Storage Strategy](#data-storage-strategy)
-- [AI Visibility Scan Pipeline](#ai-visibility-scan-pipeline)
+- [AEO Hub Pipeline](#aeo-hub-pipeline)
 - [SEO Audit Pipeline](#seo-audit-pipeline)
 - [Scoring System](#scoring-system)
 - [Frontend Data Layer](#frontend-data-layer)
@@ -353,7 +353,7 @@ This approach keeps the DB fast and lean while preserving full fidelity of raw r
 
 ---
 
-## AI Visibility Scan Pipeline
+## AEO Hub Pipeline
 
 ```
 generate_prompts_task

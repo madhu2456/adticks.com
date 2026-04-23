@@ -16,7 +16,7 @@ Authorization: Bearer <access_token>
 - [Projects](#projects)
 - [Scores](#scores)
 - [SEO](#seo)
-- [AI Visibility](#ai-visibility)
+- [AEO (Answer Engine Optimization)](#aeo-answer-engine-optimization)
 - [Google Search Console (GSC)](#google-search-console-gsc)
 - [Google Ads](#google-ads)
 - [Insights](#insights)
@@ -452,7 +452,7 @@ Trigger a full asynchronous SEO audit (keywords + rankings + on-page + technical
 
 ---
 
-## AI Visibility
+## AEO (Answer Engine Optimization)
 
 ### POST `/prompts/generate`
 
