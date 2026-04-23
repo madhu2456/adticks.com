@@ -104,6 +104,17 @@ class Settings(BaseSettings):
             )
         return v
 
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, v: any) -> list[str]:
+        """Parse ALLOWED_ORIGINS from string or list."""
+        if isinstance(v, str):
+            if v.startswith("[") and v.endswith("]"):
+                import json
+                return json.loads(v)
+            return [i.strip() for i in v.split(",")]
+        return v
+
     @field_validator("ALLOWED_ORIGINS")
     @classmethod
     def validate_cors_origins(cls, v: list[str], info):
