@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import { api } from "@/lib/api";
-import { setTokens } from "@/lib/auth";
+import { setTokens, setUser } from "@/lib/auth";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -45,7 +45,13 @@ export default function RegisterPage() {
         full_name: form.name,
       });
       setTokens(tokens);
+
+      // Fetch user profile immediately
+      const user = await api.auth.me();
+      setUser(user);
+
       router.push("/");
+      router.refresh();
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { detail?: string } } };
       setError(
