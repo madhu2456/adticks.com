@@ -5,12 +5,9 @@ Handles asynchronous visibility checks and data collection.
 """
 
 from uuid import UUID
-from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.project import Project
 from app.models.keyword import Keyword
-from app.models.aeo import AEOVisibility, AEOTrends
 from app.services.ai_visibility import AIVisibilityService
 from app.core.logging import get_logger
 

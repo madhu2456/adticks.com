@@ -9,8 +9,6 @@ Tests verify that request IDs are:
 - Present in all structured logs
 """
 
-import asyncio
-import json
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -436,8 +434,8 @@ async def test_documentation_pattern_1_endpoint_to_task():
         
         async with create_request_id_client() as client:
             response = await client.get("https://api.example.com/analyze")
-            data = response.json()
-        
+            response.json()
+
         assert mock_request.called
         call_kwargs = mock_request.call_args[1]
         assert call_kwargs["headers"]["X-Request-ID"] == test_id

@@ -119,7 +119,7 @@ export function LocationList({
                   </Button>
                   <Button
                     size="sm"
-                    variant="destructive"
+                    variant="danger"
                     onClick={(e) => {
                       e.stopPropagation();
                       onDelete?.(location);

@@ -110,8 +110,6 @@ describe("useInsights", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockApi.insights.getInsights).toHaveBeenCalledWith("proj1", undefined, "P1");
   });
-})
-  });
 
   it("includes projectId in the query key", async () => {
     (mockApi.insights.getInsights as jest.Mock).mockResolvedValue(mockInsightsData);
@@ -142,12 +140,11 @@ describe("useRecommendations", () => {
     resolve!(mockRecommendationsData);
   });
 
-  it("falls back to mock recommendations when API fails", async () => {
+  it("handles API errors gracefully", async () => {
     (mockApi.insights.getRecommendations as jest.Mock).mockRejectedValue(new Error("fail"));
     const { result } = renderHook(() => useRecommendations("proj1"), { wrapper: createWrapper() });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toBeDefined();
-    expect(Array.isArray(result.current.data)).toBe(true);
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBeDefined();
   });
 
   it("each recommendation has required fields", async () => {

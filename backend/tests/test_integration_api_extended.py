@@ -14,8 +14,6 @@ Covers:
 import pytest
 import uuid
 import asyncio
-import json
-from datetime import datetime
 
 
 # ---------------------------------------------------------------------------
@@ -41,7 +39,6 @@ async def test_400_missing_required_field(client):
 async def test_400_invalid_json(client):
     """Invalid JSON returns 400 error."""
     # Try posting with text that's not valid JSON
-    import httpx
     try:
         response = await client.post(
             "/api/auth/register",
@@ -447,7 +444,6 @@ async def test_cors_headers_present(client, auth_headers):
     response = await client.get("/api/projects", headers=auth_headers)
     assert response.status_code == 200
     # Should have CORS-related headers
-    headers = {k.lower(): v for k, v in response.headers.items()}
     # Access-Control-Allow headers may be present depending on CORS config
 
 

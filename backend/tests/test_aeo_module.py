@@ -8,20 +8,13 @@ Tests for:
 """
 
 import pytest
-from uuid import UUID
-from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.project import Project
 from app.models.keyword import Keyword
 from app.models.user import User
 from app.models.aeo import (
-    AEOVisibility,
-    AEOTrends,
-    SnippetTracking,
-    PAA,
     ContentRecommendation,
-    GeneratedFAQ,
 )
 from app.services.ai_visibility import AIVisibilityService
 from app.services.snippet_tracking import SnippetTrackingService
@@ -190,7 +183,7 @@ class TestSnippetTrackingService:
         service = SnippetTrackingService()
 
         # Create two records
-        snippet1 = await service.create_or_update_snippet(
+        await service.create_or_update_snippet(
             db, keyword.id, True, "featured", "Text 1", None, 3
         )
         await db.commit()
@@ -216,7 +209,7 @@ class TestSnippetTrackingService:
         await db.commit()
 
         # Snippet is lost
-        snippet2 = await service.create_or_update_snippet(
+        await service.create_or_update_snippet(
             db, keyword.id, False, None, None, None, None
         )
         await db.commit()
@@ -403,7 +396,7 @@ class TestContentRecommendationService:
         paa = await service.add_paa_query(db, keyword.id, "Q1?", None, None, None)
         await db.commit()
 
-        faq = await rec_service.generate_faq_from_paa(
+        await rec_service.generate_faq_from_paa(
             db, project.id, keyword.id, paa.id
         )
         await db.commit()

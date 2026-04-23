@@ -4,12 +4,9 @@ Integration tests for AEO API endpoints.
 
 import pytest
 from httpx import AsyncClient
-from uuid import UUID
 
 from app.models.project import Project
 from app.models.keyword import Keyword
-from app.models.user import User
-from app.models.aeo import AEOVisibility, SnippetTracking, PAA, ContentRecommendation
 
 
 class TestAEO_APIEndpoints:
@@ -141,7 +138,7 @@ class TestAEO_APIEndpoints:
     ):
         """Test checking snippet opportunity."""
         response = await client.post(
-            f"/api/aeo/snippets/check-opportunity",
+            "/api/aeo/snippets/check-opportunity",
             json={"keyword_id": str(keyword.id)},
             headers={"Authorization": f"Bearer {user_token}"}
         )
@@ -175,7 +172,7 @@ class TestAEO_APIEndpoints:
     ):
         """Test generating content recommendations."""
         response = await client.post(
-            f"/api/aeo/content/generate-recommendations",
+            "/api/aeo/content/generate-recommendations",
             json={"keyword_id": str(keyword.id)},
             headers={"Authorization": f"Bearer {user_token}"}
         )
@@ -208,7 +205,7 @@ class TestAEO_APIEndpoints:
         """Test marking recommendation action."""
         # First generate recommendations
         gen_response = await client.post(
-            f"/api/aeo/content/generate-recommendations",
+            "/api/aeo/content/generate-recommendations",
             json={"keyword_id": str(keyword.id)},
             headers={"Authorization": f"Bearer {user_token}"}
         )
@@ -236,7 +233,7 @@ class TestAEO_APIEndpoints:
     ):
         """Test generating FAQ from PAA."""
         # Create a PAA query first
-        paa_response = await client.post(
+        await client.post(
             f"/api/aeo/keywords/{keyword.id}/paa",
             json={
                 "paa_query": "How to optimize?",
@@ -278,7 +275,7 @@ class TestAEO_APIEndpoints:
     ):
         """Test generating content outline."""
         response = await client.post(
-            f"/api/aeo/content/generate-outline",
+            "/api/aeo/content/generate-outline",
             json={
                 "keyword_id": str(keyword.id),
                 "content_type": "blog",

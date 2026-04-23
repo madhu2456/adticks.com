@@ -14,7 +14,7 @@ import sys
 import uuid
 from contextlib import contextmanager
 from contextvars import ContextVar, copy_context
-from typing import Any, Generator
+from typing import Generator
 
 # Context variable for request tracking
 request_id_context: ContextVar[str | None] = ContextVar("request_id", default=None)

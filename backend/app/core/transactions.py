@@ -20,9 +20,8 @@ from contextvars import ContextVar
 from functools import wraps
 from typing import Any, Callable, TypeVar
 
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import OperationalError, IntegrityError
+from sqlalchemy.exc import OperationalError
 
 # Context variable to track transaction state (for debugging/monitoring)
 _transaction_depth: ContextVar[int] = ContextVar("transaction_depth", default=0)

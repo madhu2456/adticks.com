@@ -11,13 +11,9 @@ Covers:
 - Database connection pooling
 """
 
-import json
 import pytest
-from datetime import timedelta
-from unittest.mock import AsyncMock, patch
 
 from app.core.exceptions import (
-    AdTicksException,
     AuthenticationError,
     AuthorizationError,
     ConflictError,
@@ -26,7 +22,6 @@ from app.core.exceptions import (
     ValidationError,
 )
 from app.core.logging import get_logger, set_request_id, request_id_context
-from app.core.security import create_access_token
 from app.schemas.common import PaginationParams, PaginatedResponse, ApiResponse
 from app.schemas.user import UserCreate
 

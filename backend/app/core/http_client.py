@@ -10,8 +10,7 @@ Wraps httpx.AsyncClient to transparently add request IDs to:
 - Third-party integrations
 """
 
-import logging
-from typing import Any, AsyncGenerator, Optional
+from typing import Any, Optional
 
 import httpx
 

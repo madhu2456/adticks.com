@@ -10,7 +10,6 @@ Tests that all endpoints:
 """
 
 import pytest
-import json
 import uuid
 
 

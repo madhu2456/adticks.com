@@ -6,6 +6,8 @@ import { RankTracker } from "@/components/seo/RankTracker";
 import { OnPageScore } from "@/components/seo/OnPageScore";
 import { ContentGaps } from "@/components/seo/ContentGaps";
 import { TechnicalSEO } from "@/components/seo/TechnicalSEO";
+import { mockKeywords, mockContentGaps, mockTechnicalChecks } from "@/lib/mockData";
+
 export default function SEOPage() {
   const [tab, setTab] = useState("keywords");
   const [search, setSearch] = useState("");
@@ -35,11 +37,11 @@ export default function SEOPage() {
         </TabsContent>
 
         <TabsContent value="rankings">
-          <RankTracker />
+          <RankTracker projectId="demo-project" />
         </TabsContent>
 
         <TabsContent value="onpage">
-          <OnPageScore />
+          <OnPageScore projectId="demo-project" />
         </TabsContent>
 
         <TabsContent value="gaps">

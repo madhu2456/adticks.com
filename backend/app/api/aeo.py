@@ -16,21 +16,17 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.project import Project
 from app.models.keyword import Keyword
-from app.models.aeo import AEOVisibility, AEOTrends, SnippetTracking, PAA, ContentRecommendation, GeneratedFAQ
+from app.models.aeo import AEOVisibility, AEOTrends, SnippetTracking, PAA, ContentRecommendation
 from app.models.user import User
 from app.schemas.aeo import (
     AEOVisibilityResponse,
     AEOTrendsResponse,
-    AIVisibilitySummary,
     VisibilityCheckRequest,
     SnippetTrackingResponse,
     PAA_Response,
     ContentRecommendationResponse,
-    ContentRecommendationCreate,
     ContentRecommendationUpdate,
     GeneratedFAQResponse,
-    GeneratedFAQCreate,
-    GeneratedFAQUpdate,
     ContentOutlineRequest,
     ContentOutline,
     SnippetOpportunity,
@@ -85,7 +81,7 @@ async def get_aeo_summary(
     current_user: User = Depends(get_current_user),
 ):
     """Get overall AEO dashboard summary for a project."""
-    project = await _assert_owner(project_id, current_user, db)
+    await _assert_owner(project_id, current_user, db)
 
     # Count keywords
     keyword_result = await db.execute(
@@ -160,7 +156,7 @@ async def check_ai_visibility(
     Queries ChatGPT, Perplexity, and Claude for brand mentions.
     This is an asynchronous operation.
     """
-    keyword = await _get_keyword(request.keyword_id, db)
+    await _get_keyword(request.keyword_id, db)
     
     # For MVP, return accepted without queuing - in production, use Celery
     return {
@@ -308,7 +304,7 @@ async def get_snippet_history(
     current_user: User = Depends(get_current_user),
 ):
     """Get featured snippet tracking history for a keyword."""
-    keyword = await _get_keyword(keyword_id, db)
+    await _get_keyword(keyword_id, db)
     snippets = await snippet_service.get_snippet_history(db, keyword_id, limit)
     return [SnippetTrackingResponse.from_orm(s) for s in snippets]
 
@@ -324,7 +320,7 @@ async def get_paa_queries(
     current_user: User = Depends(get_current_user),
 ):
     """Get People Also Ask queries for a keyword."""
-    keyword = await _get_keyword(keyword_id, db)
+    await _get_keyword(keyword_id, db)
     paa_queries = await snippet_service.get_paa_queries(db, keyword_id)
     return [PAA_Response.from_orm(p) for p in paa_queries]
 
@@ -340,7 +336,7 @@ async def check_snippet_opportunity(
     current_user: User = Depends(get_current_user),
 ):
     """Analyze featured snippet optimization opportunity for a keyword."""
-    keyword = await _get_keyword(keyword_id, db)
+    await _get_keyword(keyword_id, db)
     opportunity = await snippet_service.check_snippet_opportunity(db, keyword_id)
     return SnippetOpportunity(**opportunity)
 
@@ -355,7 +351,7 @@ async def get_snippet_summary(
     current_user: User = Depends(get_current_user),
 ):
     """Get snippet summary for all keywords in a project."""
-    project = await _assert_owner(project_id, current_user, db)
+    await _assert_owner(project_id, current_user, db)
     summary = await snippet_service.get_snippet_summary(db, project_id)
     return summary
 
@@ -526,7 +522,7 @@ async def generate_content_outline(
     current_user: User = Depends(get_current_user),
 ):
     """Generate a content outline for a keyword."""
-    keyword = await _get_keyword(request.keyword_id, db)
+    await _get_keyword(request.keyword_id, db)
 
     outline = await recommendation_service.generate_content_outline(
         db=db,

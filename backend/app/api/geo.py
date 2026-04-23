@@ -4,22 +4,20 @@ AdTicks GEO Module API Routes.
 Endpoints for managing locations, local rankings, reviews, and citations.
 """
 
-import uuid
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import and_, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from app.core.caching import cached, invalidate_cache
+from app.core.caching import invalidate_cache
 from app.core.database import get_db
 from app.core.logging import get_logger
 from app.core.security import get_current_user
 from app.models.geo import Citation, Location, LocalRank, Review, ReviewSummary
 from app.models.project import Project
 from app.models.user import User
-from app.schemas.common import PaginatedResponse, PaginationParams
+from app.schemas.common import PaginatedResponse
 from app.schemas.geo import (
     CitationCreate,
     CitationResponse,
@@ -388,7 +386,7 @@ async def get_local_ranks(
     - 403 Forbidden: User does not own the project
     - 404 Not Found: Location not found
     """
-    location = await _assert_location_exists(location_id, current_user, db)
+    await _assert_location_exists(location_id, current_user, db)
 
     # Build query
     query = select(LocalRank).where(LocalRank.location_id == location_id)

@@ -701,7 +701,7 @@ async def test_transaction_depth_tracking(db_session, test_user):
     assert depth1 == 0
 
     async with transaction_scope(db_session) as tx:
-        async with nested_transaction(tx) as nested_tx:
+        async with nested_transaction(tx):
             depth2 = await get_transaction_depth()
             assert depth2 == 1
 
@@ -811,7 +811,6 @@ async def test_sequential_nested_transactions(db_session, test_user):
 @pytest.mark.asyncio
 async def test_transaction_with_retry_succeeds_immediately(db_session, test_user):
     """transaction_with_retry succeeds on first attempt when no errors."""
-    from app.core.transactions import transaction_with_retry
     
     async with transaction_with_retry(db_session, max_retries=3) as tx:
         project = Project(
@@ -833,7 +832,6 @@ async def test_transaction_with_retry_succeeds_immediately(db_session, test_user
 @pytest.mark.asyncio
 async def test_transaction_with_retry_handles_non_retryable_error(db_session, test_user):
     """transaction_with_retry propagates non-retryable errors immediately."""
-    from app.core.transactions import transaction_with_retry
     
     with pytest.raises(ValueError):
         async with transaction_with_retry(db_session, max_retries=3) as tx:
@@ -850,7 +848,6 @@ async def test_transaction_with_retry_handles_non_retryable_error(db_session, te
 @pytest.mark.asyncio
 async def test_transaction_with_retry_rollback_on_error(db_session, test_user):
     """transaction_with_retry rolls back on any error."""
-    from app.core.transactions import transaction_with_retry
     
     try:
         async with transaction_with_retry(db_session, max_retries=1) as tx:
@@ -875,7 +872,6 @@ async def test_transaction_with_retry_rollback_on_error(db_session, test_user):
 @pytest.mark.asyncio
 async def test_with_transaction_retry_decorator_success(db_session, test_user):
     """@with_transaction_retry decorator succeeds on valid operation."""
-    from app.core.transactions import with_transaction_retry
     
     @with_transaction_retry(max_retries=3)
     async def create_project(brand: str, db):
@@ -900,7 +896,6 @@ async def test_with_transaction_retry_decorator_success(db_session, test_user):
 @pytest.mark.asyncio
 async def test_with_transaction_retry_decorator_error_propagation(db_session, test_user):
     """@with_transaction_retry decorator propagates non-retryable errors."""
-    from app.core.transactions import with_transaction_retry
     
     call_count = 0
     
@@ -927,7 +922,6 @@ async def test_with_transaction_retry_decorator_error_propagation(db_session, te
 @pytest.mark.asyncio
 async def test_transaction_retry_multiple_adds(db_session, test_user):
     """Transaction retry handles multiple adds correctly."""
-    from app.core.transactions import transaction_with_retry
     
     async with transaction_with_retry(db_session, max_retries=3) as tx:
         projects = []
@@ -954,7 +948,6 @@ async def test_transaction_retry_multiple_adds(db_session, test_user):
 @pytest.mark.asyncio
 async def test_retry_respects_max_retries(db_session, test_user):
     """Retry decorator gives up after max_retries."""
-    from app.core.transactions import with_transaction_retry
     from sqlalchemy.exc import OperationalError
     
     attempt_count = 0
@@ -976,7 +969,7 @@ async def test_retry_respects_max_retries(db_session, test_user):
 @pytest.mark.asyncio
 async def test_transaction_retry_with_nested_transactions(db_session, test_user):
     """Retry works correctly with nested transactions."""
-    from app.core.transactions import transaction_with_retry, nested_transaction
+    from app.core.transactions import nested_transaction
     
     async with transaction_with_retry(db_session, max_retries=2) as tx:
         # Parent transaction

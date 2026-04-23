@@ -4,6 +4,7 @@ import { RefreshCw, AlertTriangle, TrendingUp, Search } from "lucide-react";
 import { InsightList } from "@/components/insights/InsightList";
 import { RecommendationPanel } from "@/components/insights/RecommendationPanel";
 import { Insight, InsightCategory, InsightPriority } from "@/lib/types";
+import { mockInsights, mockRecommendations } from "@/lib/mockData";
 
 type CategoryFilter = "all" | InsightCategory;
 type PriorityFilter = "all" | InsightPriority;

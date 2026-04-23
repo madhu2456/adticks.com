@@ -7,7 +7,6 @@ AI-powered content optimization and FAQ generation using Claude.
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
-import json
 
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -282,7 +281,7 @@ class ContentRecommendationService:
             query = query.where(GeneratedFAQ.keyword_id == keyword_id)
 
         if approved_only:
-            query = query.where(GeneratedFAQ.approved == True)
+            query = query.where(GeneratedFAQ.approved)
 
         query = query.order_by(desc(GeneratedFAQ.created_at))
 

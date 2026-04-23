@@ -12,6 +12,10 @@ import { ChannelBreakdown } from "@/components/dashboard/ChannelBreakdown";
 import { TopInsights } from "@/components/dashboard/TopInsights";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { formatNumber, formatCurrency, cn } from "@/lib/utils";
+import { 
+  mockStats, mockScore, mockChannelPerformance, 
+  mockActivity, mockInsights 
+} from "@/lib/mockData";
 
 
 /* ── Mini sparkline SVG ──────────────────────────────────────────────── */

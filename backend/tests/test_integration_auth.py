@@ -15,9 +15,8 @@ import pytest
 import asyncio
 import uuid
 from datetime import timedelta
-from unittest.mock import patch, AsyncMock
 
-from app.core.security import create_access_token, hash_password
+from app.core.security import create_access_token
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +152,6 @@ async def test_login_inactive_user_rejected(client, db_session, test_user):
 async def test_login_wrong_password_database_not_modified(client, db_session, test_user):
     """Failed login due to wrong password doesn't modify user record."""
     original_password_hash = test_user.hashed_password
-    original_updated_at = test_user.created_at if hasattr(test_user, "updated_at") else None
 
     response = await client.post(
         "/api/auth/login",

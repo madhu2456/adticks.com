@@ -171,7 +171,7 @@ export interface GSCQuery {
 }
 
 export interface GSCPage {
-  page: string;
+  query: string;
   clicks: number;
   impressions: number;
   ctr: number;

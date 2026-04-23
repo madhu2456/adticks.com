@@ -14,7 +14,6 @@ from sqlalchemy import select, func, cast, Integer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.aeo import AEOVisibility, AEOTrends
-from app.models.keyword import Keyword
 from app.core.logging import get_logger
 from app.core.config import settings
 
@@ -49,7 +48,6 @@ class AIVisibilityService:
         try:
             # Simulate ChatGPT API call (for MVP, would use actual API)
             # Real implementation would call OpenAI API
-            prompt = f"For the keyword '{keyword}', do you mention {brand_name} ({domain})? Provide a brief answer."
             
             # This is a mock implementation - real version would call OpenAI
             is_mentioned = self._mock_api_call(keyword, brand_name)
@@ -58,7 +56,7 @@ class AIVisibilityService:
             if is_mentioned:
                 mention_text = f"Mentioned {brand_name} in context of {keyword}"
                 position = 1  # Would extract actual position from response
-                logger.info(f"chatgpt_mention_found", extra={"keyword": keyword, "brand": brand_name})
+                logger.info("chatgpt_mention_found", extra={"keyword": keyword, "brand": brand_name})
             else:
                 mention_text = None
                 position = None

@@ -22,7 +22,7 @@ function generateRankingHistory(keywordId: string) {
 
 export function RankTracker({ projectId }: RankTrackerProps) {
   const { data } = useKeywords(projectId);
-  const keywords = data?.items ?? [];
+  const keywords = data?.data ?? [];
   const [selectedId, setSelectedId] = useState(keywords[0]?.id ?? "");
   const historyData = generateRankingHistory(selectedId);
 

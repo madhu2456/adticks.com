@@ -5,7 +5,6 @@ Comprehensive test suite for locations, local ranks, reviews, and citations.
 """
 
 import uuid
-from datetime import datetime, timezone
 
 import pytest
 from httpx import AsyncClient
