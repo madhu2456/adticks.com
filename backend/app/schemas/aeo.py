@@ -7,7 +7,7 @@ Request/response schemas for AEO endpoints.
 from datetime import datetime
 from uuid import UUID
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 # ============================================================================
@@ -35,8 +35,7 @@ class AEOVisibilityResponse(BaseModel):
     confidence_score: float
     timestamp: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AEOTrendsResponse(BaseModel):
@@ -50,8 +49,7 @@ class AEOTrendsResponse(BaseModel):
     avg_position: Optional[float] = None
     timestamp: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AIVisibilitySummary(BaseModel):
@@ -95,8 +93,7 @@ class SnippetTrackingResponse(BaseModel):
     date_captured: datetime
     lost_date: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PAA_Create(BaseModel):
@@ -117,8 +114,7 @@ class PAA_Response(BaseModel):
     position: Optional[int] = None
     date_found: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SnippetOpportunity(BaseModel):
@@ -156,8 +152,7 @@ class ContentRecommendationResponse(BaseModel):
     created_at: datetime
     user_action: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ContentRecommendationUpdate(BaseModel):
@@ -183,8 +178,7 @@ class GeneratedFAQResponse(BaseModel):
     approved: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class GeneratedFAQUpdate(BaseModel):

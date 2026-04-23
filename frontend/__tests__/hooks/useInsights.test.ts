@@ -14,40 +14,6 @@ jest.mock("@/lib/api", () => ({
   },
 }));
 
-jest.mock("@/lib/mockData", () => ({
-  mockInsights: [
-    {
-      id: "mock1",
-      title: "Mock Insight SEO",
-      description: "Mock SEO description",
-      category: "seo",
-      priority: "P1",
-      created_at: new Date().toISOString(),
-      is_read: false,
-    },
-    {
-      id: "mock2",
-      title: "Mock Insight AI",
-      description: "Mock AI description",
-      category: "ai",
-      priority: "P2",
-      created_at: new Date().toISOString(),
-      is_read: false,
-    },
-  ],
-  mockRecommendations: [
-    {
-      id: "rec1",
-      title: "Mock Recommendation",
-      description: "Mock recommendation description",
-      priority: "P1",
-      category: "seo",
-      effort: "low",
-      impact: "high",
-    },
-  ],
-}));
-
 import { api } from "@/lib/api";
 const mockApi = api as jest.Mocked<typeof api>;
 
@@ -116,12 +82,11 @@ describe("useInsights", () => {
     resolve!(mockInsightsData);
   });
 
-  it("falls back to mock insights when API fails", async () => {
+  it("handles API errors", async () => {
     (mockApi.insights.getInsights as jest.Mock).mockRejectedValue(new Error("Server error"));
     const { result } = renderHook(() => useInsights("proj1"), { wrapper: createWrapper() });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toBeDefined();
-    expect(Array.isArray(result.current.data)).toBe(true);
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toEqual(new Error("Server error"));
   });
 
   it("filters by category when category param is provided", async () => {
@@ -145,19 +110,7 @@ describe("useInsights", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockApi.insights.getInsights).toHaveBeenCalledWith("proj1", undefined, "P1");
   });
-
-  it("falls back and filters mock insights by category when API fails", async () => {
-    (mockApi.insights.getInsights as jest.Mock).mockRejectedValue(new Error("fail"));
-    const { result } = renderHook(
-      () => useInsights("proj1", "seo"),
-      { wrapper: createWrapper() }
-    );
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    // All returned insights should be of category seo
-    const data = result.current.data ?? [];
-    data.forEach((insight) => {
-      expect(insight.category).toBe("seo");
-    });
+})
   });
 
   it("includes projectId in the query key", async () => {

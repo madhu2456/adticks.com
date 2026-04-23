@@ -3,7 +3,11 @@ import React, { useState } from "react";
 import { LineChart } from "@/components/charts/LineChart";
 import { Select, SelectItem } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { mockKeywords } from "@/lib/mockData";
+import { useKeywords } from "@/hooks/useSEO";
+
+interface RankTrackerProps {
+  projectId: string;
+}
 
 function generateRankingHistory(keywordId: string) {
   return Array.from({ length: 30 }, (_, i) => {
@@ -16,9 +20,22 @@ function generateRankingHistory(keywordId: string) {
   });
 }
 
-export function RankTracker() {
-  const [selectedId, setSelectedId] = useState(mockKeywords[0]?.id ?? "");
-  const data = generateRankingHistory(selectedId);
+export function RankTracker({ projectId }: RankTrackerProps) {
+  const { data } = useKeywords(projectId);
+  const keywords = data?.items ?? [];
+  const [selectedId, setSelectedId] = useState(keywords[0]?.id ?? "");
+  const historyData = generateRankingHistory(selectedId);
+
+  if (!keywords.length) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Rank Tracker</CardTitle>
+          <p className="text-xs text-text-muted mt-0.5">No keywords available</p>
+        </CardHeader>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -28,14 +45,14 @@ export function RankTracker() {
           <p className="text-xs text-text-muted mt-0.5">Position over last 30 days</p>
         </div>
         <Select value={selectedId} onValueChange={setSelectedId} className="w-64">
-          {mockKeywords.map((k) => (
+          {keywords.map((k) => (
             <SelectItem key={k.id} value={k.id}>{k.keyword}</SelectItem>
           ))}
         </Select>
       </CardHeader>
       <CardContent>
         <LineChart
-          data={data}
+          data={historyData}
           xKey="date"
           height={280}
           lines={[{ key: "position", color: "#6366f1", name: "Position" }]}

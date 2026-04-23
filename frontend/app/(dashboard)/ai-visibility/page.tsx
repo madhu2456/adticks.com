@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/button";
 import { SOVChart } from "@/components/ai/SOVChart";
 import { PromptResults } from "@/components/ai/PromptResults";
 import { CompetitorComparison } from "@/components/ai/CompetitorComparison";
-import { mockAIScore, mockSOV, mockCategoryBreakdown, mockAIResults } from "@/lib/mockData";
-
 export default function AIVisibilityPage() {
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -95,3 +93,4 @@ export default function AIVisibilityPage() {
     </div>
   );
 }
+

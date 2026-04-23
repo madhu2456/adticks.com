@@ -7,8 +7,6 @@ import {
 import { ImpressionsChart } from "@/components/gsc/ImpressionsChart";
 import { CTRChart } from "@/components/gsc/CTRChart";
 import { QueryTable } from "@/components/gsc/QueryTable";
-import { mockGSCMetrics, mockGSCQueries } from "@/lib/mockData";
-
 const MOCK_QUERIES_EXTENDED = [
   { query: "visibility intelligence platform", clicks: 342, impressions: 4800, ctr: 7.1, position: 3.2, positionChange: 2 },
   { query: "ai seo tools comparison", clicks: 218, impressions: 6200, ctr: 3.5, position: 7.8, positionChange: -1 },
@@ -187,3 +185,4 @@ export default function GSCPage() {
     </div>
   );
 }
+

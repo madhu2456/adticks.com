@@ -3,7 +3,6 @@ import React, { useState, useMemo } from "react";
 import { RefreshCw, AlertTriangle, TrendingUp, Search } from "lucide-react";
 import { InsightList } from "@/components/insights/InsightList";
 import { RecommendationPanel } from "@/components/insights/RecommendationPanel";
-import { mockInsights, mockRecommendations } from "@/lib/mockData";
 import { Insight, InsightCategory, InsightPriority } from "@/lib/types";
 
 type CategoryFilter = "all" | InsightCategory;
@@ -161,3 +160,4 @@ export default function InsightsPage() {
     </div>
   );
 }
+

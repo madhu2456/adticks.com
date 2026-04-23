@@ -5,20 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { mockOnPageAudit } from "@/lib/mockData";
+import { useOnPageAudit } from "@/hooks/useSEO";
 import { getScoreColor, cn } from "@/lib/utils";
 
-export function OnPageScore() {
-  const [url, setUrl] = useState("https://adticks.io");
-  const [loading, setLoading] = useState(false);
-  const [audit, setAudit] = useState(mockOnPageAudit);
+interface OnPageScoreProps {
+  projectId: string;
+}
 
-  const handleAudit = async () => {
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 1500));
-    setAudit({ ...mockOnPageAudit, url });
-    setLoading(false);
-  };
+export function OnPageScore({ projectId }: OnPageScoreProps) {
+  const [url, setUrl] = useState("");
+  const { data: audit, isLoading } = useOnPageAudit(projectId, url);
 
   const icons = {
     pass: <CheckCircle className="h-4 w-4 text-success shrink-0" />,
@@ -33,8 +29,21 @@ export function OnPageScore() {
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
           <Input placeholder="https://yoursite.com/page" value={url} onChange={(e) => setUrl(e.target.value)} className="pl-9" />
         </div>
-        <Button onClick={handleAudit} loading={loading}>Audit Page</Button>
+        <Button loading={isLoading} disabled={!url}>Run Audit</Button>
       </div>
+
+      {isLoading && (
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-4 w-32" />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-12" />
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {audit && (
         <Card>

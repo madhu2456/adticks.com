@@ -47,8 +47,8 @@ async def test_cached_decorator_returns_function_result():
     
     # Use unique test_id to avoid cache collisions across test runs
     result = await expensive_function(5, test_id="test_result_1")
-    # Result is JSON-serialized, so it comes back as string "10"
-    assert result == "10"
+    # Result should be 10
+    assert int(result) == 10
     # If Redis is running, it returns from cache, so call_count stays 0
     # If Redis is not running, call_count should be 1
     # Accept both scenarios

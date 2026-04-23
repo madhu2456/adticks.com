@@ -6,8 +6,6 @@ import {
 } from "lucide-react";
 import { PerformanceChart } from "@/components/ads/PerformanceChart";
 import { CampaignTable } from "@/components/ads/CampaignTable";
-import { mockAdsPerformance, mockCampaigns } from "@/lib/mockData";
-
 const EXTENDED_CAMPAIGNS = [
   { id: "1", name: "Brand Keywords", status: "active" as const, budget: 1500, spend: 1247, impressions: 182000, clicks: 3640, conversions: 48, cpc: 0.34, roas: 4.2, ctr: 2.0 },
   { id: "2", name: "Competitor Conquest", status: "active" as const, budget: 1000, spend: 892, impressions: 94000, clicks: 1880, conversions: 31, cpc: 0.47, roas: 3.8, ctr: 2.0 },
@@ -138,3 +136,4 @@ export default function AdsPage() {
     </div>
   );
 }
+

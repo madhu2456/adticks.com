@@ -1,12 +1,11 @@
 "use client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { mockAIScore, mockSOV, mockCategoryBreakdown, mockAIResults } from "@/lib/mockData";
 
 export function useAIScore(projectId: string) {
   return useQuery({
     queryKey: ["ai-score", projectId],
-    queryFn: () => api.ai.getScore(projectId).catch(() => mockAIScore),
+    queryFn: () => api.ai.getScore(projectId),
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -14,7 +13,7 @@ export function useAIScore(projectId: string) {
 export function useSOV(projectId: string) {
   return useQuery({
     queryKey: ["sov", projectId],
-    queryFn: () => api.ai.getSOV(projectId).catch(() => mockSOV),
+    queryFn: () => api.ai.getSOV(projectId),
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -22,7 +21,7 @@ export function useSOV(projectId: string) {
 export function useCategoryBreakdown(projectId: string) {
   return useQuery({
     queryKey: ["ai-categories", projectId],
-    queryFn: () => api.ai.getCategoryBreakdown(projectId).catch(() => mockCategoryBreakdown),
+    queryFn: () => api.ai.getCategoryBreakdown(projectId),
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -30,7 +29,7 @@ export function useCategoryBreakdown(projectId: string) {
 export function useAIResults(projectId: string) {
   return useQuery({
     queryKey: ["ai-results", projectId],
-    queryFn: () => api.ai.getMentions(projectId).catch(() => mockAIResults),
+    queryFn: () => api.ai.getMentions(projectId),
     staleTime: 2 * 60 * 1000,
   });
 }

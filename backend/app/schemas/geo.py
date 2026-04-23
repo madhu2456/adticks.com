@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 # Location Schemas
@@ -68,8 +68,7 @@ class LocationResponse(BaseModel):
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Local Rank Schemas
@@ -87,8 +86,7 @@ class LocalRankResponse(BaseModel):
     timestamp: datetime = Field(description="Rank timestamp")
     created_at: datetime = Field(description="Creation timestamp")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Review Schemas
@@ -127,8 +125,7 @@ class ReviewResponse(BaseModel):
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Review Summary Schemas
@@ -153,8 +150,7 @@ class ReviewSummaryResponse(BaseModel):
     last_updated: datetime = Field(description="Last update timestamp")
     created_at: datetime = Field(description="Creation timestamp")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Citation Schemas
@@ -188,8 +184,7 @@ class CitationResponse(BaseModel):
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NAPCheckResponse(BaseModel):
@@ -201,5 +196,4 @@ class NAPCheckResponse(BaseModel):
     consistency_percentage: float = Field(description="Percentage of consistent citations")
     issues: list[dict] = Field(description="List of NAP inconsistencies")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -5,7 +5,7 @@ AdTicks — SEO Suite schemas (RankHistory, SerpFeatures, CompetitorKeywords, Ba
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 # ============================================================================
@@ -31,8 +31,7 @@ class RankHistoryResponse(RankHistoryBase):
     keyword_id: UUID = Field(description="Associated keyword ID")
     timestamp: datetime = Field(description="Timestamp of the ranking")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================================
@@ -57,8 +56,7 @@ class SerpFeaturesResponse(SerpFeaturesBase):
     keyword_id: UUID = Field(description="Associated keyword ID")
     timestamp: datetime = Field(description="Timestamp of the features")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================================
@@ -82,8 +80,7 @@ class CompetitorKeywordsResponse(CompetitorKeywordsBase):
     count: int = Field(description="Number of keywords")
     timestamp: datetime = Field(description="Timestamp of the data")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================================
@@ -106,5 +103,4 @@ class BacklinksResponse(BacklinksBase):
     project_id: UUID = Field(description="Associated project ID")
     timestamp: datetime = Field(description="Timestamp of the backlink")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

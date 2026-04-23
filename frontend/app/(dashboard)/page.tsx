@@ -11,10 +11,6 @@ import { VisibilityScore } from "@/components/dashboard/VisibilityScore";
 import { ChannelBreakdown } from "@/components/dashboard/ChannelBreakdown";
 import { TopInsights } from "@/components/dashboard/TopInsights";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
-import {
-  mockScore, mockStats, mockChannelPerformance,
-  mockActivity, mockInsights,
-} from "@/lib/mockData";
 import { formatNumber, formatCurrency, cn } from "@/lib/utils";
 
 
