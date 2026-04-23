@@ -84,9 +84,13 @@ export default function LoginPage() {
             </button>
           </div>
           <div className="mt-1.5 text-right">
-            <a href="#" className="text-xs text-[#6366f1] hover:text-[#8b5cf6] transition-colors">
+            <button 
+              type="button"
+              onClick={() => alert('Password recovery is coming soon!')}
+              className="text-xs text-[#6366f1] hover:text-[#8b5cf6] transition-colors"
+            >
               Forgot password?
-            </a>
+            </button>
           </div>
         </div>
 

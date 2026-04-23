@@ -32,7 +32,7 @@ const impactColors = {
   high: 'bg-purple-100 text-purple-800',
 };
 
-export default function ContentRecommendations({ projectId }: { projectId: string }) {
+export function ContentRecommendations({ projectId }: { projectId: string }) {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [marking, setMarking] = useState<string | null>(null);

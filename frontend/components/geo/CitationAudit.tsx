@@ -9,6 +9,7 @@ import { Citation, NAPCheckResult } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface CitationAuditProps {
+  projectId?: string;
   citations?: Citation[];
   napCheck?: NAPCheckResult;
   loading?: boolean;
@@ -16,6 +17,7 @@ interface CitationAuditProps {
 }
 
 export function CitationAudit({
+  projectId,
   citations = [],
   napCheck,
   loading = false,

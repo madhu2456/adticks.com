@@ -85,8 +85,8 @@ export default function AdsPage() {
             </div>
 
             <button
-              onClick={() => alert("Redirecting to Google Ads OAuth...")}
-              className="w-full flex items-center justify-center gap-2 bg-[#f97316] hover:bg-[#ea6c0a] text-white font-semibold rounded-xl py-3 text-sm transition-colors shadow-lg shadow-[#f97316]/20 mb-3"
+              onClick={() => alert("Google Ads integration is coming soon! Reach out to support for early access.")}
+              className="w-full flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white font-semibold rounded-xl py-3 text-sm transition-colors shadow-lg shadow-[#6366f1]/25 mb-3"
             >
               <Link2 className="h-4 w-4" />
               Connect Google Ads

@@ -9,6 +9,7 @@ import { Location } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface LocationListProps {
+  projectId?: string;
   locations?: Location[];
   loading?: boolean;
   onAdd?: () => void;
@@ -18,6 +19,7 @@ interface LocationListProps {
 }
 
 export function LocationList({
+  projectId,
   locations = [],
   loading = false,
   onAdd,

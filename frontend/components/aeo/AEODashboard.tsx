@@ -14,10 +14,10 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
-import AIVisibilityTracker from './AIVisibilityTracker';
-import SnippetTracker from './SnippetTracker';
-import ContentRecommendations from './ContentRecommendations';
-import FAQGenerator from './FAQGenerator';
+import { AIVisibilityTracker } from './AIVisibilityTracker';
+import { SnippetTracker } from './SnippetTracker';
+import { ContentRecommendations } from './ContentRecommendations';
+import { FAQGenerator } from './FAQGenerator';
 
 interface AEOSummary {
   total_keywords: number;
@@ -31,9 +31,9 @@ interface AEOSummary {
   snippet_opportunities: number;
 }
 
-export default function AEODashboard() {
+export function AEODashboard({ projectId: propProjectId }: { projectId?: string }) {
   const params = useParams();
-  const projectId = params.id as string;
+  const projectId = propProjectId || params.id as string;
   const { toast } = useToast();
 
   const [summary, setSummary] = useState<AEOSummary | null>(null);

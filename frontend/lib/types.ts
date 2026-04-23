@@ -7,6 +7,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  full_name?: string;
   avatar?: string;
   plan: "free" | "starter" | "pro" | "enterprise";
   trial_ends_at?: string;
@@ -34,7 +35,10 @@ export interface RegisterRequest {
 export interface Project {
   id: string;
   name: string;
+  brand_name?: string;
   domain: string;
+  color?: string;
+  initials?: string;
   favicon?: string;
   created_at: string;
   updated_at: string;

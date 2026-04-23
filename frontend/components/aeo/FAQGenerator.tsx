@@ -26,7 +26,7 @@ interface ContentOutline {
   key_topics: string[];
 }
 
-export default function FAQGenerator({ projectId }: { projectId: string }) {
+export function FAQGenerator({ projectId }: { projectId: string }) {
   const [faqs, setFAQs] = useState<FAQ[]>([]);
   const [outline, setOutline] = useState<ContentOutline | null>(null);
   const [loading, setLoading] = useState(true);

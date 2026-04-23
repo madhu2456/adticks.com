@@ -9,12 +9,13 @@ import { LocalRank } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface LocalRankCardsProps {
+  projectId?: string;
   ranks?: LocalRank[];
   loading?: boolean;
   maxRows?: number;
 }
 
-export function LocalRankCards({ ranks = [], loading = false, maxRows = 5 }: LocalRankCardsProps) {
+export function LocalRankCards({ projectId, ranks = [], loading = false, maxRows = 5 }: LocalRankCardsProps) {
   if (loading) {
     return (
       <div className="space-y-3">

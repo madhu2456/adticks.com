@@ -30,7 +30,7 @@ interface VisibilitySummary {
   context?: string;
 }
 
-export default function AIVisibilityTracker({ projectId }: { projectId: string }) {
+export function AIVisibilityTracker({ projectId }: { projectId: string }) {
   const [data, setData] = useState<VisibilitySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);

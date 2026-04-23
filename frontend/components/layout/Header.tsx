@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import {
   ChevronDown, Zap, Bell, Settings, LogOut, Check,
   Plus, Globe, User, Loader2, Search, Command, Moon, Sun,
@@ -11,48 +12,14 @@ import {
 import { useTheme } from 'next-themes'
 import { cn } from '@/lib/utils'
 import { formatRelativeTime } from '@/lib/utils'
+import { api } from '@/lib/api'
+import { clearTokens, getUser } from '@/lib/auth'
+import { useProjects, useActiveProject } from '@/hooks/useProject'
+import { ProjectModal } from '@/components/projects/ProjectModal'
+import { Project, User as UserType } from '@/lib/types'
 
 /* ── Data ─────────────────────────────────────────────────────────────── */
-const PROJECTS = [
-  { id: '1', name: 'Optivio',   domain: 'optivio.com',   color: '#6366f1', initials: 'OP', active: true  },
-  { id: '2', name: 'AdTicks',   domain: 'adticks.io',    color: '#8b5cf6', initials: 'AT', active: false },
-  { id: '3', name: 'TestBrand', domain: 'testbrand.co',  color: '#3b82f6', initials: 'TB', active: false },
-]
-
-const NOTIFICATIONS = [
-  {
-    id: '1',
-    type: 'scan',
-    icon: TrendingUp,
-    title: 'Full scan completed',
-    body: 'Visibility score improved 67 → 72 (+7.5%)',
-    time: new Date(Date.now() - 1000 * 60 * 23).toISOString(),
-    read: false,
-    accent: '#6366f1',
-  },
-  {
-    id: '2',
-    type: 'alert',
-    icon: AlertTriangle,
-    title: '3 critical insights found',
-    body: 'AI visibility and ads need immediate attention',
-    time: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    read: false,
-    accent: '#ef4444',
-  },
-  {
-    id: '3',
-    type: 'sync',
-    icon: RefreshCw,
-    title: 'GSC data synced',
-    body: '28 days of performance data imported',
-    time: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
-    read: true,
-    accent: '#22c55e',
-  },
-]
-
-const USER = { name: 'Madhu Kumar', email: 'madhu.kumar245@gmail.com', initials: 'MK' }
+const NOTIFICATIONS: any[] = []
 
 /* ── Hooks ────────────────────────────────────────────────────────────── */
 function useOutsideClick(ref: React.RefObject<HTMLElement>, cb: () => void) {
@@ -99,15 +66,21 @@ interface HeaderProps {
 
 /* ── Component ────────────────────────────────────────────────────────── */
 function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
+  const router = useRouter()
+  const { data: projectList = [] } = useProjects()
+  const { activeProject, setActiveId } = useActiveProject()
+  
   const [projectOpen,  setProjectOpen]  = useState(false)
   const [notifOpen,    setNotifOpen]    = useState(false)
   const [userOpen,     setUserOpen]     = useState(false)
   const [scanning,     setScanning]     = useState(false)
-  const [activeProject, setActiveProject] = useState(PROJECTS[0])
+  const [isModalOpen,  setModalOpen]    = useState(false)
+  
   const [notifications, setNotifications] = useState(NOTIFICATIONS)
   const [scanProgress,  setScanProgress]  = useState(0)
   const [mounted, setMounted] = useState(false)
   const { theme, setTheme } = useTheme()
+  const [user, setUser] = useState<{ name: string; email: string; initials: string } | null>(null)
 
   const projectRef = useRef<HTMLDivElement>(null!)
   const notifRef   = useRef<HTMLDivElement>(null!)
@@ -120,6 +93,15 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
   const closeAll = () => { setProjectOpen(false); setNotifOpen(false); setUserOpen(false) }
 
   const unreadCount = notifications.filter(n => !n.read).length
+
+  const activeProjectData = activeProject || { 
+    id: '0', 
+    name: 'No Project', 
+    domain: 'Add a project', 
+    color: '#64748b', 
+    initials: '?',
+    brand_name: 'No Project'
+  }
 
   const handleScan = async () => {
     if (scanning) return
@@ -135,14 +117,35 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
 
   const markAllRead = () => setNotifications(prev => prev.map(n => ({ ...n, read: true })))
 
+  const handleLogout = async () => {
+    try {
+      await api.auth.logout()
+    } catch (err) {
+      console.error('Logout failed:', err)
+    } finally {
+      clearTokens()
+      router.push('/login')
+    }
+  }
+
   useEffect(() => {
     setMounted(true)
+    const currentUser = getUser()
+    if (currentUser) {
+      const initials = currentUser.name
+        ? currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase()
+        : currentUser.email[0].toUpperCase()
+      setUser({
+        name: currentUser.name || 'User',
+        email: currentUser.email,
+        initials
+      })
+    }
   }, [])
 
   // ⌘K trigger (UI-only for now)
   const handleCommandPalette = useCallback(() => {
-    // Future: open command palette modal
-    console.log('⌘K command palette triggered')
+    alert('Command Palette coming soon! Press ⌘K to try again later.');
   }, [])
 
   useEffect(() => {
@@ -194,17 +197,17 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
           <div
             className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 text-[9px] font-bold text-white"
             style={{
-              background: `linear-gradient(135deg, ${activeProject.color}, ${activeProject.color}cc)`,
-              boxShadow: `0 0 8px ${activeProject.color}40`,
+              background: `linear-gradient(135deg, ${activeProjectData.color || '#6366f1'}, ${activeProjectData.color || '#6366f1'}cc)`,
+              boxShadow: `0 0 8px ${activeProjectData.color || '#6366f1'}40`,
             }}
           >
-            {activeProject.initials}
+            {activeProjectData.initials || (activeProjectData.brand_name || activeProjectData.name || "?")[0].toUpperCase()}
           </div>
           <div className="text-left hidden sm:block">
-            <p className="text-[13px] font-semibold text-text-1 leading-none">{activeProject.name}</p>
+            <p className="text-[13px] font-semibold text-text-1 leading-none">{activeProjectData.brand_name || activeProjectData.name}</p>
             <p className="text-[10px] text-text-3 mt-0.5 leading-none flex items-center gap-1">
               <Globe size={9} />
-              {activeProject.domain}
+              {activeProjectData.domain}
             </p>
           </div>
           <ChevronDown
@@ -214,32 +217,39 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
         </button>
 
         <Dropdown open={projectOpen} className="left-0 w-64">
-          <div className="px-2 pt-2 pb-1">
+          <div className="px-2 pt-2 pb-1 max-h-[60vh] overflow-y-auto">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-text-3 px-1.5 pb-1.5">Switch Project</p>
-            {PROJECTS.map(project => (
-              <button
-                key={project.id}
-                onClick={() => { setActiveProject(project); setProjectOpen(false) }}
-                className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-white/[0.05] transition-colors text-left group"
-              >
-                <div
-                  className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white"
-                  style={{ background: `linear-gradient(135deg, ${project.color}, ${project.color}cc)` }}
+            {projectList.length === 0 ? (
+              <p className="text-[11px] text-text-3 px-2 py-4 text-center italic">No projects found.</p>
+            ) : (
+              projectList.map(project => (
+                <button
+                  key={project.id}
+                  onClick={() => { setActiveId(project.id); setProjectOpen(false) }}
+                  className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-white/[0.05] transition-colors text-left group"
                 >
-                  {project.initials}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-text-1 truncate">{project.name}</p>
-                  <p className="text-[11px] text-text-3 truncate">{project.domain}</p>
-                </div>
-                {project.id === activeProject.id && (
-                  <Check size={13} className="text-primary flex-shrink-0" />
-                )}
-              </button>
-            ))}
+                  <div
+                    className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white"
+                    style={{ background: `linear-gradient(135deg, ${project.color || '#6366f1'}, ${project.color || '#6366f1'}cc)` }}
+                  >
+                    {project.initials || (project.brand_name || project.name || "?")[0].toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-medium text-text-1 truncate">{project.brand_name || project.name}</p>
+                    <p className="text-[11px] text-text-3 truncate">{project.domain}</p>
+                  </div>
+                  {project.id === activeProject?.id && (
+                    <Check size={13} className="text-primary flex-shrink-0" />
+                  )}
+                </button>
+              ))
+            )}
           </div>
           <div className="p-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.05] transition-colors text-text-3 hover:text-text-2">
+            <button 
+              onClick={() => { setModalOpen(true); setProjectOpen(false) }}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.05] transition-colors text-text-3 hover:text-text-2"
+            >
               <div
                 className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                 style={{ border: '1px dashed rgba(255,255,255,0.12)' }}
@@ -251,6 +261,12 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
           </div>
         </Dropdown>
       </div>
+
+      <ProjectModal 
+        isOpen={isModalOpen} 
+        onClose={() => setModalOpen(false)} 
+        onSuccess={(id) => setActiveId(id)}
+      />
 
       {/* ── Breadcrumb ───────────────────────────────────────────────── */}
       <div className="hidden md:flex items-center gap-1 text-[13px] text-text-3 ml-1">
@@ -403,7 +419,10 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
               className="px-3 py-2"
               style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
             >
-              <button className="flex items-center gap-1 text-[11px] text-text-3 hover:text-text-2 transition-colors">
+              <button 
+                onClick={() => { alert('Notifications inbox coming soon!'); closeAll(); }}
+                className="flex items-center gap-1 text-[11px] text-text-3 hover:text-text-2 transition-colors"
+              >
                 View all notifications <ArrowUpRight size={11} />
               </button>
             </div>
@@ -420,7 +439,7 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
               boxShadow: '0 0 0 2px rgba(99,102,241,0.25)',
             }}
           >
-            {USER.initials}
+            {user?.initials || '??'}
           </button>
 
           <Dropdown open={userOpen} className="right-0 w-56">
@@ -433,22 +452,23 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
                   className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
                   style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
                 >
-                  {USER.initials}
+                  {user?.initials || '??'}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-text-1 truncate">{USER.name}</p>
-                  <p className="text-[11px] text-text-3 truncate">{USER.email}</p>
+                  <p className="text-[13px] font-semibold text-text-1 truncate">{user?.name || 'Loading...'}</p>
+                  <p className="text-[11px] text-text-3 truncate">{user?.email || '...'}</p>
                 </div>
               </div>
             </div>
             <div className="p-1.5">
               {[
-                { icon: User,     label: 'Profile' },
-                { icon: Settings, label: 'Settings' },
-                { icon: Calendar, label: 'Usage & Billing' },
-              ].map(({ icon: Icon, label }) => (
+                { icon: User,     label: 'Profile',         href: '/settings?tab=profile' },
+                { icon: Settings, label: 'Settings',        href: '/settings' },
+                { icon: Calendar, label: 'Usage & Billing', href: '/settings?tab=plan' },
+              ].map(({ icon: Icon, label, href }) => (
                 <button
                   key={label}
+                  onClick={() => { router.push(href); closeAll(); }}
                   className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/[0.05] transition-colors text-text-2 hover:text-text-1 text-[13px] font-medium"
                 >
                   <Icon size={13} className="text-text-3" />
@@ -457,7 +477,10 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
               ))}
             </div>
             <div className="p-1.5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-              <button className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-danger/10 transition-colors text-text-2 hover:text-danger text-[13px] font-medium">
+              <button 
+                onClick={handleLogout}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-danger/10 transition-colors text-text-2 hover:text-danger text-[13px] font-medium"
+              >
                 <LogOut size={13} />
                 Sign out
               </button>

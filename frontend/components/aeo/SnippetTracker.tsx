@@ -35,7 +35,7 @@ interface SnippetSummary {
   snippet_percentage: number;
 }
 
-export default function SnippetTracker({ projectId }: { projectId: string }) {
+export function SnippetTracker({ projectId }: { projectId: string }) {
   const [summary, setSummary] = useState<SnippetSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();

@@ -415,12 +415,9 @@ def test_logger_adapter_with_request_id():
 async def test_documentation_pattern_1_endpoint_to_task():
     """Example from docs: Endpoint → Task → External API."""
     from app.core.http_client import create_request_id_client
-    from app.core.logging import get_logger
     
     test_id = "pattern1-" + str(uuid.uuid4())
     set_request_id(test_id)
-    
-    logger = get_logger(__name__)
     
     # Simulate external API call with request ID
     with patch.object(
@@ -445,10 +442,8 @@ async def test_documentation_pattern_1_endpoint_to_task():
 async def test_documentation_pattern_4_manual_request_id():
     """Example from docs: Manual request ID management."""
     from app.core.http_client import create_request_id_client
-    from app.core.logging import with_request_id, get_logger
-    
-    logger = get_logger(__name__)
-    
+    from app.core.logging import with_request_id
+
     with with_request_id("custom-request-123"):
         assert get_request_id() == "custom-request-123"
         

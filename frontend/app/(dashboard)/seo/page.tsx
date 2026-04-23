@@ -6,15 +6,27 @@ import { RankTracker } from "@/components/seo/RankTracker";
 import { OnPageScore } from "@/components/seo/OnPageScore";
 import { ContentGaps } from "@/components/seo/ContentGaps";
 import { TechnicalSEO } from "@/components/seo/TechnicalSEO";
+import { BacklinkDashboard } from "@/components/seo/BacklinkDashboard";
+import { CompetitorAnalysis } from "@/components/seo/CompetitorAnalysis";
 import { mockKeywords, mockContentGaps, mockTechnicalChecks } from "@/lib/mockData";
+import { useActiveProject } from "@/hooks/useProject";
 
 export default function SEOPage() {
+  const { activeProject } = useActiveProject();
   const [tab, setTab] = useState("keywords");
   const [search, setSearch] = useState("");
 
   const filteredKeywords = mockKeywords.filter((k) =>
     search ? k.keyword.toLowerCase().includes(search.toLowerCase()) : true
   );
+
+  if (!activeProject) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <p className="text-text-muted">Please select a project to view SEO data.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -24,10 +36,12 @@ export default function SEOPage() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
+        <TabsList className="overflow-x-auto">
           <TabsTrigger value="keywords">Keywords</TabsTrigger>
           <TabsTrigger value="rankings">Rankings</TabsTrigger>
           <TabsTrigger value="onpage">On-Page</TabsTrigger>
+          <TabsTrigger value="backlinks">Backlinks</TabsTrigger>
+          <TabsTrigger value="competitors">Competitors</TabsTrigger>
           <TabsTrigger value="gaps">Content Gaps</TabsTrigger>
           <TabsTrigger value="technical">Technical</TabsTrigger>
         </TabsList>
@@ -37,11 +51,19 @@ export default function SEOPage() {
         </TabsContent>
 
         <TabsContent value="rankings">
-          <RankTracker projectId="demo-project" />
+          <RankTracker projectId={activeProject.id} />
         </TabsContent>
 
         <TabsContent value="onpage">
-          <OnPageScore projectId="demo-project" />
+          <OnPageScore projectId={activeProject.id} />
+        </TabsContent>
+
+        <TabsContent value="backlinks">
+          <BacklinkDashboard projectId={activeProject.id} />
+        </TabsContent>
+
+        <TabsContent value="competitors">
+          <CompetitorAnalysis projectId={activeProject.id} />
         </TabsContent>
 
         <TabsContent value="gaps">

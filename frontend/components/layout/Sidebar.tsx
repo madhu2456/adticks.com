@@ -1,15 +1,16 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Search, Sparkles, Activity, Megaphone, Zap,
   Settings, BarChart2, ChevronRight, ChevronLeft, ArrowRight,
-  HelpCircle, ChevronsUpDown, User, LogOut, Moon, ExternalLink,
+  HelpCircle, ChevronsUpDown, User, Moon, ExternalLink, MapPin,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useEffect, useState } from 'react'
+import { getUser } from '@/lib/auth'
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 interface NavItem {
@@ -49,13 +50,20 @@ const NAV_SECTIONS = [
         description: 'Keywords & rank tracking',
       },
       {
-        label: 'AI Visibility',
-        href: '/ai-visibility',
+        label: 'AEO Hub',
+        href: '/aeo',
         icon: Sparkles,
-        badge: 'NEW',
+        badge: 'BETA',
         badgeType: 'new' as const,
         shortcut: 'G A',
-        description: 'LLM brand monitoring',
+        description: 'LLM & AI visibility',
+      },
+      {
+        label: 'Local SEO',
+        href: '/geo',
+        icon: MapPin,
+        shortcut: 'G L',
+        description: 'Maps & geo tracking',
       },
       {
         label: 'Search Console',
@@ -155,7 +163,23 @@ interface SidebarProps {
 /* ── Main component ──────────────────────────────────────────────────── */
 function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
+  const [user, setUser] = useState<{ name: string; email: string; initials: string } | null>(null)
+
+  useEffect(() => {
+    const currentUser = getUser()
+    if (currentUser) {
+      const initials = currentUser.full_name
+        ? currentUser.full_name.split(' ').map(n => n[0]).join('').toUpperCase()
+        : currentUser.email[0].toUpperCase()
+      setUser({
+        name: currentUser.full_name || 'User',
+        email: currentUser.email,
+        initials
+      })
+    }
+  }, [])
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/'
@@ -479,6 +503,7 @@ function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 </div>
 
                 <button
+                  onClick={() => router.push('/settings?tab=plan')}
                   className="w-full flex items-center justify-center gap-1.5 h-7 rounded-lg text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
                   style={{
                     background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
@@ -520,7 +545,7 @@ function Sidebar({ collapsed, onToggle }: SidebarProps) {
               boxShadow: '0 0 0 2px rgba(99,102,241,0.2)',
             }}
           >
-            MK
+            {user?.initials || '??'}
           </div>
           <AnimatePresence>
             {!collapsed && (
@@ -530,8 +555,8 @@ function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 exit={{ opacity: 0 }}
                 className="flex-1 min-w-0"
               >
-                <p className="text-[12px] font-semibold text-text-1 truncate leading-none">Madhu Kumar</p>
-                <p className="text-[10px] text-text-3 truncate mt-0.5">madhu.kumar245@gmail.com</p>
+                <p className="text-[12px] font-semibold text-text-1 truncate leading-none">{user?.name || 'Loading...'}</p>
+                <p className="text-[10px] text-text-3 truncate mt-0.5">{user?.email || '...'}</p>
               </motion.div>
             )}
           </AnimatePresence>

@@ -8,11 +8,12 @@ import { ReviewSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface ReviewDashboardProps {
+  projectId?: string;
   summary?: ReviewSummary;
   loading?: boolean;
 }
 
-export function ReviewDashboard({ summary, loading = false }: ReviewDashboardProps) {
+export function ReviewDashboard({ projectId, summary, loading = false }: ReviewDashboardProps) {
   if (loading) {
     return (
       <div className="space-y-4">

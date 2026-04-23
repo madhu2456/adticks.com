@@ -10,46 +10,10 @@ const DEFAULT_DATA: HeatmapData[] = [
   {
     category: "Brand Awareness",
     brands: [
-      { name: "Optivio", count: 18, percentage: 75, isSelf: true },
-      { name: "HubSpot", count: 22, percentage: 92 },
-      { name: "Semrush", count: 20, percentage: 83 },
-      { name: "Ahrefs", count: 16, percentage: 67 },
-    ],
-  },
-  {
-    category: "Comparison",
-    brands: [
-      { name: "Optivio", count: 8, percentage: 33, isSelf: true },
-      { name: "HubSpot", count: 19, percentage: 79 },
-      { name: "Semrush", count: 21, percentage: 88 },
-      { name: "Ahrefs", count: 18, percentage: 75 },
-    ],
-  },
-  {
-    category: "Problem-Solving",
-    brands: [
-      { name: "Optivio", count: 12, percentage: 50, isSelf: true },
-      { name: "HubSpot", count: 15, percentage: 63 },
-      { name: "Semrush", count: 14, percentage: 58 },
-      { name: "Ahrefs", count: 10, percentage: 42 },
-    ],
-  },
-  {
-    category: "Trust",
-    brands: [
-      { name: "Optivio", count: 5, percentage: 21, isSelf: true },
-      { name: "HubSpot", count: 20, percentage: 83 },
-      { name: "Semrush", count: 17, percentage: 71 },
-      { name: "Ahrefs", count: 19, percentage: 79 },
-    ],
-  },
-  {
-    category: "Recommendations",
-    brands: [
-      { name: "Optivio", count: 4, percentage: 17, isSelf: true },
-      { name: "HubSpot", count: 18, percentage: 75 },
-      { name: "Semrush", count: 22, percentage: 92 },
-      { name: "Ahrefs", count: 20, percentage: 83 },
+      { name: "You", count: 0, percentage: 0, isSelf: true },
+      { name: "Comp A", count: 0, percentage: 0 },
+      { name: "Comp B", count: 0, percentage: 0 },
+      { name: "Comp C", count: 0, percentage: 0 },
     ],
   },
 ];
@@ -114,7 +78,7 @@ export function MentionHeatmap() {
         <div className="flex items-center gap-3 text-xs text-[#94a3b8]">
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-sm bg-[#6366f1] inline-block" />
-            You (Optivio)
+            Your Brand
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-sm bg-[#8b5cf6] inline-block" />

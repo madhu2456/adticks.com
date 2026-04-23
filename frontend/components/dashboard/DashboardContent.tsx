@@ -12,11 +12,11 @@ import { ChannelBreakdown } from "@/components/dashboard/ChannelBreakdown";
 import { TopInsights } from "@/components/dashboard/TopInsights";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { formatNumber, formatCurrency, cn } from "@/lib/utils";
+import { useActiveProject } from "@/hooks/useProject";
 import { 
   mockStats, mockScore, mockChannelPerformance, 
   mockActivity, mockInsights 
 } from "@/lib/mockData";
-
 
 /* ── Mini sparkline SVG ──────────────────────────────────────────────── */
 function Sparkline({
@@ -125,10 +125,8 @@ function getGreeting() {
   return "Good evening";
 }
 
-/* ════════════════════════════════════════════════════════════════════════
-   DASHBOARD PAGE
-   ════════════════════════════════════════════════════════════════════════ */
-export default function DashboardPage() {
+export function DashboardContent() {
+  const { activeProject } = useActiveProject();
   const stats    = mockStats;
   const score    = mockScore;
   const channels = mockChannelPerformance;
@@ -136,6 +134,10 @@ export default function DashboardPage() {
   const insights = mockInsights;
 
   const greeting = getGreeting();
+
+  const handleRefresh = () => {
+    alert("Refreshing data... this will take a few seconds.");
+  };
 
   return (
     <div className="relative min-h-full">
@@ -166,24 +168,25 @@ export default function DashboardPage() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <h1 className="text-[22px] font-bold text-text-1 tracking-tight">
-                {greeting}, Madhu 👋
+                {greeting}, User 👋
               </h1>
             </div>
             <div className="flex items-center gap-3 text-[13px] text-text-3">
               <span className="flex items-center gap-1.5">
                 <Clock size={12} />
-                Updated 23 minutes ago
+                Just now
               </span>
               <span className="w-px h-3.5" style={{ background: 'rgba(255,255,255,0.1)' }} />
               <span className="flex items-center gap-1.5">
                 <Globe size={12} />
-                optivio.com
+                {activeProject?.domain || "yourdomain.com"}
               </span>
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
+              onClick={handleRefresh}
               className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-[13px] font-medium text-text-2 hover:text-text-1 hover:bg-white/[0.05] transition-all"
               style={{ border: '1px solid rgba(255,255,255,0.07)' }}
             >
@@ -200,7 +203,7 @@ export default function DashboardPage() {
               }}
             >
               <Zap size={13} />
-              <span className="hidden sm:inline">3 critical insights</span>
+              <span className="hidden sm:inline">0 insights</span>
               <ChevronRight size={12} />
             </Link>
           </div>
@@ -293,7 +296,7 @@ export default function DashboardPage() {
                           {positive
                             ? <TrendingUp size={10} />
                             : <TrendingDown size={10} />}
-                          {Math.abs(change)}%
+                          {change}%
                         </div>
                       </div>
 

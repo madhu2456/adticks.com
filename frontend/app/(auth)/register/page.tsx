@@ -92,7 +92,7 @@ export default function RegisterPage() {
               type="text"
               value={form.company}
               onChange={(e) => handleChange("company", e.target.value)}
-              placeholder="Optivio"
+              placeholder="Your Brand"
               className="w-full rounded-lg bg-[#0f172a] border border-[#334155] text-[#f1f5f9] placeholder-[#475569] px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#6366f1]/50 focus:border-[#6366f1] transition-colors"
             />
           </div>

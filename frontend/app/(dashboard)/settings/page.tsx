@@ -6,6 +6,8 @@ import {
   Plus, X, ChevronDown, BarChart2, Megaphone, TrendingUp,
   Zap, Crown,
 } from "lucide-react";
+import { useActiveProject } from "@/hooks/useProject";
+import { api } from "@/lib/api";
 
 type Tab = "profile" | "project" | "integrations" | "plan" | "api";
 
@@ -57,7 +59,7 @@ function InputField({ label, value, onChange, type = "text", placeholder }: {
 }
 
 function ProfileTab() {
-  const [form, setForm] = useState({ name: "Alex Morgan", email: "alex@optivio.com", company: "Optivio" });
+  const [form, setForm] = useState({ name: "Your Name", email: "user@example.com", company: "Your Company" });
   const [saved, setSaved] = useState(false);
 
   function handleSave() {
@@ -99,9 +101,9 @@ function ProfileTab() {
 }
 
 function ProjectTab() {
-  const [domain, setDomain] = useState("optivio.com");
+  const [domain, setDomain] = useState("yourdomain.com");
   const [industry, setIndustry] = useState("SaaS / Marketing");
-  const [competitors, setCompetitors] = useState(["HubSpot", "Semrush", "Ahrefs"]);
+  const [competitors, setCompetitors] = useState(["Competitor A", "Competitor B"]);
   const [newComp, setNewComp] = useState("");
   const [saved, setSaved] = useState(false);
 
@@ -224,7 +226,23 @@ function IntegrationsTab() {
     },
   ]);
 
-  function toggleConnect(id: string) {
+  const { activeProject } = useActiveProject();
+
+  async function toggleConnect(id: string) {
+    if (id === "gsc" && !integrations.find(i => i.id === "gsc")?.connected) {
+      if (!activeProject) {
+        alert("Please select a project first.");
+        return;
+      }
+      try {
+        const { url } = await api.gsc.getAuthUrl(activeProject.id);
+        window.location.href = url;
+        return;
+      } catch (err) {
+        alert("Failed to get connection URL.");
+      }
+    }
+
     setIntegrations((prev) =>
       prev.map((i) => (i.id === id ? { ...i, connected: !i.connected } : i))
     );
@@ -378,7 +396,10 @@ function PlanTab() {
         </table>
       </div>
 
-      <button className="flex items-center gap-2 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] hover:opacity-90 text-white font-semibold rounded-xl px-6 py-3 text-sm transition-opacity shadow-lg shadow-[#6366f1]/25">
+      <button 
+        onClick={() => alert('Checkout integration is coming soon! Our sales team will reach out to you.')}
+        className="flex items-center gap-2 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] hover:opacity-90 text-white font-semibold rounded-xl px-6 py-3 text-sm transition-opacity shadow-lg shadow-[#6366f1]/25"
+      >
         <Crown className="h-4 w-4" />
         Upgrade to Pro — $49/mo
       </button>

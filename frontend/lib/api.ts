@@ -186,6 +186,60 @@ export const api = {
     markRead: (insightId: string) =>
       axiosInstance.patch(`/insights/${insightId}/read`).then(unwrap),
   },
+
+  // Geo / Local SEO
+  geo: {
+    getLocations: (projectId: string) =>
+      axiosInstance.get<PaginatedResponse<any>>(`/geo/projects/${projectId}/locations`).then(unwrap),
+    createLocation: (projectId: string, data: any) =>
+      axiosInstance.post<any>(`/geo/projects/${projectId}/locations`, data).then(unwrap),
+    getLocation: (locationId: string) =>
+      axiosInstance.get<any>(`/geo/locations/${locationId}`).then(unwrap),
+    updateLocation: (locationId: string, data: any) =>
+      axiosInstance.put<any>(`/geo/locations/${locationId}`, data).then(unwrap),
+    deleteLocation: (locationId: string) =>
+      axiosInstance.delete(`/geo/locations/${locationId}`).then(unwrap),
+    getRanks: (locationId: string) =>
+      axiosInstance.get<PaginatedResponse<any>>(`/geo/locations/${locationId}/ranks`).then(unwrap),
+    getReviews: (locationId: string) =>
+      axiosInstance.get<PaginatedResponse<any>>(`/geo/locations/${locationId}/reviews`).then(unwrap),
+    getReviewSummary: (locationId: string) =>
+      axiosInstance.get<any>(`/geo/locations/${locationId}/reviews/summary`).then(unwrap),
+    getCitations: (locationId: string) =>
+      axiosInstance.get<PaginatedResponse<any>>(`/geo/locations/${locationId}/citations`).then(unwrap),
+    getNapCheck: (locationId: string) =>
+      axiosInstance.get<any>(`/geo/locations/${locationId}/citations/nap-check`).then(unwrap),
+  },
+
+  // AEO / AI SEO
+  aeo: {
+    getSummary: (projectId: string) =>
+      axiosInstance.get<any>(`/aeo/projects/${projectId}/visibility/summary`).then(unwrap),
+    getChatGPT: (projectId: string) =>
+      axiosInstance.get<any[]>(`/aeo/projects/${projectId}/visibility/chatgpt`).then(unwrap),
+    getPerplexity: (projectId: string) =>
+      axiosInstance.get<any[]>(`/aeo/projects/${projectId}/visibility/perplexity`).then(unwrap),
+    getClaude: (projectId: string) =>
+      axiosInstance.get<any[]>(`/aeo/projects/${projectId}/visibility/claude`).then(unwrap),
+    getSnippets: (projectId: string) =>
+      axiosInstance.get<any[]>(`/aeo/projects/${projectId}/snippets`).then(unwrap),
+    getPAA: (projectId: string) =>
+      axiosInstance.get<any[]>(`/aeo/projects/${projectId}/paa`).then(unwrap),
+    getRecommendations: (projectId: string) =>
+      axiosInstance.get<any[]>(`/aeo/projects/${projectId}/recommendations`).then(unwrap),
+    generateFAQ: (projectId: string, keywordId: string) =>
+      axiosInstance.post<any>(`/aeo/generate-faq`, { project_id: projectId, keyword_id: keywordId }).then(unwrap),
+  },
+
+  // Advanced SEO Suite
+  seoSuite: {
+    getBacklinks: (projectId: string) =>
+      axiosInstance.get<PaginatedResponse<any>>(`/seo-suite/projects/${projectId}/backlinks`).then(unwrap),
+    getCompetitorKeywords: (projectId: string) =>
+      axiosInstance.get<PaginatedResponse<any>>(`/seo-suite/projects/${projectId}/competitors/keywords`).then(unwrap),
+    getSerpFeatures: (keywordId: string) =>
+      axiosInstance.get<any>(`/seo-suite/keywords/${keywordId}/serp-features`).then(unwrap),
+  },
 };
 
 export default axiosInstance;

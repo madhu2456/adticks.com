@@ -8,6 +8,8 @@ import { ImpressionsChart } from "@/components/gsc/ImpressionsChart";
 import { CTRChart } from "@/components/gsc/CTRChart";
 import { QueryTable } from "@/components/gsc/QueryTable";
 import { mockGSCQueries, mockGSCPages, mockGSCMetrics } from "@/lib/mockData";
+import { useActiveProject } from "@/hooks/useProject";
+import { api } from "@/lib/api";
 
 function StatCard({ icon: Icon, label, value, sub }: { icon: React.ElementType; label: string; value: string; sub?: string }) {
   return (
@@ -25,6 +27,7 @@ function StatCard({ icon: Icon, label, value, sub }: { icon: React.ElementType; 
 }
 
 export default function GSCPage() {
+  const { activeProject } = useActiveProject();
   const [isConnected, setIsConnected] = useState(false);
   const [activeTab, setActiveTab] = useState<"queries" | "pages">("queries");
   const [syncing, setSyncing] = useState(false);
@@ -33,6 +36,20 @@ export default function GSCPage() {
   const totalImpressions = mockGSCMetrics.reduce((s, m) => s + m.impressions, 0);
   const avgCTR = (mockGSCMetrics.reduce((s, m) => s + m.ctr, 0) / mockGSCMetrics.length).toFixed(2);
   const avgPosition = (mockGSCMetrics.reduce((s, m) => s + m.position, 0) / mockGSCMetrics.length).toFixed(1);
+
+  async function handleConnect() {
+    if (!activeProject) {
+      alert("Please create or select a project first.");
+      return;
+    }
+    try {
+      const { url } = await api.gsc.getAuthUrl(activeProject.id);
+      window.location.href = url;
+    } catch (err) {
+      console.error("Failed to get GSC auth URL:", err);
+      alert("Failed to connect to Google Search Console. Please try again.");
+    }
+  }
 
   function handleSync() {
     setSyncing(true);
@@ -72,7 +89,7 @@ export default function GSCPage() {
             </div>
 
             <button
-              onClick={() => alert("Redirecting to Google OAuth...")}
+              onClick={handleConnect}
               className="w-full flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white font-semibold rounded-xl py-3 text-sm transition-colors shadow-lg shadow-[#6366f1]/25 mb-3"
             >
               <Link2 className="h-4 w-4" />
