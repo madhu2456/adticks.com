@@ -29,6 +29,7 @@ from app.models.project import Project
 from app.models.prompt import Mention, Prompt, Response
 from app.models.recommendation import Recommendation
 from app.models.score import Score
+from app.models.seo import RankHistory, SerpFeatures
 from app.models.user import User
 
 __all__ = [
@@ -37,6 +38,8 @@ __all__ = [
     "Competitor",
     "Keyword",
     "Ranking",
+    "RankHistory",
+    "SerpFeatures",
     "Prompt",
     "Response",
     "Mention",

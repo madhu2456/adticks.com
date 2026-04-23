@@ -44,6 +44,7 @@ class UserResponse(BaseModel):
     email: EmailStr
     full_name: str | None
     is_active: bool
+    is_superuser: bool
     trial_ends_at: datetime | None
     created_at: datetime
     model_config = {"from_attributes": True}
