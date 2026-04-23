@@ -14,9 +14,22 @@ const nextConfig = {
     domains: ["avatars.githubusercontent.com", "lh3.googleusercontent.com"],
   },
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8002",
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8002/api",
   },
-};
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(), browsing-topics=(), join-ad-interest-group=(), run-ad-auction=(), attribution-reporting=(), private-state-token-issuance=(), private-state-token-redemption=()",
+          },
+        ],
+      },
+    ];
+  },
+  };
 
 export default withSentryConfig(nextConfig, {
   // For all available options, see:

@@ -18,11 +18,6 @@ services:
       else
         echo 'Skip sync: adticks config not found';
       fi"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "5m"
-        max-file: "1"
 
   db:
     image: pgvector/pgvector:pg16
@@ -39,16 +34,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
     networks:
       - adticks-network
 
@@ -60,7 +45,6 @@ services:
       redis-server
       --appendonly yes
       --requirepass ${REDIS_PASSWORD:-password}
-      --loglevel warning
     volumes:
       - redis_data:/data
     healthcheck:
@@ -68,81 +52,44 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
     networks:
       - adticks-network
 
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
     container_name: adticks-backend
     restart: unless-stopped
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-adticks}
       REDIS_URL: redis://:${REDIS_PASSWORD:-password}@redis:6379/0
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://adticks.com}
     ports:
       - "8002:8000"
     depends_on:
-      nginx_sync:
-        condition: service_completed_successfully
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
     command: >
-      sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2"
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+      sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000"
     networks:
       - adticks-network
 
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${SITE_URL:-http://localhost:3002}/api
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://adticks.com/api}
     container_name: adticks-frontend
     restart: unless-stopped
-    env_file: ./frontend/.env.local
     environment:
-      NEXT_PUBLIC_API_URL: ${SITE_URL:-http://localhost:3002}/api
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://adticks.com/api}
     ports:
       - "3002:3000"
     depends_on:
-      nginx_sync:
-        condition: service_completed_successfully
-      backend:
-        condition: service_started
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+      - backend
     networks:
       - adticks-network
 

@@ -108,7 +108,8 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Permissions-Policy"] = (
         "camera=(), microphone=(), geolocation=(), "
         "browsing-topics=(), join-ad-interest-group=(), "
-        "run-ad-auction=(), attribution-reporting=()"
+        "run-ad-auction=(), attribution-reporting=(), "
+        "private-state-token-issuance=(), private-state-token-redemption=()"
     )
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
