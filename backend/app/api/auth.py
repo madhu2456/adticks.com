@@ -75,10 +75,12 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)):
             raise ConflictError("Email already registered")
         
         # Create user
+        from datetime import datetime, timedelta, timezone
         user = User(
             email=payload.email,
             hashed_password=hash_password(payload.password),
             full_name=payload.full_name,
+            trial_ends_at=datetime.now(tz=timezone.utc) + timedelta(days=14),
         )
         tx.add(user)
         await tx.flush()
@@ -232,6 +234,99 @@ async def me(current_user: User = Depends(get_current_user)):
     - 401 Unauthorized: Invalid or missing token
     """
     return current_user
+
+
+@router.get("/usage")
+async def usage(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get current user's account usage statistics and limits.
+    
+    **Authentication:** Required (Bearer token)
+    
+    **Returns:**
+    - Usage object with scans, keywords, competitors, and trial status
+    """
+    from datetime import datetime, timezone
+    from sqlalchemy import func
+    from app.models.project import Project
+    from app.models.keyword import Keyword
+    from app.models.competitor import Competitor
+    from app.models.aeo import AEOVisibility
+
+    # Count projects
+    project_result = await db.execute(
+        select(Project.id).where(Project.user_id == current_user.id)
+    )
+    project_ids = [r[0] for r in project_result.all()]
+
+    # Count keywords
+    keywords_used = 0
+    if project_ids:
+        kw_result = await db.execute(
+            select(func.count(Keyword.id)).where(Keyword.project_id.in_(project_ids))
+        )
+        keywords_used = kw_result.scalar() or 0
+
+    # Count competitors
+    competitors_used = 0
+    if project_ids:
+        comp_result = await db.execute(
+            select(func.count(Competitor.id)).where(Competitor.project_id.in_(project_ids))
+        )
+        competitors_used = comp_result.scalar() or 0
+
+    # Count AI scans (AEO visibility records)
+    ai_scans_used = 0
+    if project_ids:
+        ai_result = await db.execute(
+            select(func.count(AEOVisibility.id)).where(AEOVisibility.project_id.in_(project_ids))
+        )
+        ai_scans_used = ai_result.scalar() or 0
+
+    # Calculate days remaining
+    days_remaining = 0
+    if current_user.trial_ends_at:
+        delta = current_user.trial_ends_at - datetime.now(tz=timezone.utc)
+        days_remaining = max(0, delta.days)
+
+    from app.core.plans import get_plan_limits
+    limits = get_plan_limits(current_user.plan)
+
+    return {
+        "ai_scans_used": ai_scans_used,
+        "ai_scans_limit": limits["ai_scans"],
+        "keywords_used": keywords_used,
+        "keywords_limit": limits["keywords"],
+        "competitors_used": competitors_used,
+        "competitors_limit": limits["competitors"],
+        "days_remaining": days_remaining,
+        "plan": current_user.plan,
+        "api_requests_today": 0,  # Placeholder
+        "api_requests_month": 0,  # Placeholder
+        "api_rate_limit": limits["api_rate_limit"],
+    }
+
+
+@router.post("/upgrade")
+async def upgrade_plan(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Upgrade current user to Pro plan.
+    
+    **Authentication:** Required (Bearer token)
+    """
+    async with transaction_scope(db):
+        current_user.plan = "pro"
+        # Optional: extend trial or set specific end date
+        db.add(current_user)
+    
+    logger.info("user_upgrade", extra={"user_id": str(current_user.id), "plan": "pro"})
+    return {"message": "Upgraded to Pro plan successfully", "plan": "pro"}
 
 
 @router.patch("/me", response_model=UserResponse)

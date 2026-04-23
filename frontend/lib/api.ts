@@ -75,6 +75,8 @@ export const api = {
     register: (data: RegisterRequest) =>
       axiosInstance.post<AuthTokens>("/auth/register", data).then(unwrap),
     me: () => axiosInstance.get<User>("/auth/me").then(unwrap),
+    getUsage: () => axiosInstance.get<any>("/auth/usage").then(unwrap),
+    upgrade: () => axiosInstance.post<any>("/auth/upgrade").then(unwrap),
     updateMe: (data: { full_name?: string; email?: string; password?: string; company_name?: string }) =>
       axiosInstance.patch<User>("/auth/me", data).then(unwrap),
     uploadAvatar: (file: File) => {

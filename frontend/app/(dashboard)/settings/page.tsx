@@ -7,8 +7,11 @@ import {
   Zap, Crown, Loader2,
 } from "lucide-react";
 import { useActiveProject, useUpdateProject } from "@/hooks/useProject";
+import { useUsage } from "@/hooks/useUsage";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 
 type Tab = "profile" | "project" | "integrations" | "plan" | "api";
 
@@ -431,6 +434,10 @@ function IntegrationsTab() {
 }
 
 function PlanTab() {
+  const { data: usage } = useUsage();
+  const queryClient = useQueryClient();
+  const [upgrading, setUpgrading] = useState(false);
+
   const features = [
     { name: "AI Visibility Scans", free: "50/mo", pro: "Unlimited" },
     { name: "Keywords Tracked", free: "500", pro: "Unlimited" },
@@ -442,6 +449,23 @@ function PlanTab() {
     { name: "Team Members", free: "1", pro: "10" },
     { name: "Priority Support", free: false, pro: true },
   ];
+
+  const planName = usage?.plan === "free" ? "Free Trial" : (usage?.plan ? usage.plan.charAt(0).toUpperCase() + usage.plan.slice(1) : "Free Trial");
+  const isPro = usage?.plan === "pro" || usage?.plan === "enterprise";
+
+  async function handleUpgrade() {
+    setUpgrading(true);
+    try {
+      await api.auth.upgrade();
+      queryClient.invalidateQueries({ queryKey: ["usage"] });
+      alert("Successfully upgraded to Pro plan!");
+    } catch (error) {
+      console.error("Upgrade failed:", error);
+      alert("Failed to upgrade. Please try again later.");
+    } finally {
+      setUpgrading(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -456,9 +480,9 @@ function PlanTab() {
           <div>
             <div className="flex items-center gap-2 mb-2">
               <Zap className="h-5 w-5 text-[#6366f1]" />
-              <span className="font-semibold text-[#f1f5f9]">Free Trial</span>
+              <span className="font-semibold text-[#f1f5f9]">{planName}</span>
               <span className="text-xs bg-[#f59e0b]/20 text-[#f59e0b] border border-[#f59e0b]/30 px-2 py-0.5 rounded-md font-semibold">
-                14 days remaining
+                {usage?.days_remaining || 0} days remaining
               </span>
             </div>
             <p className="text-sm text-[#94a3b8]">Your trial includes full access to all Pro features.</p>
@@ -467,10 +491,10 @@ function PlanTab() {
 
         <div className="mt-4 grid grid-cols-2 gap-3">
           {[
-            { label: "AI Scans Used", value: "23/50" },
-            { label: "Keywords Tracked", value: "284/500" },
-            { label: "Competitors", value: "3/3" },
-            { label: "Days Remaining", value: "14" },
+            { label: "AI Scans Used", value: `${usage?.ai_scans_used || 0}/${usage?.ai_scans_limit || 50}` },
+            { label: "Keywords Tracked", value: `${usage?.keywords_used || 0}/${usage?.keywords_limit || 500}` },
+            { label: "Competitors", value: `${usage?.competitors_used || 0}/${usage?.competitors_limit || 3}` },
+            { label: "Days Remaining", value: `${usage?.days_remaining || 0}` },
           ].map(({ label, value }) => (
             <div key={label} className="bg-[#0f172a]/30 rounded-lg p-3">
               <p className="text-xs text-[#94a3b8]">{label}</p>
@@ -522,18 +546,26 @@ function PlanTab() {
         </table>
       </div>
 
-      <button 
-        onClick={() => alert('Checkout integration is coming soon! Our sales team will reach out to you.')}
-        className="flex items-center gap-2 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] hover:opacity-90 text-white font-semibold rounded-xl px-6 py-3 text-sm transition-opacity shadow-lg shadow-[#6366f1]/25"
-      >
-        <Crown className="h-4 w-4" />
-        Upgrade to Pro — $49/mo
-      </button>
+      {!isPro && (
+        <button 
+          onClick={handleUpgrade}
+          disabled={upgrading}
+          className="flex items-center gap-2 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] hover:opacity-90 text-white font-semibold rounded-xl px-6 py-3 text-sm transition-opacity shadow-lg shadow-[#6366f1]/25 disabled:opacity-60"
+        >
+          {upgrading ? (
+            <RefreshCw className="h-4 w-4 animate-spin" />
+          ) : (
+            <Crown className="h-4 w-4" />
+          )}
+          {upgrading ? "Upgrading..." : "Upgrade to Pro — $49/mo"}
+        </button>
+      )}
     </div>
   );
 }
 
 function APITab() {
+  const { data: usage } = useUsage();
   const [apiKey] = useState("No API Key generated yet.");
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -589,9 +621,9 @@ function APITab() {
       {/* Usage stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Requests Today", value: "1,284" },
-          { label: "Requests This Month", value: "38,471" },
-          { label: "Rate Limit", value: "1,000/hr" },
+          { label: "Requests Today", value: usage?.api_requests_today?.toLocaleString() || 0 },
+          { label: "Requests This Month", value: usage?.api_requests_month?.toLocaleString() || 0 },
+          { label: "Rate Limit", value: usage?.api_rate_limit || "100/hr" },
         ].map(({ label, value }) => (
           <div key={label} className="bg-[#0f172a]/40 border border-[#334155] rounded-xl p-4">
             <p className="text-xs text-[#94a3b8] mb-1">{label}</p>

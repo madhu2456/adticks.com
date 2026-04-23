@@ -29,6 +29,7 @@ class User(Base):
     avatar_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    plan: Mapped[str] = mapped_column(String(50), default="free", nullable=False)
     trial_ends_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -40,13 +41,6 @@ class User(Base):
 
     # Relationships
     projects = relationship("Project", back_populates="owner", cascade="all, delete-orphan")
-
-    @property
-    def plan(self) -> str:
-        """Return the user's current plan level."""
-        if self.is_superuser:
-            return "enterprise"
-        return "free"
 
     @property
     def token(self) -> str:
