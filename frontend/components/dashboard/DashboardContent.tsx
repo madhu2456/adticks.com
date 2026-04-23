@@ -84,7 +84,7 @@ const STAT_CARDS = [
     color: "#8b5cf6",
     bgColor: "rgba(139,92,246,0.1)",
     format: (v: number) => formatNumber(v, true),
-    href: "/ai-visibility",
+    href: "/aeo",
   },
   {
     label: "GSC Impressions",
@@ -113,7 +113,7 @@ const STAT_CARDS = [
 /* ── Quick actions ───────────────────────────────────────────────────── */
 const QUICK_ACTIONS = [
   { label: "SEO Report",       icon: BarChart,  color: "#6366f1", href: "/seo",          desc: "Export rankings" },
-  { label: "AI Scan",          icon: Sparkles,  color: "#8b5cf6", href: "/ai-visibility", desc: "Check LLM mentions" },
+  { label: "AI Scan",          icon: Sparkles,  color: "#8b5cf6", href: "/aeo", desc: "Check LLM mentions" },
   { label: "GSC Insights",     icon: Activity,  color: "#3b82f6", href: "/gsc",           desc: "Search analytics" },
   { label: "Campaign Perf.",   icon: Target,    color: "#f97316", href: "/ads",            desc: "Ad performance" },
 ];

@@ -14,6 +14,15 @@ jest.mock("next/link", () => {
   );
 });
 
+// Mock auth
+jest.mock("@/lib/auth", () => ({
+  getUser: jest.fn(() => ({
+    name: "Test User",
+    email: "test@example.com",
+    plan: "free",
+  })),
+}));
+
 describe("Sidebar", () => {
   it("renders 'AdTicks' brand name when expanded", () => {
     render(<Sidebar collapsed={false} onToggle={jest.fn()} />);
@@ -35,9 +44,9 @@ describe("Sidebar", () => {
     expect(screen.getByText("SEO Hub")).toBeInTheDocument();
   });
 
-  it("renders AI Visibility navigation link", () => {
+  it("renders AEO Hub navigation link", () => {
     render(<Sidebar collapsed={false} onToggle={jest.fn()} />);
-    expect(screen.getByText("AI Visibility")).toBeInTheDocument();
+    expect(screen.getByText("AEO Hub")).toBeInTheDocument();
   });
 
   it("renders Search Console navigation link", () => {
@@ -78,7 +87,7 @@ describe("Sidebar", () => {
     render(<Sidebar collapsed={false} onToggle={jest.fn()} />);
     expect(screen.getByRole("link", { name: /overview/i })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: /seo hub/i })).toHaveAttribute("href", "/seo");
-    expect(screen.getByRole("link", { name: /ai visibility/i })).toHaveAttribute("href", "/ai-visibility");
+    expect(screen.getByRole("link", { name: /aeo hub/i })).toHaveAttribute("href", "/aeo");
     expect(screen.getByRole("link", { name: /search console/i })).toHaveAttribute("href", "/gsc");
     expect(screen.getByRole("link", { name: /^ads$/i })).toHaveAttribute("href", "/ads");
     expect(screen.getByRole("link", { name: /insights/i })).toHaveAttribute("href", "/insights");
@@ -97,7 +106,7 @@ describe("Sidebar", () => {
 
   it("renders 'Upgrade Plan' button when expanded", () => {
     render(<Sidebar collapsed={false} onToggle={jest.fn()} />);
-    expect(screen.getByText("Upgrade to Pro")).toBeInTheDocument();
+    expect(screen.getByText(/Upgrade to Pro/i)).toBeInTheDocument();
   });
 
   it("uses title attributes on nav links when collapsed for accessibility", () => {

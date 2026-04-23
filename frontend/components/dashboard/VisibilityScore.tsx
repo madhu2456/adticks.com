@@ -15,7 +15,7 @@ interface Props { score?: VisibilityScoreType; loading?: boolean }
 
 const CHANNELS = [
   { key: "seo",  label: "SEO Hub",        color: "#6366f1", href: "/seo",           trend: 0 },
-  { key: "ai",   label: "AI Visibility",  color: "#8b5cf6", href: "/ai-visibility",  trend: 0 },
+  { key: "ai",   label: "AI Visibility",  color: "#8b5cf6", href: "/aeo",  trend: 0 },
   { key: "gsc",  label: "Search Console", color: "#3b82f6", href: "/gsc",            trend: 0 },
   { key: "ads",  label: "Google Ads",     color: "#f97316", href: "/ads",            trend: 0 },
 ] as const;

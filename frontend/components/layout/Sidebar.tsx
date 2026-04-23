@@ -578,7 +578,6 @@ function Sidebar({ collapsed, onToggle }: SidebarProps) {
             )}
           </AnimatePresence>
         </div>
-      </div>
     </motion.aside>
   )
 }

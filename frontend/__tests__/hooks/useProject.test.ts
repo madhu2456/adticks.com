@@ -54,13 +54,11 @@ describe("useProjects", () => {
     jest.clearAllMocks();
   });
 
-  it("returns initial data immediately (uses initialData)", () => {
+  it("is initially empty before data arrives", () => {
     (mockApi.projects.list as jest.Mock).mockResolvedValue(MOCK_PROJECTS);
     const { result } = renderHook(() => useProjects(), { wrapper: createWrapper() });
-    // initialData is the mock projects array defined in the hook
-    expect(result.current.data).toBeDefined();
-    expect(Array.isArray(result.current.data)).toBe(true);
-    expect(result.current.data!.length).toBeGreaterThan(0);
+    // Should be undefined until fetch starts/completes
+    expect(result.current.data).toBeUndefined();
   });
 
   it("returns data after successful fetch", async () => {
@@ -72,13 +70,12 @@ describe("useProjects", () => {
     ]));
   });
 
-  it("falls back to mock data when API fails", async () => {
+  it("falls back to empty array when API fails", async () => {
     (mockApi.projects.list as jest.Mock).mockRejectedValue(new Error("Network error"));
     const { result } = renderHook(() => useProjects(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    // The hook catches the error and falls back to MOCK_PROJECTS
-    expect(result.current.data).toBeDefined();
-    expect(Array.isArray(result.current.data)).toBe(true);
+    // The hook catches the error and falls back to []
+    expect(result.current.data).toEqual([]);
   });
 
   it("data includes expected project fields", async () => {
@@ -107,8 +104,8 @@ describe("useProject", () => {
   });
 
   it("starts in loading state before data arrives", async () => {
-    let resolve: (v: Project) => void;
-    const promise = new Promise<Project>((res) => { resolve = res; });
+    let resolve: (v: any) => void;
+    const promise = new Promise((res) => { resolve = res; });
     (mockApi.projects.get as jest.Mock).mockReturnValue(promise);
     const { result } = renderHook(() => useProject("proj1"), { wrapper: createWrapper() });
     expect(result.current.isLoading).toBe(true);
@@ -116,12 +113,11 @@ describe("useProject", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
   });
 
-  it("falls back to mock data when API fails for useProject", async () => {
+  it("falls back to null when API fails for useProject", async () => {
     (mockApi.projects.get as jest.Mock).mockRejectedValue(new Error("Not found"));
     const { result } = renderHook(() => useProject("proj1"), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    // Fallback returns the found mock project or undefined
-    expect(result.current.data?.id).toBe("proj1");
+    expect(result.current.data).toBeNull();
   });
 });
 
@@ -130,24 +126,21 @@ describe("useActiveProject", () => {
     jest.clearAllMocks();
   });
 
-  it("returns activeProject, setActiveId, and projects array", async () => {
+  it("returns activeProject, activeId, setActiveId, and projects array", async () => {
     (mockApi.projects.list as jest.Mock).mockResolvedValue(MOCK_PROJECTS);
     const { result } = renderHook(() => useActiveProject(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.projects.length).toBeGreaterThan(0));
     expect(result.current).toHaveProperty("activeProject");
     expect(result.current).toHaveProperty("activeId");
     expect(result.current).toHaveProperty("setActiveId");
     expect(result.current).toHaveProperty("projects");
   });
 
-  it("defaults activeId to proj1", async () => {
-    (mockApi.projects.list as jest.Mock).mockResolvedValue(MOCK_PROJECTS);
-    const { result } = renderHook(() => useActiveProject(), { wrapper: createWrapper() });
-    expect(result.current.activeId).toBe("proj1");
-  });
-
-  it("projects array is not empty", async () => {
+  it("defaults activeId and activeProject to first project", async () => {
     (mockApi.projects.list as jest.Mock).mockResolvedValue(MOCK_PROJECTS);
     const { result } = renderHook(() => useActiveProject(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.projects.length).toBeGreaterThan(0));
+    expect(result.current.activeId).toBe("proj1");
+    expect(result.current.activeProject?.id).toBe("proj1");
   });
 });

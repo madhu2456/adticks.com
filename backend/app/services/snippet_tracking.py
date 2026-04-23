@@ -184,7 +184,7 @@ class SnippetTrackingService:
             ranking = result.scalar_one_or_none()
 
             current_position = ranking.position if ranking else None
-            has_snippet = snippet and snippet.has_snippet
+            has_snippet = bool(snippet and snippet.has_snippet)
 
             # Get keyword details
             keyword_result = await db.execute(

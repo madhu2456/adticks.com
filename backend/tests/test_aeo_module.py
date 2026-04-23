@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.project import Project
 from app.models.keyword import Keyword
-from app.models.user import User
 from app.models.aeo import (
     ContentRecommendation,
 )
@@ -215,7 +214,7 @@ class TestSnippetTrackingService:
         await db.commit()
 
         # Get first snippet again
-        db.refresh(snippet1)
+        await db.refresh(snippet1)
         assert snippet1.lost_date is not None
 
     @pytest.mark.asyncio
@@ -441,27 +440,3 @@ class TestContentRecommendationService:
         assert "pending_recommendations" in summary
         assert summary["total_recommendations"] > 0
 
-
-# Fixtures
-@pytest.fixture
-def db() -> AsyncSession:
-    """Database session fixture."""
-    pytest.skip("Use conftest fixtures")
-
-
-@pytest.fixture
-def project(db: AsyncSession, user: User) -> Project:
-    """Create test project."""
-    pytest.skip("Use conftest fixtures")
-
-
-@pytest.fixture
-def keyword(db: AsyncSession, project: Project) -> Keyword:
-    """Create test keyword."""
-    pytest.skip("Use conftest fixtures")
-
-
-@pytest.fixture
-def user(db: AsyncSession) -> User:
-    """Create test user."""
-    pytest.skip("Use conftest fixtures")

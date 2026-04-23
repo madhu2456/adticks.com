@@ -4,7 +4,7 @@ import {
   User, FolderOpen, Link2, CreditCard, Key,
   CheckCircle, XCircle, Copy, RefreshCw, Eye, EyeOff,
   Plus, X, ChevronDown, BarChart2, Megaphone, TrendingUp,
-  Zap, Crown,
+  Zap, Crown, Loader2,
 } from "lucide-react";
 import { useActiveProject, useUpdateProject } from "@/hooks/useProject";
 import { api } from "@/lib/api";

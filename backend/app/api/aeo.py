@@ -22,6 +22,7 @@ from app.schemas.aeo import (
     AEOVisibilityResponse,
     AEOTrendsResponse,
     VisibilityCheckRequest,
+    KeywordIdRequest,
     SnippetTrackingResponse,
     PAA_Response,
     ContentRecommendationResponse,
@@ -97,21 +98,26 @@ async def get_aeo_summary(
     all_visibility = visibility_result.scalars().all()
 
     # Count snippets
-    snippet_result = await db.execute(
-        select(SnippetTracking).where(
-            SnippetTracking.keyword_id.in_([k.id for k in all_keywords]) if all_keywords else []
+    snippet_records = []
+    if all_keywords:
+        snippet_result = await db.execute(
+            select(SnippetTracking).where(
+                SnippetTracking.keyword_id.in_([k.id for k in all_keywords])
+            )
         )
-    )
-    snippet_records = snippet_result.scalars().all()
+        snippet_records = snippet_result.scalars().all()
+    
     featured_snippet_count = sum(1 for s in snippet_records if s.has_snippet)
 
     # Count PAA queries
-    paa_result = await db.execute(
-        select(PAA).where(
-            PAA.keyword_id.in_([k.id for k in all_keywords]) if all_keywords else []
+    paa_queries = []
+    if all_keywords:
+        paa_result = await db.execute(
+            select(PAA).where(
+                PAA.keyword_id.in_([k.id for k in all_keywords])
+            )
         )
-    )
-    paa_queries = paa_result.scalars().all()
+        paa_queries = paa_result.scalars().all()
 
     # Count recommendations
     rec_result = await db.execute(
@@ -331,13 +337,13 @@ async def get_paa_queries(
     summary="Check Snippet Opportunity"
 )
 async def check_snippet_opportunity(
-    keyword_id: UUID,
+    request: KeywordIdRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Analyze featured snippet optimization opportunity for a keyword."""
-    await _get_keyword(keyword_id, db)
-    opportunity = await snippet_service.check_snippet_opportunity(db, keyword_id)
+    await _get_keyword(request.keyword_id, db)
+    opportunity = await snippet_service.check_snippet_opportunity(db, request.keyword_id)
     return SnippetOpportunity(**opportunity)
 
 
@@ -366,17 +372,17 @@ async def get_snippet_summary(
     summary="Generate Content Recommendations"
 )
 async def generate_recommendations(
-    keyword_id: UUID,
+    request: KeywordIdRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Generate AI-powered content recommendations for a keyword."""
-    keyword = await _get_keyword(keyword_id, db)
+    keyword = await _get_keyword(request.keyword_id, db)
 
     recommendations = await recommendation_service.generate_recommendations(
         db=db,
         project_id=keyword.project_id,
-        keyword_id=keyword_id,
+        keyword_id=request.keyword_id,
         keyword_text=keyword.keyword
     )
     await db.commit()

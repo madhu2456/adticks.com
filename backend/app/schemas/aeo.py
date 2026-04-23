@@ -68,6 +68,11 @@ class VisibilityCheckRequest(BaseModel):
     ai_models: list[str] = Field(default=["chatgpt", "perplexity", "claude"])
 
 
+class KeywordIdRequest(BaseModel):
+    """Simple request with only a keyword_id."""
+    keyword_id: UUID
+
+
 # ============================================================================
 # Featured Snippets & PAA
 # ============================================================================

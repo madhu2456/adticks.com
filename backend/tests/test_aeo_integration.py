@@ -356,33 +356,3 @@ class TestAEO_APIEndpoints:
         data = response.json()
         assert isinstance(data, list)
 
-
-# Fixtures
-@pytest.fixture
-def client() -> AsyncClient:
-    """HTTP client fixture."""
-    pytest.skip("Use conftest fixtures")
-
-
-@pytest.fixture
-def user_token(client: AsyncClient) -> str:
-    """User authentication token."""
-    pytest.skip("Use conftest fixtures")
-
-
-@pytest.fixture
-def other_user_token(client: AsyncClient) -> str:
-    """Different user authentication token."""
-    pytest.skip("Use conftest fixtures")
-
-
-@pytest.fixture
-def project(db) -> Project:
-    """Test project fixture."""
-    pytest.skip("Use conftest fixtures")
-
-
-@pytest.fixture
-def keyword(db) -> Keyword:
-    """Test keyword fixture."""
-    pytest.skip("Use conftest fixtures")
