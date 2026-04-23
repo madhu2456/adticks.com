@@ -293,7 +293,12 @@ async def usage(
         days_remaining = max(0, delta.days)
 
     from app.core.plans import get_plan_limits
-    limits = get_plan_limits(current_user.plan)
+    
+    plan_name = current_user.plan
+    if current_user.is_superuser:
+        plan_name = "enterprise"
+        
+    limits = get_plan_limits(plan_name)
 
     return {
         "ai_scans_used": ai_scans_used,
@@ -303,7 +308,7 @@ async def usage(
         "competitors_used": competitors_used,
         "competitors_limit": limits["competitors"],
         "days_remaining": days_remaining,
-        "plan": current_user.plan,
+        "plan": plan_name,
         "api_requests_today": 0,  # Placeholder
         "api_requests_month": 0,  # Placeholder
         "api_rate_limit": limits["api_rate_limit"],
