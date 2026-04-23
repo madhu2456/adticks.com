@@ -61,8 +61,11 @@ function InputField({ label, value, onChange, type = "text", placeholder }: {
 
 function ProfileTab() {
   const [form, setForm] = useState({ name: "", email: "", company: "" });
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     const user = getUser();
@@ -70,10 +73,33 @@ function ProfileTab() {
       setForm({
         name: user.full_name || user.name || "",
         email: user.email || "",
-        company: "Your Company", // Note: Company field is UI-only for now or could be project name
+        company: user.company_name || "",
       });
+      setAvatarUrl(user.avatar_url || null);
     }
   }, []);
+
+  async function handleAvatarClick() {
+    fileInputRef.current?.click();
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const updatedUser = await api.auth.uploadAvatar(file);
+      setAvatarUrl(updatedUser.avatar_url || null);
+      
+      const { setUser } = await import("@/lib/auth");
+      setUser(updatedUser);
+    } catch (err) {
+      alert("Failed to upload avatar.");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function handleSave() {
     setLoading(true);
@@ -81,6 +107,7 @@ function ProfileTab() {
       const updatedUser = await api.auth.updateMe({
         full_name: form.name,
         email: form.email,
+        company_name: form.company,
       });
       // Save updated user back to local storage
       const { setUser } = await import("@/lib/auth");
@@ -103,14 +130,44 @@ function ProfileTab() {
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] flex items-center justify-center text-white font-bold text-xl">
-          {form.name.charAt(0)}
+        <div className="relative group cursor-pointer" onClick={handleAvatarClick}>
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] flex items-center justify-center text-white font-bold text-xl overflow-hidden">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              form.name.charAt(0) || "U"
+            )}
+            
+            {/* Hover overlay */}
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <Plus className="w-5 h-5 text-white" />
+            </div>
+          </div>
+          
+          {uploading && (
+            <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center">
+              <Loader2 className="w-5 h-5 text-white animate-spin" />
+            </div>
+          )}
         </div>
+        
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          className="hidden" 
+          accept="image/*"
+          onChange={handleFileChange}
+        />
+        
         <div>
-          <p className="text-sm font-medium text-[#f1f5f9]">{form.name}</p>
-          <p className="text-xs text-[#94a3b8]">{form.email}</p>
-          <button className="text-xs text-[#6366f1] hover:text-[#8b5cf6] mt-1 transition-colors">
-            Change avatar
+          <p className="text-sm font-medium text-[#f1f5f9]">{form.name || "Your Name"}</p>
+          <p className="text-xs text-[#94a3b8]">{form.email || "user@example.com"}</p>
+          <button 
+            onClick={handleAvatarClick}
+            className="text-xs text-[#6366f1] hover:text-[#8b5cf6] mt-1 transition-colors disabled:opacity-50"
+            disabled={uploading}
+          >
+            {uploading ? "Uploading..." : "Change avatar"}
           </button>
         </div>
       </div>
@@ -270,14 +327,17 @@ interface Integration {
 }
 
 function IntegrationsTab() {
-  const [integrations, setIntegrations] = useState<Integration[]>([
+  const { activeProject } = useActiveProject();
+
+  const integrations = [
     {
       id: "gsc",
       name: "Google Search Console",
       description: "Track impressions, clicks, CTR and ranking positions",
       icon: BarChart2,
       color: "#6366f1",
-      connected: false,
+      connected: activeProject?.gsc_connected || false,
+      available: true,
     },
     {
       id: "ads",
@@ -285,7 +345,8 @@ function IntegrationsTab() {
       description: "Monitor spend, conversions, ROAS and campaign data",
       icon: Megaphone,
       color: "#f97316",
-      connected: false,
+      connected: activeProject?.ads_connected || false,
+      available: false,
     },
     {
       id: "ga4",
@@ -294,13 +355,12 @@ function IntegrationsTab() {
       icon: TrendingUp,
       color: "#10b981",
       connected: false,
+      available: false,
     },
-  ]);
+  ];
 
-  const { activeProject } = useActiveProject();
-
-  async function toggleConnect(id: string) {
-    if (id === "gsc" && !integrations.find(i => i.id === "gsc")?.connected) {
+  async function handleConnect(id: string) {
+    if (id === "gsc") {
       if (!activeProject) {
         alert("Please select a project first.");
         return;
@@ -308,68 +368,63 @@ function IntegrationsTab() {
       try {
         const { url } = await api.gsc.getAuthUrl(activeProject.id);
         window.location.href = url;
-        return;
       } catch (err) {
-        alert("Failed to get connection URL.");
+        alert("Failed to initialize connection.");
       }
+    } else {
+      alert(`${integrations.find(i => i.id === id)?.name} integration is coming soon! Contact support to join the beta.`);
     }
-
-    setIntegrations((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, connected: !i.connected } : i))
-    );
   }
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold text-[#f1f5f9] mb-1">Integrations</h2>
-        <p className="text-sm text-[#94a3b8]">Connect your marketing tools</p>
+        <p className="text-sm text-[#94a3b8]">Connect your external data sources to AdTicks</p>
       </div>
 
-      <div className="space-y-3">
-        {integrations.map((integration) => {
-          const Ic = integration.icon;
-          return (
+      <div className="space-y-4">
+        {integrations.map((i) => (
+          <div
+            key={i.id}
+            className="flex items-center gap-4 bg-[#0f172a]/40 border border-[#334155] rounded-xl p-5"
+          >
             <div
-              key={integration.id}
-              className="flex items-center gap-4 bg-[#0f172a]/40 border border-[#334155] rounded-xl p-5"
+              className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+              style={{ backgroundColor: `${i.color}18` }}
             >
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-                style={{ backgroundColor: `${integration.color}18` }}
-              >
-                <Ic className="h-6 w-6" style={{ color: integration.color }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-[#f1f5f9]">{integration.name}</p>
-                  {integration.connected ? (
-                    <span className="flex items-center gap-1 text-[10px] font-semibold text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/20 px-2 py-0.5 rounded-md">
-                      <CheckCircle className="h-2.5 w-2.5" />
-                      Connected
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-[10px] font-semibold text-[#94a3b8] bg-[#334155] border border-[#475569]/30 px-2 py-0.5 rounded-md">
-                      <XCircle className="h-2.5 w-2.5" />
-                      Not connected
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-[#94a3b8] mt-0.5">{integration.description}</p>
-              </div>
-              <button
-                onClick={() => toggleConnect(integration.id)}
-                className={`shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  integration.connected
-                    ? "bg-[#334155] hover:bg-[#ef4444]/20 text-[#94a3b8] hover:text-[#ef4444]"
-                    : "bg-[#6366f1]/10 hover:bg-[#6366f1]/20 border border-[#6366f1]/30 text-[#6366f1]"
-                }`}
-              >
-                {integration.connected ? "Disconnect" : "Connect"}
-              </button>
+              <i.icon className="h-6 w-6" style={{ color: i.color }} />
             </div>
-          );
-        })}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-sm font-semibold text-[#f1f5f9]">{i.name}</h3>
+                {i.connected && (
+                  <span className="flex items-center gap-1 text-[10px] font-semibold text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/20 px-2 py-0.5 rounded-md">
+                    <CheckCircle className="h-3 w-3" /> Connected
+                  </span>
+                )}
+                {!i.available && !i.connected && (
+                  <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                    COMING SOON
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[#94a3b8]">{i.description}</p>
+            </div>
+            <button
+              onClick={() => handleConnect(i.id)}
+              disabled={i.connected}
+              className={cn(
+                "px-4 py-2 rounded-lg text-xs font-bold transition-all shrink-0",
+                i.connected
+                  ? "bg-white/[0.05] text-[#475569] cursor-default"
+                  : "bg-white text-black hover:bg-white/90 active:scale-95"
+              )}
+            >
+              {i.connected ? "Manage" : "Connect"}
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -44,8 +44,6 @@ const NAV_SECTIONS = [
         label: 'SEO Hub',
         href: '/seo',
         icon: Search,
-        badge: '2,847',
-        badgeType: 'count' as const,
         shortcut: 'G S',
         description: 'Keywords & rank tracking',
       },
@@ -88,8 +86,6 @@ const NAV_SECTIONS = [
         label: 'Insights',
         href: '/insights',
         icon: Zap,
-        badge: 3,
-        badgeType: 'alert' as const,
         shortcut: 'G I',
         description: 'AI-powered recommendations',
       },
@@ -165,7 +161,7 @@ function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
-  const [user, setUser] = useState<{ name: string; email: string; initials: string; plan?: string } | null>(null)
+  const [user, setUser] = useState<{ name: string; email: string; initials: string; plan?: string; avatarUrl?: string } | null>(null)
 
   useEffect(() => {
     const currentUser = getUser()
@@ -178,7 +174,8 @@ function Sidebar({ collapsed, onToggle }: SidebarProps) {
         name,
         email: currentUser.email,
         initials,
-        plan: currentUser.plan
+        plan: currentUser.plan,
+        avatarUrl: currentUser.avatar_url
       })
     }
   }, [])
@@ -194,8 +191,8 @@ function Sidebar({ collapsed, onToggle }: SidebarProps) {
       transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
       className="fixed left-0 top-0 h-screen z-40 flex flex-col overflow-hidden"
       style={{
-        background: '#0e0e10',
-        borderRight: '1px solid rgba(255,255,255,0.055)',
+        background: 'var(--bg)',
+        borderRight: '1px solid var(--border)',
       }}
     >
       {/* ── Logo ─────────────────────────────────────────────────────── */}
@@ -452,94 +449,98 @@ function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </nav>
 
       {/* ── Trial / Upgrade banner ───────────────────────────────────── */}
-      <div className="flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.055)' }}>
-        <AnimatePresence>
-          {!collapsed && (
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 6 }}
-              className="p-3"
-            >
-              <div
-                className="rounded-xl p-3 space-y-2.5 relative overflow-hidden"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.06))',
-                  border: '1px solid rgba(99,102,241,0.18)',
-                }}
+      {user?.plan === 'free' && (
+        <div className="flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.055)' }}>
+          <AnimatePresence>
+            {!collapsed && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 6 }}
+                className="p-3"
               >
-                {/* Subtle glow orb */}
                 <div
-                  className="absolute -top-4 -right-4 w-16 h-16 rounded-full pointer-events-none"
-                  style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.2), transparent 70%)', filter: 'blur(12px)' }}
-                />
-                <div className="flex items-center justify-between relative">
-                  <div>
-                    <p className="text-[11px] font-semibold text-text-2">Trial Plan</p>
-                    <p className="text-xs font-semibold text-warning mt-0.5">14 days remaining</p>
-                  </div>
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center"
-                    style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.2)' }}
-                  >
-                    <Zap className="w-3.5 h-3.5 text-warning" />
-                  </div>
-                </div>
-
-                {/* Progress bar */}
-                <div className="space-y-1">
-                  <div
-                    className="h-1 rounded-full overflow-hidden relative"
-                    style={{ background: 'rgba(255,255,255,0.06)' }}
-                  >
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: '80%',
-                        background: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
-                        boxShadow: '0 0 6px rgba(99,102,241,0.5)',
-                      }}
-                    />
-                  </div>
-                  <p className="text-[10px] text-text-3">80% of trial period used</p>
-                </div>
-
-                <button
-                  onClick={() => router.push('/settings?tab=plan')}
-                  className="w-full flex items-center justify-center gap-1.5 h-7 rounded-lg text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+                  className="rounded-xl p-3 space-y-2.5 relative overflow-hidden"
                   style={{
-                    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                    boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+                    background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.06))',
+                    border: '1px solid rgba(99,102,241,0.18)',
                   }}
                 >
-                  Upgrade to Pro
-                  <ArrowRight size={11} />
-                </button>
+                  {/* Subtle glow orb */}
+                  <div
+                    className="absolute -top-4 -right-4 w-16 h-16 rounded-full pointer-events-none"
+                    style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.2), transparent 70%)', filter: 'blur(12px)' }}
+                  />
+                  <div className="flex items-center justify-between relative">
+                    <div>
+                      <p className="text-[11px] font-semibold text-text-2">Trial Plan</p>
+                      <p className="text-xs font-semibold text-warning mt-0.5">14 days remaining</p>
+                    </div>
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center"
+                      style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.2)' }}
+                    >
+                      <Zap className="w-3.5 h-3.5 text-warning" />
+                    </div>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="space-y-1">
+                    <div
+                      className="h-1 rounded-full overflow-hidden relative"
+                      style={{ background: 'rgba(255,255,255,0.06)' }}
+                    >
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: '80%',
+                          background: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
+                          boxShadow: '0 0 6px rgba(99,102,241,0.5)',
+                        }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-text-3">80% of trial period used</p>
+                  </div>
+
+                  <button
+                    onClick={() => router.push('/settings?tab=plan')}
+                    className="w-full flex items-center justify-center gap-1.5 h-7 rounded-lg text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+                    style={{
+                      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                      boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+                    }}
+                  >
+                    Upgrade to Pro
+                    <ArrowRight size={11} />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Collapsed: just the zap icon */}
+          {collapsed && (
+            <div className="py-2 flex justify-center">
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
+                style={{ background: 'rgba(234,179,8,0.10)' }}
+                title="Upgrade to Pro"
+              >
+                <Zap className="w-4 h-4 text-warning" />
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Collapsed: just the zap icon */}
-        {collapsed && (
-          <div className="py-2 flex justify-center">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
-              style={{ background: 'rgba(234,179,8,0.10)' }}
-              title="Upgrade to Pro"
-            >
-              <Zap className="w-4 h-4 text-warning" />
             </div>
-          </div>
-        )}
-
-        {/* ── User section ──────────────────────────────────────────── */}
-        <div
-          className={cn(
-            'flex items-center gap-2.5 cursor-pointer hover:bg-white/[0.03] transition-colors',
-            collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5',
           )}
-        >
+        </div>
+      )}
+
+      {/* ── User section ──────────────────────────────────────────── */}
+      <div
+        className={cn(
+          'flex items-center gap-2.5 cursor-pointer hover:bg-white/[0.03] transition-colors',
+          collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5',
+        )}
+        style={{ borderTop: user?.plan !== 'free' ? '1px solid rgba(255,255,255,0.055)' : 'none' }}
+      >
           <div
             className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[11px] font-bold text-white"
             style={{

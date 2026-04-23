@@ -56,10 +56,10 @@ function Sparkline({
 
 /* ── Sparkline data seeds ────────────────────────────────────────────── */
 const SPARKLINES: Record<string, number[]> = {
-  total_keywords:  [2200, 2310, 2280, 2400, 2450, 2520, 2600, 2700, 2750, 2847],
-  ai_mentions:     [124,  130,  128,  142,  138,  155,  162,  170,  175,  186],
-  gsc_impressions: [38000,40000,41000,39500,43000,45000,47000,48500,51000,52400],
-  ad_spend:        [3200, 3400, 3100, 3600, 3500, 3800, 4100, 3900, 4200, 4320],
+  total_keywords:  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ai_mentions:     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  gsc_impressions: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ad_spend:        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 };
 
 /* ── Stat card config ────────────────────────────────────────────────── */
@@ -263,8 +263,8 @@ export function DashboardContent() {
                 href={qa.href}
                 className="group flex items-center gap-2.5 h-10 px-3 rounded-xl transition-all hover:-translate-y-px"
                 style={{
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.07)',
+                  background: 'var(--surface-1)',
+                  border: '1px solid var(--border)',
                 }}
               >
                 <div
@@ -308,8 +308,8 @@ export function DashboardContent() {
                   <div
                     className="relative overflow-hidden rounded-xl h-full cursor-pointer group transition-all hover:-translate-y-px"
                     style={{
-                      background: '#141416',
-                      border: '1px solid rgba(255,255,255,0.07)',
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--border)',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
                     }}
                   >

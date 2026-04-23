@@ -136,6 +136,10 @@ class StorageService:
     def exports_path(project_id: str, filename: str) -> str:
         return f"projects/{project_id}/exports/{filename}"
 
+    @staticmethod
+    def avatar_path(user_id: str, filename: str) -> str:
+        return f"users/{user_id}/avatar/{filename}"
+
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------

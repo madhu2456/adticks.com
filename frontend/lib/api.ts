@@ -75,8 +75,15 @@ export const api = {
     register: (data: RegisterRequest) =>
       axiosInstance.post<AuthTokens>("/auth/register", data).then(unwrap),
     me: () => axiosInstance.get<User>("/auth/me").then(unwrap),
-    updateMe: (data: { full_name?: string; email?: string; password?: string }) =>
+    updateMe: (data: { full_name?: string; email?: string; password?: string; company_name?: string }) =>
       axiosInstance.patch<User>("/auth/me", data).then(unwrap),
+    uploadAvatar: (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return axiosInstance.post<User>("/auth/avatar", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      }).then(unwrap);
+    },
     logout: () => axiosInstance.post("/auth/logout").then(unwrap),
     refreshToken: (refreshToken: string) =>
       axiosInstance.post<AuthTokens>("/auth/refresh", { refresh_token: refreshToken }).then(unwrap),

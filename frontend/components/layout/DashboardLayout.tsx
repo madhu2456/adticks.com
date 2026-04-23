@@ -8,7 +8,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen" style={{ background: '#09090b' }}>
+    <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
       <Header sidebarCollapsed={collapsed} />
 
@@ -22,7 +22,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         <div
           className="pointer-events-none fixed top-14 left-0 right-0 h-32 z-10"
           style={{
-            background: 'linear-gradient(to bottom, rgba(9,9,11,0.4), transparent)',
+            background: 'linear-gradient(to bottom, var(--surface-1), transparent)',
+            opacity: 0.15,
           }}
         />
 

@@ -9,7 +9,7 @@ const MOCK_PROJECTS: Project[] = [];
 export function useProjects() {
   return useQuery({
     queryKey: ["projects"],
-    queryFn: () => api.projects.list().catch(() => []),
+    queryFn: () => api.projects.list().then(res => res.data).catch(() => []),
     initialData: [],
     staleTime: 5 * 60 * 1000,
   });

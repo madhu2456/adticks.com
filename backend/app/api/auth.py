@@ -10,7 +10,8 @@ POST /auth/refresh   — refresh an access token using a refresh token
 POST /auth/logout    — logout (client-side token invalidation)
 """
 
-from fastapi import APIRouter, Depends, Request, status
+import uuid
+from fastapi import APIRouter, Depends, Request, status, File, UploadFile, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +20,7 @@ from app.core.database import get_db
 from app.core.exceptions import AuthenticationError, ConflictError
 from app.core.logging import get_logger
 from app.core.transactions import transaction_scope
+from app.core.storage import storage
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -248,6 +250,9 @@ async def update_me(
     async with transaction_scope(db) as tx:
         if payload.full_name is not None:
             current_user.full_name = payload.full_name
+            
+        if payload.company_name is not None:
+            current_user.company_name = payload.company_name
         
         if payload.email is not None:
             # Check if email is already taken by another user
@@ -265,3 +270,54 @@ async def update_me(
         
         logger.info("user_updated", extra={"user_id": str(current_user.id)})
         return current_user
+
+
+@router.post("/avatar", response_model=UserResponse)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Upload a new profile avatar.
+    """
+    # 1. Validate file extension
+    ext = file.filename.split(".")[-1].lower() if "." in file.filename else ""
+    if ext not in ("jpg", "jpeg", "png", "webp", "gif"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported file extension"
+        )
+
+    # 2. Read content
+    content = await file.read()
+    
+    # 3. Upload to storage
+    filename = f"avatar_{uuid.uuid4().hex}.{ext}"
+    path = storage.avatar_path(str(current_user.id), filename)
+    
+    try:
+        public_url = storage.upload_file(path, content)
+    except Exception as exc:
+        logger.error("Failed to upload avatar: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to upload file to storage"
+        )
+
+    # 4. Update user record
+    async with transaction_scope(db) as tx:
+        # Delete old avatar if exists
+        if current_user.avatar_url:
+            try:
+                # Extract path from URL (naive)
+                old_path = current_user.avatar_url.split(settings.DO_SPACES_BUCKET + "/")[-1]
+                storage.delete_file(old_path)
+            except Exception:
+                pass
+        
+        current_user.avatar_url = public_url
+        tx.add(current_user)
+        await tx.flush()
+        
+    return current_user

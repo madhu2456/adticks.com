@@ -2,6 +2,7 @@ import React from "react";
 import type { Metadata } from "next";
 import "./globals.css";
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { ThemeProvider } from "next-themes";
 
@@ -16,9 +17,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body className="bg-background text-text-primary antialiased">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-          <QueryProvider>
-            <PageErrorBoundary>{children}</PageErrorBoundary>
-          </QueryProvider>
+          <AuthProvider>
+            <QueryProvider>
+              <PageErrorBoundary>{children}</PageErrorBoundary>
+            </QueryProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

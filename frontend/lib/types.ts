@@ -8,6 +8,7 @@ export interface User {
   email: string;
   name: string;
   full_name?: string;
+  company_name?: string;
   avatar?: string;
   plan: "free" | "starter" | "pro" | "enterprise";
   trial_ends_at?: string;

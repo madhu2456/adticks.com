@@ -64,7 +64,7 @@ export function TopInsights({ insights, loading }: TopInsightsProps) {
   return (
     <div
       className="rounded-xl"
-      style={{ background: '#141416', border: '1px solid rgba(255,255,255,0.07)', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }}
+      style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }}
     >
       {/* Header */}
       <div

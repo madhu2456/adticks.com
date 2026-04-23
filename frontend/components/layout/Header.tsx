@@ -16,6 +16,7 @@ import { api } from '@/lib/api'
 import { clearTokens, getUser } from '@/lib/auth'
 import { useProjects, useActiveProject } from '@/hooks/useProject'
 import { ProjectModal } from '@/components/projects/ProjectModal'
+import { CommandPalette } from '@/components/layout/CommandPalette'
 import { Project, User as UserType } from '@/lib/types'
 
 /* ── Data ─────────────────────────────────────────────────────────────── */
@@ -75,12 +76,13 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
   const [userOpen,     setUserOpen]     = useState(false)
   const [scanning,     setScanning]     = useState(false)
   const [isModalOpen,  setModalOpen]    = useState(false)
+  const [isCommandOpen, setCommandOpen] = useState(false)
   
   const [notifications, setNotifications] = useState(NOTIFICATIONS)
   const [scanProgress,  setScanProgress]  = useState(0)
   const [mounted, setMounted] = useState(false)
   const { theme, setTheme } = useTheme()
-  const [user, setUser] = useState<{ name: string; email: string; initials: string; plan?: string } | null>(null)
+  const [user, setUser] = useState<{ name: string; email: string; initials: string; plan?: string; avatarUrl?: string } | null>(null)
 
   const projectRef = useRef<HTMLDivElement>(null!)
   const notifRef   = useRef<HTMLDivElement>(null!)
@@ -104,7 +106,7 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
   }
 
   const handleScan = async () => {
-    if (scanning) return
+    if (scanning || !activeProject) return
     setScanning(true)
     setScanProgress(0)
     for (let p = 0; p <= 100; p += 4) {
@@ -140,14 +142,15 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
         name,
         email: currentUser.email,
         initials,
-        plan: currentUser.plan
+        plan: currentUser.plan,
+        avatarUrl: currentUser.avatar_url
       })
     }
   }, [])
 
-  // ⌘K trigger (UI-only for now)
+  // ⌘K trigger
   const handleCommandPalette = useCallback(() => {
-    alert('Command Palette coming soon! Press ⌘K to try again later.');
+    setCommandOpen(true)
   }, [])
 
   useEffect(() => {
@@ -170,10 +173,10 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
           paddingLeft: '16px',
           paddingRight: '16px',
           transition: 'left 0.22s cubic-bezier(0.4,0,0.2,1)',
-          background: 'rgba(9,9,11,0.88)',
+          background: 'var(--glass)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          borderBottom: '1px solid rgba(255,255,255,0.055)',
+          borderBottom: '1px solid var(--border)',
         }}
       >
       {/* ── Scan progress bar ────────────────────────────────────────── */}
@@ -313,10 +316,11 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
         {/* Run Full Scan */}
         <button
           onClick={handleScan}
-          disabled={scanning}
+          disabled={scanning || !activeProject}
+          title={!activeProject ? "Select a project to run scan" : "Run AI Scan"}
           className={cn(
             'flex items-center gap-1.5 h-8 px-3 rounded-lg text-[13px] font-semibold text-white transition-all',
-            'disabled:opacity-60',
+            'disabled:opacity-40 disabled:cursor-not-allowed',
           )}
           style={{
             background: scanning
@@ -426,17 +430,21 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
           </Dropdown>
         </div>
 
-        {/* User avatar */}
+        {/* User avatar ─────────────────────────────────────────────── */}
         <div ref={userRef} className="relative">
           <button
             onClick={() => { closeAll(); setUserOpen(p => !p) }}
-            className="flex items-center justify-center w-8 h-8 rounded-full text-white text-[11px] font-bold hover:opacity-90 transition-all"
+            className="flex items-center justify-center w-8 h-8 rounded-full text-white text-[11px] font-bold hover:opacity-90 transition-all overflow-hidden"
             style={{
               background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
               boxShadow: '0 0 0 2px rgba(99,102,241,0.25)',
             }}
           >
-            {user?.initials || '??'}
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              user?.initials || '??'
+            )}
           </button>
 
           <Dropdown open={userOpen} className="right-0 w-56">
@@ -446,10 +454,14 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
             >
               <div className="flex items-center gap-2.5">
                 <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0 overflow-hidden"
                   style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
                 >
-                  {user?.initials || '??'}
+                  {user?.avatarUrl ? (
+                    <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    user?.initials || '??'
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
@@ -498,6 +510,11 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
         isOpen={isModalOpen} 
         onClose={() => setModalOpen(false)} 
         onSuccess={(id) => setActiveId(id)}
+      />
+
+      <CommandPalette 
+        isOpen={isCommandOpen} 
+        onClose={() => setCommandOpen(false)} 
       />
     </>
   )

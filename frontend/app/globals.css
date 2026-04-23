@@ -5,29 +5,50 @@
 @tailwind utilities;
 
 :root {
+  --bg:          #ffffff;
+  --surface-0:   #ffffff;
+  --surface-1:   #f4f4f5;
+  --surface-2:   #e4e4e7;
+  --surface-3:   #d4d4d8;
+  --surface-4:   #a1a1aa;
+  --glass:       rgba(255,255,255,0.8);
+  --border:      rgba(0,0,0,0.08);
+  --border-h:    rgba(0,0,0,0.12);
+  --border-s:    rgba(0,0,0,0.16);
+  --primary:     #6366f1;
+  --primary-dim: rgba(99,102,241,0.08);
+  --primary-glow:rgba(99,102,241,0.15);
+  --violet:      #8b5cf6;
+  --pink:        #ec4899;
+  --sky:         #38bdf8;
+  --emerald:     #10b981;
+  --amber:       #f59e0b;
+  --success:     #10b981;
+  --warning:     #f59e0b;
+  --danger:      #ef4444;
+  --text-1:      #09090b;
+  --text-2:      #3f3f46;
+  --text-3:      #71717a;
+  --radius:      10px;
+}
+
+.dark {
   --bg:          #09090b;
+  --surface-0:   #09090b;
   --surface-1:   #111113;
   --surface-2:   #18181b;
   --surface-3:   #1f1f23;
   --surface-4:   #27272a;
+  --glass:       rgba(9,9,11,0.8);
   --border:      rgba(255,255,255,0.06);
   --border-h:    rgba(255,255,255,0.10);
   --border-s:    rgba(255,255,255,0.14);
   --primary:     #6366f1;
   --primary-dim: rgba(99,102,241,0.12);
   --primary-glow:rgba(99,102,241,0.25);
-  --violet:      #8b5cf6;
-  --pink:        #ec4899;
-  --sky:         #38bdf8;
-  --emerald:     #34d399;
-  --amber:       #fbbf24;
-  --success:     #22c55e;
-  --warning:     #eab308;
-  --danger:      #ef4444;
   --text-1:      #fafafa;
   --text-2:      #a1a1aa;
   --text-3:      #52525b;
-  --radius:      10px;
 }
 
 @layer base {

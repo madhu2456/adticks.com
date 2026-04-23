@@ -21,7 +21,7 @@ export function ChannelBreakdown({ data, loading }: ChannelBreakdownProps) {
     return (
       <div
         className="rounded-xl"
-        style={{ background: '#141416', border: '1px solid rgba(255,255,255,0.07)' }}
+        style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
       >
         <div className="p-5 pb-4"><Skeleton className="h-5 w-44" /></div>
         <div className="px-5 pb-5"><Skeleton className="h-56 w-full" /></div>
@@ -33,8 +33,8 @@ export function ChannelBreakdown({ data, loading }: ChannelBreakdownProps) {
     <div
       className="rounded-xl flex flex-col h-full"
       style={{
-        background: '#141416',
-        border: '1px solid rgba(255,255,255,0.07)',
+        background: 'var(--surface-2)',
+        border: '1px solid var(--border)',
         boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
       }}
     >
