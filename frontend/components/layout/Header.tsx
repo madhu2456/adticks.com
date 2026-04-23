@@ -80,7 +80,7 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
   const [scanProgress,  setScanProgress]  = useState(0)
   const [mounted, setMounted] = useState(false)
   const { theme, setTheme } = useTheme()
-  const [user, setUser] = useState<{ name: string; email: string; initials: string } | null>(null)
+  const [user, setUser] = useState<{ name: string; email: string; initials: string; plan?: string } | null>(null)
 
   const projectRef = useRef<HTMLDivElement>(null!)
   const notifRef   = useRef<HTMLDivElement>(null!)
@@ -132,13 +132,15 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
     setMounted(true)
     const currentUser = getUser()
     if (currentUser) {
-      const initials = currentUser.name
-        ? currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase()
+      const name = currentUser.full_name || currentUser.name || 'User'
+      const initials = name
+        ? name.split(' ').map(n => n[0]).join('').toUpperCase()
         : currentUser.email[0].toUpperCase()
       setUser({
-        name: currentUser.name || 'User',
+        name,
         email: currentUser.email,
-        initials
+        initials,
+        plan: currentUser.plan
       })
     }
   }, [])
@@ -160,19 +162,20 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
   }, [handleCommandPalette])
 
   return (
-    <header
-      className="fixed top-0 right-0 z-30 flex items-center h-14 gap-2"
-      style={{
-        left: sidebarCollapsed ? 60 : 224,
-        paddingLeft: '16px',
-        paddingRight: '16px',
-        transition: 'left 0.22s cubic-bezier(0.4,0,0.2,1)',
-        background: 'rgba(9,9,11,0.88)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255,255,255,0.055)',
-      }}
-    >
+    <>
+      <header
+        className="fixed top-0 right-0 z-30 flex items-center h-14 gap-2"
+        style={{
+          left: sidebarCollapsed ? 60 : 224,
+          paddingLeft: '16px',
+          paddingRight: '16px',
+          transition: 'left 0.22s cubic-bezier(0.4,0,0.2,1)',
+          background: 'rgba(9,9,11,0.88)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(255,255,255,0.055)',
+        }}
+      >
       {/* ── Scan progress bar ────────────────────────────────────────── */}
       <AnimatePresence>
         {scanning && (
@@ -261,12 +264,6 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
           </div>
         </Dropdown>
       </div>
-
-      <ProjectModal 
-        isOpen={isModalOpen} 
-        onClose={() => setModalOpen(false)} 
-        onSuccess={(id) => setActiveId(id)}
-      />
 
       {/* ── Breadcrumb ───────────────────────────────────────────────── */}
       <div className="hidden md:flex items-center gap-1 text-[13px] text-text-3 ml-1">
@@ -454,8 +451,15 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
                 >
                   {user?.initials || '??'}
                 </div>
-                <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-text-1 truncate">{user?.name || 'Loading...'}</p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-[13px] font-semibold text-text-1 truncate">{user?.name || 'Loading...'}</p>
+                    {user?.plan && user.plan !== 'free' && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/20 text-primary uppercase tracking-wider">
+                        {user.plan}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-text-3 truncate">{user?.email || '...'}</p>
                 </div>
               </div>
@@ -488,7 +492,14 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
           </Dropdown>
         </div>
       </div>
-    </header>
+      </header>
+
+      <ProjectModal 
+        isOpen={isModalOpen} 
+        onClose={() => setModalOpen(false)} 
+        onSuccess={(id) => setActiveId(id)}
+      />
+    </>
   )
 }
 

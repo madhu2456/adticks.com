@@ -6,8 +6,9 @@ import {
   Plus, X, ChevronDown, BarChart2, Megaphone, TrendingUp,
   Zap, Crown,
 } from "lucide-react";
-import { useActiveProject } from "@/hooks/useProject";
+import { useActiveProject, useUpdateProject } from "@/hooks/useProject";
 import { api } from "@/lib/api";
+import { getUser } from "@/lib/auth";
 
 type Tab = "profile" | "project" | "integrations" | "plan" | "api";
 
@@ -59,12 +60,39 @@ function InputField({ label, value, onChange, type = "text", placeholder }: {
 }
 
 function ProfileTab() {
-  const [form, setForm] = useState({ name: "Your Name", email: "user@example.com", company: "Your Company" });
+  const [form, setForm] = useState({ name: "", email: "", company: "" });
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+  React.useEffect(() => {
+    const user = getUser();
+    if (user) {
+      setForm({
+        name: user.full_name || user.name || "",
+        email: user.email || "",
+        company: "Your Company", // Note: Company field is UI-only for now or could be project name
+      });
+    }
+  }, []);
+
+  async function handleSave() {
+    setLoading(true);
+    try {
+      const updatedUser = await api.auth.updateMe({
+        full_name: form.name,
+        email: form.email,
+      });
+      // Save updated user back to local storage
+      const { setUser } = await import("@/lib/auth");
+      setUser(updatedUser);
+      
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      alert("Failed to save profile changes.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -101,11 +129,29 @@ function ProfileTab() {
 }
 
 function ProjectTab() {
-  const [domain, setDomain] = useState("yourdomain.com");
-  const [industry, setIndustry] = useState("SaaS / Marketing");
+  const { activeProject } = useActiveProject();
+  const updateProject = useUpdateProject();
+  
+  const [form, setForm] = useState({ 
+    brand_name: "", 
+    domain: "", 
+    industry: "SaaS / Marketing" 
+  });
+  
   const [competitors, setCompetitors] = useState(["Competitor A", "Competitor B"]);
   const [newComp, setNewComp] = useState("");
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    if (activeProject) {
+      setForm({
+        brand_name: activeProject.brand_name || activeProject.name || "",
+        domain: activeProject.domain || "",
+        industry: activeProject.industry || "SaaS / Marketing",
+      });
+    }
+  }, [activeProject]);
 
   function addCompetitor() {
     if (newComp.trim() && !competitors.includes(newComp.trim())) {
@@ -118,15 +164,37 @@ function ProjectTab() {
     setCompetitors(competitors.filter((x) => x !== c));
   }
 
-  function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+  async function handleSave() {
+    if (!activeProject) return;
+    setLoading(true);
+    try {
+      await updateProject.mutateAsync({
+        id: activeProject.id,
+        data: form
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      alert("Failed to update project settings.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   const industries = [
     "SaaS / Marketing", "E-commerce", "Finance", "Healthcare",
     "Education", "Real Estate", "Travel", "Media / Publishing", "Other",
   ];
+
+  if (!activeProject) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <FolderOpen className="h-12 w-12 text-[#475569] mb-4" />
+        <h2 className="text-lg font-semibold text-[#f1f5f9]">No Project Selected</h2>
+        <p className="text-sm text-[#94a3b8] max-w-xs mt-1">Select or create a project to manage its settings.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -135,14 +203,17 @@ function ProjectTab() {
         <p className="text-sm text-[#94a3b8]">Configure your tracked domain and competitors</p>
       </div>
 
-      <InputField label="Project Domain" value={domain} onChange={setDomain} placeholder="example.com" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <InputField label="Brand Name" value={form.brand_name} onChange={(v) => setForm({ ...form, brand_name: v })} placeholder="Your Brand" />
+        <InputField label="Project Domain" value={form.domain} onChange={(v) => setForm({ ...form, domain: v })} placeholder="example.com" />
+      </div>
 
       <div>
         <label className="block text-sm font-medium text-[#f1f5f9] mb-1.5">Industry</label>
         <div className="relative">
           <select
-            value={industry}
-            onChange={(e) => setIndustry(e.target.value)}
+            value={form.industry}
+            onChange={(e) => setForm({ ...form, industry: e.target.value })}
             className="w-full appearance-none rounded-lg bg-[#0f172a] border border-[#334155] text-[#f1f5f9] px-3.5 py-2.5 text-sm pr-10 focus:outline-none focus:ring-2 focus:ring-[#6366f1]/40 focus:border-[#6366f1] transition-colors cursor-pointer"
           >
             {industries.map((ind) => (
@@ -408,7 +479,7 @@ function PlanTab() {
 }
 
 function APITab() {
-  const [apiKey] = useState("at_live_sk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+  const [apiKey] = useState("No API Key generated yet.");
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
   const [regenerating, setRegenerating] = useState(false);

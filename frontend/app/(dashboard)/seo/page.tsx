@@ -79,8 +79,8 @@ export default function SEOPage() {
         <TabsContent value="technical">
           <div className="space-y-4">
             <div>
-              <h2 className="text-lg font-semibold text-text-primary">Technical SEO</h2>
-              <p className="text-sm text-text-muted">Core technical health checks for adticks.io</p>
+              <h2 className="text-lg font-semibold text-text-primary">Technical Audit</h2>
+              <p className="text-sm text-text-muted">Core technical health checks for your domain</p>
             </div>
             <TechnicalSEO checks={mockTechnicalChecks} />
           </div>

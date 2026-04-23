@@ -165,18 +165,20 @@ function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
-  const [user, setUser] = useState<{ name: string; email: string; initials: string } | null>(null)
+  const [user, setUser] = useState<{ name: string; email: string; initials: string; plan?: string } | null>(null)
 
   useEffect(() => {
     const currentUser = getUser()
     if (currentUser) {
-      const initials = currentUser.full_name
-        ? currentUser.full_name.split(' ').map(n => n[0]).join('').toUpperCase()
+      const name = currentUser.full_name || currentUser.name || 'User'
+      const initials = name
+        ? name.split(' ').map(n => n[0]).join('').toUpperCase()
         : currentUser.email[0].toUpperCase()
       setUser({
-        name: currentUser.full_name || 'User',
+        name,
         email: currentUser.email,
-        initials
+        initials,
+        plan: currentUser.plan
       })
     }
   }, [])
@@ -555,7 +557,14 @@ function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 exit={{ opacity: 0 }}
                 className="flex-1 min-w-0"
               >
-                <p className="text-[12px] font-semibold text-text-1 truncate leading-none">{user?.name || 'Loading...'}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[12px] font-semibold text-text-1 truncate leading-none">{user?.name || 'Loading...'}</p>
+                  {user?.plan && user.plan !== 'free' && (
+                    <span className="text-[8px] font-bold px-1 py-0 rounded bg-primary/20 text-primary uppercase tracking-wider">
+                      {user.plan}
+                    </span>
+                  )}
+                </div>
                 <p className="text-[10px] text-text-3 truncate mt-0.5">{user?.email || '...'}</p>
               </motion.div>
             )}

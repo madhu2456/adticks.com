@@ -28,7 +28,7 @@ from app.core.security import (
     verify_refresh_token,
 )
 from app.models.user import User
-from app.schemas.user import RefreshTokenRequest, Token, UserCreate, UserLogin, UserResponse
+from app.schemas.user import RefreshTokenRequest, Token, UserCreate, UserLogin, UserResponse, UserUpdate
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = get_logger(__name__)
@@ -229,3 +229,39 @@ async def me(current_user: User = Depends(get_current_user)):
     - 401 Unauthorized: Invalid or missing token
     """
     return current_user
+
+
+@router.patch("/me", response_model=UserResponse)
+async def update_me(
+    payload: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Update the current user's profile information.
+    
+    **Authentication:** Required (Bearer token)
+    
+    **Returns:**
+    - Updated user object
+    """
+    async with transaction_scope(db) as tx:
+        if payload.full_name is not None:
+            current_user.full_name = payload.full_name
+        
+        if payload.email is not None:
+            # Check if email is already taken by another user
+            if payload.email != current_user.email:
+                result = await tx.execute(select(User).where(User.email == payload.email))
+                if result.scalar_one_or_none():
+                    raise ConflictError("Email already registered")
+                current_user.email = payload.email
+        
+        if payload.password is not None:
+            current_user.hashed_password = hash_password(payload.password)
+            
+        tx.add(current_user)
+        await tx.flush()
+        
+        logger.info("user_updated", extra={"user_id": str(current_user.id)})
+        return current_user

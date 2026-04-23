@@ -38,6 +38,13 @@ class UserLogin(BaseModel):
     password: str = Field(min_length=1, max_length=128)
 
 
+class UserUpdate(BaseModel):
+    """Schema for updating user profile."""
+    email: EmailStr | None = None
+    full_name: str | None = Field(default=None, min_length=1, max_length=255)
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+
+
 class UserResponse(BaseModel):
     """Schema for user responses (excludes sensitive data)."""
     id: UUID
@@ -45,6 +52,7 @@ class UserResponse(BaseModel):
     full_name: str | None
     is_active: bool
     is_superuser: bool
+    plan: str
     trial_ends_at: datetime | None
     created_at: datetime
     model_config = {"from_attributes": True}

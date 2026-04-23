@@ -34,6 +34,18 @@ export function useCreateProject() {
   });
 }
 
+export function useUpdateProject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Project> }) =>
+      api.projects.update(id, data),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["project", updated.id] });
+    },
+  });
+}
+
 export function useActiveProject() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const { data: projects } = useProjects();

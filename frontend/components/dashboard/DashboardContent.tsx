@@ -13,6 +13,7 @@ import { TopInsights } from "@/components/dashboard/TopInsights";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { formatNumber, formatCurrency, cn } from "@/lib/utils";
 import { useActiveProject } from "@/hooks/useProject";
+import { getUser } from "@/lib/auth";
 import { 
   mockStats, mockScore, mockChannelPerformance, 
   mockActivity, mockInsights 
@@ -127,6 +128,12 @@ function getGreeting() {
 
 export function DashboardContent() {
   const { activeProject } = useActiveProject();
+  const [user, setUser] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    setUser(getUser());
+  }, []);
+
   const stats    = mockStats;
   const score    = mockScore;
   const channels = mockChannelPerformance;
@@ -138,6 +145,43 @@ export function DashboardContent() {
   const handleRefresh = () => {
     alert("Refreshing data... this will take a few seconds.");
   };
+
+  if (!activeProject) {
+    return (
+      <div className="relative flex items-center justify-center min-h-[60vh] p-6 text-center">
+        <div className="max-w-md w-full">
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#6366f1]/20 to-[#8b5cf6]/20 border border-[#6366f1]/30 flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-[#6366f1]/20 animate-pulse">
+            <BarChart2 className="h-10 w-10 text-[#6366f1]" />
+          </div>
+          <h2 className="text-2xl font-bold text-text-1 mb-3 tracking-tight">Your Dashboard is Waiting.</h2>
+          <p className="text-text-3 text-sm leading-relaxed mb-10">
+            AdTicks needs a project to start analyzing visibility, AI mentions, and search performance. 
+            Create your first project to unlock total intelligence.
+          </p>
+          <div className="p-1 rounded-2xl bg-white/[0.03] border border-white/5 flex flex-col gap-2">
+             <div className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02]">
+                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                  <Search size={16} />
+                </div>
+                <div className="text-left">
+                   <p className="text-[12px] font-bold text-text-1">Step 1: Create Project</p>
+                   <p className="text-[10px] text-text-3">Add your brand name and domain</p>
+                </div>
+             </div>
+             <div className="flex items-center gap-3 p-3 rounded-xl opacity-50">
+                <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center text-violet-400">
+                  <Sparkles size={16} />
+                </div>
+                <div className="text-left">
+                   <p className="text-[12px] font-bold text-text-1">Step 2: Connect Channels</p>
+                   <p className="text-[10px] text-text-3">Sync GSC and LLM scanning</p>
+                </div>
+             </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-full">
@@ -168,7 +212,7 @@ export function DashboardContent() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <h1 className="text-[22px] font-bold text-text-1 tracking-tight">
-                {greeting}, User 👋
+                {greeting}, {user?.full_name || user?.name || "User"} 👋
               </h1>
             </div>
             <div className="flex items-center gap-3 text-[13px] text-text-3">

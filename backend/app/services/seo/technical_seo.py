@@ -10,11 +10,13 @@ from urllib.parse import urlparse
 
 import httpx
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 TIMEOUT = 15.0
 HEADERS = {
-    "User-Agent": "AdTicks TechSEO Bot/1.0 (+https://adticks.io/bot)",
+    "User-Agent": f"AdTicks TechSEO Bot/1.0 (+{settings.ALLOWED_ORIGINS[0] if settings.ALLOWED_ORIGINS else 'https://adticks.com'})",
     "Accept": "*/*",
 }
 

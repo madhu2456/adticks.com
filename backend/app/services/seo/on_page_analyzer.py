@@ -12,6 +12,8 @@ import json
 import httpx
 from bs4 import BeautifulSoup
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 IDEAL_TITLE_MIN = 50
@@ -20,7 +22,7 @@ IDEAL_META_MIN = 150
 IDEAL_META_MAX = 160
 
 HEADERS = {
-    "User-Agent": "AdTicks SEO Analyzer/1.0 (compatible; +https://adticks.io/bot)",
+    "User-Agent": f"AdTicks SEO Analyzer/1.0 (compatible; +{settings.ALLOWED_ORIGINS[0] if settings.ALLOWED_ORIGINS else 'https://adticks.com'})",
     "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.5",
 }

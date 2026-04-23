@@ -10,12 +10,11 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
-# OAuth configuration (fill with real values via environment)
-GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID"
-GOOGLE_CLIENT_SECRET = "YOUR_GOOGLE_CLIENT_SECRET"
-GOOGLE_REDIRECT_URI = "https://app.adticks.io/auth/gsc/callback"
+# OAuth base URLs
 GOOGLE_AUTH_BASE = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GSC_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly"
@@ -65,8 +64,8 @@ def get_auth_url(state: Optional[str] = None) -> str:
         Full OAuth2 authorization URL string
     """
     params = {
-        "client_id": GOOGLE_CLIENT_ID,
-        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
         "response_type": "code",
         "scope": GSC_SCOPE,
         "access_type": "offline",

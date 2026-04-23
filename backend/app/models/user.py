@@ -40,6 +40,13 @@ class User(Base):
     projects = relationship("Project", back_populates="owner", cascade="all, delete-orphan")
 
     @property
+    def plan(self) -> str:
+        """Return the user's current plan level."""
+        if self.is_superuser:
+            return "enterprise"
+        return "free"
+
+    @property
     def token(self) -> str:
         """Generate a test JWT token for this user."""
         from app.core.security import create_access_token

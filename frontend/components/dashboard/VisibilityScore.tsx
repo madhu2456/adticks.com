@@ -14,10 +14,10 @@ import { cn } from "@/lib/utils";
 interface Props { score?: VisibilityScoreType; loading?: boolean }
 
 const CHANNELS = [
-  { key: "seo",  label: "SEO Hub",        color: "#6366f1", href: "/seo",           trend: +4.2 },
-  { key: "ai",   label: "AI Visibility",  color: "#8b5cf6", href: "/ai-visibility",  trend: +11.8 },
-  { key: "gsc",  label: "Search Console", color: "#3b82f6", href: "/gsc",            trend: -2.1 },
-  { key: "ads",  label: "Google Ads",     color: "#f97316", href: "/ads",            trend: +6.5 },
+  { key: "seo",  label: "SEO Hub",        color: "#6366f1", href: "/seo",           trend: 0 },
+  { key: "ai",   label: "AI Visibility",  color: "#8b5cf6", href: "/ai-visibility",  trend: 0 },
+  { key: "gsc",  label: "Search Console", color: "#3b82f6", href: "/gsc",            trend: 0 },
+  { key: "ads",  label: "Google Ads",     color: "#f97316", href: "/ads",            trend: 0 },
 ] as const;
 
 
