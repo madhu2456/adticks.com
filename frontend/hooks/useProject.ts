@@ -48,7 +48,8 @@ export function useUpdateProject() {
 
 export function useActiveProject() {
   const [activeId, setActiveId] = useState<string | null>(null);
-  const { data: projects = [] } = useProjects();
+  const query = useProjects();
+  const projects = Array.isArray(query.data) ? query.data : [];
   
   // Default to first project if none active
   const activeProject = projects.find((p) => p.id === activeId) || projects[0] || null;

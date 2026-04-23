@@ -91,7 +91,11 @@ export const api = {
 
   // Projects
   projects: {
-    list: () => axiosInstance.get<Project[]>("/projects").then(unwrap),
+    list: () =>
+      axiosInstance
+        .get<PaginatedResponse<Project>>("/projects")
+        .then(unwrap)
+        .then((res) => res.data),
     get: (id: string) => axiosInstance.get<Project>(`/projects/${id}`).then(unwrap),
     create: (data: Partial<Project>) =>
       axiosInstance.post<Project>("/projects", data).then(unwrap),
