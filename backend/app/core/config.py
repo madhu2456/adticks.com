@@ -48,7 +48,10 @@ class Settings(BaseSettings):
     # Storage Configuration
     # ------------------------------------------------------------------
     STORAGE_ROOT: str = "data"
-    BASE_URL: str = "http://localhost:8002"
+    BASE_URL: str = Field(
+        default="http://localhost:8002",
+        description="Base URL for generating file URLs"
+    )
 
     # ------------------------------------------------------------------
     # AI providers
@@ -61,7 +64,10 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
-    GOOGLE_REDIRECT_URI: str = "http://localhost:8002/api/gsc/callback"
+    GOOGLE_REDIRECT_URI: str = Field(
+        default="http://localhost:8002/api/gsc/callback",
+        description="Google OAuth callback URL"
+    )
 
     # ------------------------------------------------------------------
     # Monitoring & Error Tracking

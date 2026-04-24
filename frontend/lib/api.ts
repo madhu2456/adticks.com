@@ -10,7 +10,24 @@ import {
   PaginatedResponse, ApiResponse,
 } from "./types";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8002/api";
+// Use relative URL when frontend and backend are on same domain (production)
+// Use explicit URL for local development
+const getBaseUrl = () => {
+  if (typeof window === "undefined") return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8002/api";
+  
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (apiUrl) return apiUrl;
+  
+  // In browser: if we're on HTTPS and the API URL hasn't been set, use relative path
+  // Otherwise use HTTP localhost for development
+  if (typeof window !== "undefined" && window.location.protocol === "https:") {
+    return "/api";
+  }
+  
+  return "http://localhost:8002/api";
+};
+
+const BASE_URL = getBaseUrl();
 
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: BASE_URL,

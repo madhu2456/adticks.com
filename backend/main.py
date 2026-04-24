@@ -91,7 +91,11 @@ app.state.limiter = limiter
 if settings.ENVIRONMENT == "development":
     origins = ["*"]
 else:
+    # Production: include the public domain and localhost for docker compose
     origins = settings.ALLOWED_ORIGINS
+    # Always allow the app's own domain for avatar/storage requests
+    if settings.BASE_URL not in origins:
+        origins.append(settings.BASE_URL)
 
 app.add_middleware(
     CORSMiddleware,
