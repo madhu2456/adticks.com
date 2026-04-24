@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useActiveProject, useUpdateProject } from "@/hooks/useProject";
 import { useUsage } from "@/hooks/useUsage";
+import { useAlertModal } from "@/hooks/useAlertModal";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -63,6 +64,7 @@ function InputField({ label, value, onChange, type = "text", placeholder }: {
 }
 
 function ProfileTab() {
+  const { showAlert, AlertModal } = useAlertModal();
   const [form, setForm] = useState({ name: "", email: "", company: "" });
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -98,7 +100,12 @@ function ProfileTab() {
       const { setUser } = await import("@/lib/auth");
       setUser(updatedUser);
     } catch (err) {
-      alert("Failed to upload avatar.");
+      showAlert({
+        title: "Upload Failed",
+        message: "Failed to upload avatar. Please try again.",
+        type: "error",
+        confirmText: "Close",
+      });
     } finally {
       setUploading(false);
     }
@@ -119,7 +126,12 @@ function ProfileTab() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {
-      alert("Failed to save profile changes.");
+      showAlert({
+        title: "Save Failed",
+        message: "Failed to save profile changes. Please try again.",
+        type: "error",
+        confirmText: "Close",
+      });
     } finally {
       setLoading(false);
     }
@@ -184,6 +196,7 @@ function ProfileTab() {
       <div className="pt-2">
         <SaveButton onClick={handleSave} saved={saved} />
       </div>
+      {AlertModal}
     </div>
   );
 }
@@ -191,6 +204,7 @@ function ProfileTab() {
 function ProjectTab() {
   const { activeProject } = useActiveProject();
   const updateProject = useUpdateProject();
+  const { showAlert, AlertModal } = useAlertModal();
   
   const [form, setForm] = useState({ 
     brand_name: "", 
@@ -235,7 +249,12 @@ function ProjectTab() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {
-      alert("Failed to update project settings.");
+      showAlert({
+        title: "Update Failed",
+        message: "Failed to update project settings. Please try again.",
+        type: "error",
+        confirmText: "Close",
+      });
     } finally {
       setLoading(false);
     }
@@ -316,6 +335,7 @@ function ProjectTab() {
       </div>
 
       <SaveButton onClick={handleSave} saved={saved} />
+      {AlertModal}
     </div>
   );
 }
@@ -331,6 +351,7 @@ interface Integration {
 
 function IntegrationsTab() {
   const { activeProject } = useActiveProject();
+  const { showAlert, AlertModal } = useAlertModal();
 
   const integrations = [
     {
@@ -365,17 +386,32 @@ function IntegrationsTab() {
   async function handleConnect(id: string) {
     if (id === "gsc") {
       if (!activeProject) {
-        alert("Please select a project first.");
+        showAlert({
+          title: "Project Required",
+          message: "Please select a project first.",
+          type: "warning",
+          confirmText: "OK",
+        });
         return;
       }
       try {
         const { url } = await api.gsc.getAuthUrl(activeProject.id);
         window.location.href = url;
       } catch (err) {
-        alert("Failed to initialize connection.");
+        showAlert({
+          title: "Connection Failed",
+          message: "Failed to initialize connection. Please try again.",
+          type: "error",
+          confirmText: "Close",
+        });
       }
     } else {
-      alert(`${integrations.find(i => i.id === id)?.name} integration is coming soon! Contact support to join the beta.`);
+      showAlert({
+        title: "Coming Soon",
+        message: `${integrations.find(i => i.id === id)?.name} integration is coming soon! Contact support to join the beta.`,
+        type: "info",
+        confirmText: "Got it",
+      });
     }
   }
 
@@ -429,6 +465,7 @@ function IntegrationsTab() {
           </div>
         ))}
       </div>
+      {AlertModal}
     </div>
   );
 }
@@ -436,6 +473,7 @@ function IntegrationsTab() {
 function PlanTab() {
   const { data: usage } = useUsage();
   const queryClient = useQueryClient();
+  const { showAlert, AlertModal } = useAlertModal();
   const [upgrading, setUpgrading] = useState(false);
 
   const features = [
@@ -458,10 +496,20 @@ function PlanTab() {
     try {
       await api.auth.upgrade();
       queryClient.invalidateQueries({ queryKey: ["usage"] });
-      alert("Successfully upgraded to Pro plan!");
+      showAlert({
+        title: "Upgrade Successful",
+        message: "Successfully upgraded to Pro plan!",
+        type: "success",
+        confirmText: "Great",
+      });
     } catch (error) {
       console.error("Upgrade failed:", error);
-      alert("Failed to upgrade. Please try again later.");
+      showAlert({
+        title: "Upgrade Failed",
+        message: "Failed to upgrade. Please try again later.",
+        type: "error",
+        confirmText: "Close",
+      });
     } finally {
       setUpgrading(false);
     }
@@ -562,6 +610,7 @@ function PlanTab() {
           {upgrading ? "Upgrading..." : "Upgrade to Pro — $49/mo"}
         </button>
       )}
+      {AlertModal}
     </div>
   );
 }

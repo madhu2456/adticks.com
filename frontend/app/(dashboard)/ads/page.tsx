@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { PerformanceChart } from "@/components/ads/PerformanceChart";
 import { CampaignTable } from "@/components/ads/CampaignTable";
+import { useAlertModal } from "@/hooks/useAlertModal";
 import { mockAdsPerformance } from "@/lib/mockData";
 
 const EXTENDED_CAMPAIGNS = [
@@ -38,6 +39,7 @@ function StatCard({ icon: Icon, label, value, sub, color = "#6366f1" }: {
 }
 
 export default function AdsPage() {
+  const { showAlert, AlertModal } = useAlertModal();
   const [isConnected, setIsConnected] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
@@ -85,7 +87,12 @@ export default function AdsPage() {
             </div>
 
             <button
-              onClick={() => alert("Google Ads integration is coming soon! Reach out to support for early access.")}
+              onClick={() => showAlert({
+                title: "Coming Soon",
+                message: "Google Ads integration is coming soon! Reach out to support for early access.",
+                type: "info",
+                confirmText: "Got it",
+              })}
               className="w-full flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white font-semibold rounded-xl py-3 text-sm transition-colors shadow-lg shadow-[#6366f1]/25 mb-3"
             >
               <Link2 className="h-4 w-4" />
@@ -135,6 +142,7 @@ export default function AdsPage() {
 
       {/* Campaigns */}
       <CampaignTable campaigns={EXTENDED_CAMPAIGNS} />
+      {AlertModal}
     </div>
   );
 }

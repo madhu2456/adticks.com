@@ -13,6 +13,7 @@ import { TopInsights } from "@/components/dashboard/TopInsights";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { formatNumber, formatCurrency, cn } from "@/lib/utils";
 import { useActiveProject } from "@/hooks/useProject";
+import { useAlertModal } from "@/hooks/useAlertModal";
 import { getUser } from "@/lib/auth";
 import { 
   mockStats, mockScore, mockChannelPerformance, 
@@ -141,9 +142,15 @@ export function DashboardContent() {
   const insights = mockInsights;
 
   const greeting = getGreeting();
+  const { showAlert, AlertModal } = useAlertModal();
 
   const handleRefresh = () => {
-    alert("Refreshing data... this will take a few seconds.");
+    showAlert({
+      title: "Refreshing Data",
+      message: "Starting comprehensive scan... this will take a few moments. You'll receive a notification when complete.",
+      type: "info",
+      confirmText: "Got it",
+    });
   };
 
   if (!activeProject) {
@@ -392,6 +399,7 @@ export function DashboardContent() {
         </div>
 
       </div>
+      {AlertModal}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { CTRChart } from "@/components/gsc/CTRChart";
 import { QueryTable } from "@/components/gsc/QueryTable";
 import { mockGSCQueries, mockGSCPages, mockGSCMetrics } from "@/lib/mockData";
 import { useActiveProject } from "@/hooks/useProject";
+import { useAlertModal } from "@/hooks/useAlertModal";
 import { api } from "@/lib/api";
 
 function StatCard({ icon: Icon, label, value, sub }: { icon: React.ElementType; label: string; value: string; sub?: string }) {
@@ -28,6 +29,7 @@ function StatCard({ icon: Icon, label, value, sub }: { icon: React.ElementType; 
 
 export default function GSCPage() {
   const { activeProject } = useActiveProject();
+  const { showAlert, AlertModal } = useAlertModal();
   const [isConnected, setIsConnected] = useState(false);
   const [activeTab, setActiveTab] = useState<"queries" | "pages">("queries");
   const [syncing, setSyncing] = useState(false);
@@ -39,7 +41,12 @@ export default function GSCPage() {
 
   async function handleConnect() {
     if (!activeProject) {
-      alert("Please create or select a project first.");
+      showAlert({
+        title: "Project Required",
+        message: "Please create or select a project first.",
+        type: "warning",
+        confirmText: "OK",
+      });
       return;
     }
     try {
@@ -47,7 +54,12 @@ export default function GSCPage() {
       window.location.href = url;
     } catch (err) {
       console.error("Failed to get GSC auth URL:", err);
-      alert("Failed to connect to Google Search Console. Please try again.");
+      showAlert({
+        title: "Connection Failed",
+        message: "Failed to connect to Google Search Console. Please try again.",
+        type: "error",
+        confirmText: "Close",
+      });
     }
   }
 
@@ -165,6 +177,7 @@ export default function GSCPage() {
           title={activeTab === "queries" ? "Top Queries" : "Top Pages"}
         />
       </div>
+      {AlertModal}
     </div>
   );
 }

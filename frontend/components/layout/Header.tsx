@@ -15,6 +15,7 @@ import { formatRelativeTime } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { clearTokens, getUser } from '@/lib/auth'
 import { useProjects, useActiveProject } from '@/hooks/useProject'
+import { useAlertModal } from '@/hooks/useAlertModal'
 import { ProjectModal } from '@/components/projects/ProjectModal'
 import { CommandPalette } from '@/components/layout/CommandPalette'
 import { Project, User as UserType } from '@/lib/types'
@@ -82,6 +83,7 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
   const [scanProgress,  setScanProgress]  = useState(0)
   const [mounted, setMounted] = useState(false)
   const { theme, setTheme } = useTheme()
+  const { showAlert, AlertModal } = useAlertModal()
   const [user, setUser] = useState<{ name: string; email: string; initials: string; plan?: string; avatarUrl?: string } | null>(null)
 
   const projectRef = useRef<HTMLDivElement>(null!)
@@ -420,12 +422,20 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
               className="px-3 py-2"
               style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
             >
-              <button 
-                onClick={() => { alert('Notifications inbox coming soon!'); closeAll(); }}
-                className="flex items-center gap-1 text-[11px] text-text-3 hover:text-text-2 transition-colors"
-              >
-                View all notifications <ArrowUpRight size={11} />
-              </button>
+            <button 
+              onClick={() => { 
+                showAlert({
+                  title: "Coming Soon",
+                  message: "Notifications inbox coming soon!",
+                  type: "info",
+                  confirmText: "Got it",
+                });
+                closeAll(); 
+              }}
+              className="flex items-center gap-1 text-[11px] text-text-3 hover:text-text-2 transition-colors"
+            >
+              View all notifications <ArrowUpRight size={11} />
+            </button>
             </div>
           </Dropdown>
         </div>
@@ -516,6 +526,8 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
         isOpen={isCommandOpen} 
         onClose={() => setCommandOpen(false)} 
       />
+
+      {AlertModal}
     </>
   )
 }

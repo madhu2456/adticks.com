@@ -107,7 +107,14 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     try {
       // Will be replaced with actual API call
       console.log("Error report would be sent:", errorData);
-      alert("Thank you for reporting this error. Our team has been notified.");
+      if (typeof window !== "undefined" && (window as any).__showAlert) {
+        (window as any).__showAlert({
+          title: "Thank You",
+          message: "Thank you for reporting this error. Our team has been notified.",
+          type: "success",
+          confirmText: "OK",
+        });
+      }
     } catch (error) {
       console.error("Failed to report error:", error);
     }

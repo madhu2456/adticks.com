@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { api } from "@/lib/api";
 import { setTokens, setUser } from "@/lib/auth";
+import { useAlertModal } from "@/hooks/useAlertModal";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { showAlert, AlertModal } = useAlertModal();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -92,7 +94,12 @@ export default function LoginPage() {
           <div className="mt-1.5 text-right">
             <button 
               type="button"
-              onClick={() => alert('Password recovery is coming soon!')}
+              onClick={() => showAlert({
+                title: "Coming Soon",
+                message: "Password recovery is coming soon!",
+                type: "info",
+                confirmText: "Got it",
+              })}
               className="text-xs text-[#6366f1] hover:text-[#8b5cf6] transition-colors"
             >
               Forgot password?
@@ -125,6 +132,7 @@ export default function LoginPage() {
           Start free trial &rarr;
         </Link>
       </p>
+      {AlertModal}
     </div>
   );
 }
