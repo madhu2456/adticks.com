@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle2, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { api } from '@/lib/api';
 
 interface FAQ {
   id: string;
@@ -41,17 +42,8 @@ export function FAQGenerator({ projectId }: { projectId: string }) {
   const loadFAQs = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `/api/aeo/projects/${projectId}/faqs`,
-        {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setFAQs(data);
-      }
+      const data = await api.aeo.getFAQs(projectId);
+      setFAQs(data);
     } catch (error) {
       toast({
         title: 'Error',
@@ -85,20 +77,13 @@ export function FAQGenerator({ projectId }: { projectId: string }) {
 
   const handleApproveFAQ = async (faqId: string) => {
     try {
-      const response = await fetch(`/api/aeo/faqs/${faqId}/approve`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
+      await api.aeo.approveFAQ(faqId);
+      
+      toast({
+        title: 'Success',
+        description: 'FAQ approved',
       });
-
-      if (response.ok) {
-        toast({
-          title: 'Success',
-          description: 'FAQ approved',
-        });
-        loadFAQs();
-      }
+      loadFAQs();
     } catch (error) {
       toast({
         title: 'Error',

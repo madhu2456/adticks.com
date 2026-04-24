@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, CheckCircle2, HelpCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { api } from '@/lib/api';
 
 interface SnippetData {
   has_snippet: boolean;
@@ -47,17 +48,8 @@ export function SnippetTracker({ projectId }: { projectId: string }) {
   const loadSnippetData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-
-      const response = await fetch(
-        `/api/aeo/projects/${projectId}/snippets/summary`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setSummary(data);
-      }
+      const data = await api.aeo.getSnippetSummary(projectId);
+      setSummary(data);
     } catch (error) {
       toast({
         title: 'Error',

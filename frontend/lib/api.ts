@@ -125,6 +125,8 @@ export const api = {
 
   // Scores
   scores: {
+    getLatest: (projectId: string) =>
+      axiosInstance.get<VisibilityScore>(`/scores/${projectId}`).then(unwrap),
     getCurrent: (projectId: string) =>
       axiosInstance.get<VisibilityScore>(`/scores/${projectId}/current`).then(unwrap),
     getHistory: (projectId: string, days = 30) =>
@@ -197,6 +199,8 @@ export const api = {
 
   // Ads
   ads: {
+    sync: (projectId: string) =>
+      axiosInstance.post<{ status: string; task_id: string }>(`/ads/sync/${projectId}`).then(unwrap),
     getPerformance: (projectId: string, days = 30) =>
       axiosInstance.get<PaginatedResponse<AdsPerformance>>(`/ads/performance/${projectId}?skip=0&limit=100`).then(unwrap),
     getCampaigns: (projectId: string) =>
@@ -255,12 +259,24 @@ export const api = {
       axiosInstance.get<any[]>(`/aeo/projects/${projectId}/visibility/perplexity`).then(unwrap),
     getClaude: (projectId: string) =>
       axiosInstance.get<any[]>(`/aeo/projects/${projectId}/visibility/claude`).then(unwrap),
-    getSnippets: (projectId: string) =>
-      axiosInstance.get<any[]>(`/aeo/projects/${projectId}/snippets`).then(unwrap),
-    getPAA: (projectId: string) =>
-      axiosInstance.get<any[]>(`/aeo/projects/${projectId}/paa`).then(unwrap),
+    getSnippetSummary: (projectId: string) =>
+      axiosInstance.get<any>(`/aeo/projects/${projectId}/snippets/summary`).then(unwrap),
+    getSnippets: (keywordId: string) =>
+      axiosInstance.get<any[]>(`/aeo/keywords/${keywordId}/snippets`).then(unwrap),
+    getPAA: (keywordId: string) =>
+      axiosInstance.get<any[]>(`/aeo/keywords/${keywordId}/paa`).then(unwrap),
     getRecommendations: (projectId: string) =>
       axiosInstance.get<any[]>(`/aeo/projects/${projectId}/recommendations`).then(unwrap),
+    getFAQs: (projectId: string) =>
+      axiosInstance.get<any[]>(`/aeo/projects/${projectId}/faqs`).then(unwrap),
+    approveFAQ: (faqId: string) =>
+      axiosInstance.put<any>(`/aeo/faqs/${faqId}/approve`).then(unwrap),
+    checkAIVisibility: (keywordId: string, models: string[]) =>
+      axiosInstance.post<any>(`/aeo/check-visibility`, { keyword_id: keywordId, ai_models: models }).then(unwrap),
+    updateRecommendation: (recId: string, action: "implemented" | "rejected") =>
+      axiosInstance.put<any>(`/aeo/recommendations/${recId}`, { user_action: action }).then(unwrap),
+    generateFAQFromPAA: (keywordId: string, paaId: string) =>
+      axiosInstance.post<any>(`/aeo/faq/generate-from-paa?keyword_id=${keywordId}&paa_id=${paaId}`).then(unwrap),
     generateFAQ: (projectId: string, keywordId: string) =>
       axiosInstance.post<any>(`/aeo/generate-faq`, { project_id: projectId, keyword_id: keywordId }).then(unwrap),
   },

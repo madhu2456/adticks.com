@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { api } from '@/lib/api';
 
 interface Recommendation {
   id: string;
@@ -45,17 +46,8 @@ export function ContentRecommendations({ projectId }: { projectId: string }) {
   const loadRecommendations = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `/api/aeo/projects/${projectId}/recommendations`,
-        {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setRecommendations(data);
-      }
+      const data = await api.aeo.getRecommendations(projectId);
+      setRecommendations(data);
     } catch (error) {
       toast({
         title: 'Error',
@@ -73,25 +65,13 @@ export function ContentRecommendations({ projectId }: { projectId: string }) {
   ) => {
     try {
       setMarking(recommendationId);
-      const response = await fetch(
-        `/api/aeo/recommendations/${recommendationId}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ user_action: action }),
-        }
-      );
-
-      if (response.ok) {
-        toast({
-          title: 'Success',
-          description: `Recommendation marked as ${action}`,
-        });
-        loadRecommendations();
-      }
+      await api.aeo.updateRecommendation(recommendationId, action);
+      
+      toast({
+        title: 'Success',
+        description: `Recommendation marked as ${action}`,
+      });
+      loadRecommendations();
     } catch (error) {
       toast({
         title: 'Error',

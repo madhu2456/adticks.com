@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { api } from '@/lib/api';
 
 import { AIVisibilityTracker } from './AIVisibilityTracker';
 import { SnippetTracker } from './SnippetTracker';
@@ -47,18 +48,7 @@ export function AEODashboard({ projectId: propProjectId }: { projectId?: string 
   const loadSummary = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `/api/aeo/projects/${projectId}/visibility/summary`,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          },
-        }
-      );
-
-      if (!response.ok) throw new Error('Failed to load summary');
-      
-      const data = await response.json();
+      const data = await api.aeo.getSummary(projectId);
       setSummary(data);
     } catch (error) {
       toast({

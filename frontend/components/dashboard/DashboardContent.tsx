@@ -18,6 +18,7 @@ import { useActiveProject } from "@/hooks/useProject";
 import { useInsights } from "@/hooks/useInsights";
 import { useAlertModal } from "@/hooks/useAlertModal";
 import { getUser } from "@/lib/auth";
+import { api } from "@/lib/api";
 import { 
   mockStats, mockScore, mockChannelPerformance, 
   mockActivity, mockInsights 
@@ -145,13 +146,12 @@ export function DashboardContent() {
     queryKey: ["dashboard-score", projectId],
     queryFn: async () => {
       if (!projectId) return null;
-      const response = await fetch(`/api/scores/${projectId}`, {
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("access_token") || ""}`,
-        },
-      });
-      if (!response.ok) return null;
-      return response.json();
+      try {
+        return await api.scores.getLatest(projectId);
+      } catch (err) {
+        console.error("Failed to fetch score:", err);
+        return null;
+      }
     },
     enabled: !!projectId,
   });
@@ -194,24 +194,7 @@ export function DashboardContent() {
     });
 
     try {
-      const response = await fetch(`/api/scan/run?project_id=${activeProject.id}`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("access_token") || ""}`,
-        },
-      });
-      
-      if (!response.ok) {
-        showAlert({
-          title: "Scan Failed",
-          message: "Failed to start scan. Please try again.",
-          type: "error",
-          confirmText: "Close",
-        });
-        return;
-      }
-
-      const data = await response.json();
+      const data = await api.ai.runScan(activeProject.id);
       const taskId = data.task_id;
 
       showAlert({
@@ -230,35 +213,27 @@ export function DashboardContent() {
         await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before polling
         
         try {
-          const statusResponse = await fetch(`/api/scan/status/${taskId}`, {
-            headers: {
-              "Authorization": `Bearer ${localStorage.getItem("access_token") || ""}`,
-            },
-          });
+          const statusData = await api.ai.getTaskStatus(taskId);
           
-          if (statusResponse.ok) {
-            const statusData = await statusResponse.json();
-            
-            if (statusData.status === "SUCCESS") {
-              isComplete = true;
-              showAlert({
-                title: "Scan Complete",
-                message: "Your scan has completed successfully! The data is now being displayed.",
-                type: "success",
-                confirmText: "OK",
-              });
-              // Refresh page to show new data
-              window.location.reload();
-            } else if (statusData.status === "FAILURE") {
-              isComplete = true;
-              showAlert({
-                title: "Scan Failed",
-                message: `Scan failed: ${statusData.error || "Unknown error"}`,
-                type: "error",
-                confirmText: "Close",
-              });
-              break;
-            }
+          if (statusData.status === "SUCCESS") {
+            isComplete = true;
+            showAlert({
+              title: "Scan Complete",
+              message: "Your scan has completed successfully! The data is now being displayed.",
+              type: "success",
+              confirmText: "OK",
+            });
+            // Refresh page to show new data
+            window.location.reload();
+          } else if (statusData.status === "FAILURE") {
+            isComplete = true;
+            showAlert({
+              title: "Scan Failed",
+              message: `Scan failed: ${statusData.error || "Unknown error"}`,
+              type: "error",
+              confirmText: "Close",
+            });
+            break;
           }
         } catch (err) {
           console.error("Poll error:", err);
@@ -278,8 +253,8 @@ export function DashboardContent() {
     } catch (err) {
       console.error("Scan error:", err);
       showAlert({
-        title: "Scan Error",
-        message: "An error occurred while starting the scan.",
+        title: "Scan Failed",
+        message: "Failed to start scan. Please try again.",
         type: "error",
         confirmText: "Close",
       });

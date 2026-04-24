@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveProject } from "@/hooks/useProject";
 import { useAdsPerformance } from "@/hooks/useAds";
 import { useAlertModal } from "@/hooks/useAlertModal";
+import { api } from "@/lib/api";
 import { mockAdsPerformance } from "@/lib/mockData";
 
 const EXTENDED_CAMPAIGNS = [
@@ -61,12 +62,7 @@ export default function AdsPage() {
     if (!activeProject) return;
     setSyncing(true);
     try {
-      await fetch(`/api/ads/sync/${activeProject.id}`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("access_token") || ""}`,
-        },
-      });
+      await api.ads.sync(activeProject.id);
       showAlert({
         title: "Sync Started",
         message: "Ads data sync has started. Check back in a moment for updates.",
