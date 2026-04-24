@@ -162,12 +162,12 @@ export const api = {
   // AI Visibility
   ai: {
     generatePrompts: (projectId: string) =>
-      axiosInstance.post<{ job_id: string }>(`/ai/${projectId}/prompts/generate`).then(unwrap),
+      axiosInstance.post<{ task_id: string; status: string }>(`/prompts/generate?project_id=${projectId}`).then(unwrap),
     runScan: (projectId: string) =>
-      axiosInstance.post<{ job_id: string }>(`/ai/${projectId}/scan`).then(unwrap),
-    getResults: (projectId: string, page = 1) =>
+      axiosInstance.post<{ task_id: string; status: string }>(`/scan/run?project_id=${projectId}`).then(unwrap),
+    getResults: (projectId: string, skip = 0, limit = 50) =>
       axiosInstance
-        .get<PaginatedResponse<AIPromptResult>>(`/ai/${projectId}/results?page=${page}`)
+        .get<PaginatedResponse<AIPromptResult>>(`/results/${projectId}?skip=${skip}&limit=${limit}`)
         .then(unwrap),
     getScore: (projectId: string) =>
       axiosInstance.get<AIVisibilityScore>(`/ai/${projectId}/score`).then(unwrap),

@@ -144,13 +144,62 @@ export function DashboardContent() {
   const greeting = getGreeting();
   const { showAlert, AlertModal } = useAlertModal();
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
+    if (!activeProject) {
+      showAlert({
+        title: "Project Required",
+        message: "Please select a project first.",
+        type: "warning",
+        confirmText: "OK",
+      });
+      return;
+    }
+
     showAlert({
-      title: "Refreshing Data",
-      message: "Starting comprehensive scan... this will take a few moments. You'll receive a notification when complete.",
+      title: "Scan Starting",
+      message: "Starting comprehensive scan of SEO, AI visibility, GSC, and Ads data... This will take a few moments.",
       type: "info",
       confirmText: "Got it",
     });
+
+    try {
+      const response = await fetch(`/api/scan/run?project_id=${activeProject.id}`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("access_token") || ""}`,
+        },
+      });
+      
+      if (!response.ok) {
+        showAlert({
+          title: "Scan Failed",
+          message: "Failed to start scan. Please try again.",
+          type: "error",
+          confirmText: "Close",
+        });
+        return;
+      }
+
+      showAlert({
+        title: "Scan Queued",
+        message: "Your scan has been queued and will complete in a few moments. Check back shortly for updated data.",
+        type: "success",
+        confirmText: "OK",
+      });
+
+      // Refresh data after a delay to allow scan to complete
+      setTimeout(() => {
+        window.location.reload();
+      }, 5000);
+    } catch (err) {
+      console.error("Scan error:", err);
+      showAlert({
+        title: "Scan Error",
+        message: "An error occurred while starting the scan.",
+        type: "error",
+        confirmText: "Close",
+      });
+    }
   };
 
   if (!activeProject) {
