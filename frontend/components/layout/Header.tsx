@@ -17,6 +17,7 @@ import { clearTokens, getUser } from '@/lib/auth'
 import { useProjects, useActiveProject } from '@/hooks/useProject'
 import { useAlertModal } from '@/hooks/useAlertModal'
 import { ProjectModal } from '@/components/projects/ProjectModal'
+import { ScanModal } from '@/components/layout/ScanModal'
 import { CommandPalette } from '@/components/layout/CommandPalette'
 import { Project, User as UserType } from '@/lib/types'
 
@@ -72,15 +73,14 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
   const { data: projectList = [] } = useProjects()
   const { activeProject, setActiveId } = useActiveProject()
   
-  const [projectOpen,  setProjectOpen]  = useState(false)
-  const [notifOpen,    setNotifOpen]    = useState(false)
-  const [userOpen,     setUserOpen]     = useState(false)
-  const [scanning,     setScanning]     = useState(false)
-  const [isModalOpen,  setModalOpen]    = useState(false)
-  const [isCommandOpen, setCommandOpen] = useState(false)
+  const [projectOpen,      setProjectOpen]      = useState(false)
+  const [notifOpen,        setNotifOpen]        = useState(false)
+  const [userOpen,         setUserOpen]         = useState(false)
+  const [isScanModalOpen,  setScanModalOpen]    = useState(false)
+  const [isModalOpen,      setModalOpen]        = useState(false)
+  const [isCommandOpen,    setCommandOpen]      = useState(false)
   
   const [notifications, setNotifications] = useState(NOTIFICATIONS)
-  const [scanProgress,  setScanProgress]  = useState(0)
   const [mounted, setMounted] = useState(false)
   const { theme, setTheme } = useTheme()
   const { showAlert, AlertModal } = useAlertModal()
@@ -107,16 +107,9 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
     brand_name: 'No Project'
   }
 
-  const handleScan = async () => {
-    if (scanning || !activeProject) return
-    setScanning(true)
-    setScanProgress(0)
-    for (let p = 0; p <= 100; p += 4) {
-      await new Promise(r => setTimeout(r, 55))
-      setScanProgress(p)
-    }
-    setScanning(false)
-    setScanProgress(0)
+  const handleScan = () => {
+    if (!activeProject) return
+    setScanModalOpen(true)
   }
 
   const markAllRead = () => setNotifications(prev => prev.map(n => ({ ...n, read: true })))
@@ -182,17 +175,7 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
         }}
       >
       {/* ── Scan progress bar ────────────────────────────────────────── */}
-      <AnimatePresence>
-        {scanning && (
-          <motion.div
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: scanProgress / 100 }}
-            exit={{ opacity: 0 }}
-            className="absolute bottom-0 left-0 right-0 h-px origin-left"
-            style={{ background: 'linear-gradient(90deg, #6366f1, #8b5cf6, #ec4899)' }}
-          />
-        )}
-      </AnimatePresence>
+      {/* Removed - now handled by ScanModal */}
 
       {/* ── Left: Project selector ───────────────────────────────────── */}
       <div ref={projectRef} className="relative">
@@ -318,32 +301,19 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
         {/* Run Full Scan */}
         <button
           onClick={handleScan}
-          disabled={scanning || !activeProject}
+          disabled={!activeProject}
           title={!activeProject ? "Select a project to run scan" : "Run AI Scan"}
           className={cn(
             'flex items-center gap-1.5 h-8 px-3 rounded-lg text-[13px] font-semibold text-white transition-all',
             'disabled:opacity-40 disabled:cursor-not-allowed',
           )}
           style={{
-            background: scanning
-              ? 'rgba(99,102,241,0.6)'
-              : 'linear-gradient(135deg, #6366f1, #7c3aed)',
-            boxShadow: scanning
-              ? '0 0 20px rgba(99,102,241,0.3)'
-              : '0 0 12px rgba(99,102,241,0.25), 0 2px 8px rgba(0,0,0,0.3)',
+            background: 'linear-gradient(135deg, #6366f1, #7c3aed)',
+            boxShadow: '0 0 12px rgba(99,102,241,0.25), 0 2px 8px rgba(0,0,0,0.3)',
           }}
         >
-          {scanning ? (
-            <>
-              <Loader2 size={13} className="animate-spin" />
-              <span className="hidden sm:inline">Scanning…</span>
-            </>
-          ) : (
-            <>
-              <Zap size={13} />
-              <span className="hidden sm:inline">Run Scan</span>
-            </>
-          )}
+          <Zap size={13} />
+          <span className="hidden sm:inline">Run Scan</span>
         </button>
 
         {/* Notification bell */}
@@ -520,6 +490,12 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
         isOpen={isModalOpen} 
         onClose={() => setModalOpen(false)} 
         onSuccess={(id) => setActiveId(id)}
+      />
+
+      <ScanModal 
+        isOpen={isScanModalOpen} 
+        onClose={() => setScanModalOpen(false)} 
+        projectId={activeProject?.id}
       />
 
       <CommandPalette 
