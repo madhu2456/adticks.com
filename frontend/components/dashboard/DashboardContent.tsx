@@ -148,7 +148,11 @@ export function DashboardContent() {
       if (!projectId) return null;
       try {
         return await api.scores.getLatest(projectId);
-      } catch (err) {
+      } catch (err: any) {
+        // 404 is expected if no scans have been run yet - use fallback data
+        if (err.response?.status === 404) {
+          return null;
+        }
         console.error("Failed to fetch score:", err);
         return null;
       }

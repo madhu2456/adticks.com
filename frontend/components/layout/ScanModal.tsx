@@ -46,14 +46,14 @@ export function ScanModal({ isOpen, onClose, projectId }: ScanModalProps) {
   }, [isOpen, projectId])
 
   const pollTaskStatus = async (taskId: string) => {
-    const maxAttempts = 60
+    const maxAttempts = 300 // 5 minutes instead of 1 minute
     let attempts = 0
 
     const interval = setInterval(async () => {
       if (attempts >= maxAttempts) {
         clearInterval(interval)
         setStatus('error')
-        setError('Scan took too long. Please try again.')
+        setError('Scan took too long. This may indicate a backend issue. Please check backend logs or try again later.')
         return
       }
 
@@ -69,13 +69,14 @@ export function ScanModal({ isOpen, onClose, projectId }: ScanModalProps) {
           setStatus('error')
           setError(response.error || 'Scan failed. Please try again.')
           clearInterval(interval)
-        } else if (taskStatus === 'running' || taskStatus === 'pending') {
-          setProgress(Math.min(90, progress + Math.random() * 30))
+        } else if (taskStatus === 'running' || taskStatus === 'pending' || taskStatus === 'started') {
+          // Slow progress increase to show activity during long scans
+          setProgress(prev => Math.min(95, prev + (Math.random() * 5 + 2)))
         }
 
         attempts++
       } catch (err: any) {
-        console.error('Error polling status:', err)
+        // Suppress error logging for polling - it's expected until scan completes
         attempts++
       }
     }, 1000)

@@ -6,7 +6,15 @@ import { InsightCategory, InsightPriority } from "@/lib/types";
 export function useInsights(projectId: string, category?: InsightCategory, priority?: InsightPriority) {
   return useQuery({
     queryKey: ["insights", projectId, category, priority],
-    queryFn: () => api.insights.getInsights(projectId, category, priority),
+    queryFn: async () => {
+      if (!projectId) return { data: [] };
+      try {
+        return await api.insights.getInsights(projectId, category, priority);
+      } catch (err) {
+        console.error("Failed to fetch insights:", err);
+        return { data: [] };
+      }
+    },
     staleTime: 2 * 60 * 1000,
   });
 }
