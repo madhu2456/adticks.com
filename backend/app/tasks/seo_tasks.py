@@ -49,7 +49,7 @@ async def _load_competitors(session, project_id: str):
 # generate_keywords_task
 # ---------------------------------------------------------------------------
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60, time_limit=1800, soft_time_limit=1500)
 def generate_keywords_task(
     self,
     project_id: str,
@@ -57,7 +57,10 @@ def generate_keywords_task(
     industry: str,
     seed_keywords: list | None = None,
 ) -> dict:
-    """Generate keywords + clusters for a project, persist to DB and Spaces."""
+    """Generate keywords + clusters for a project, persist to DB and Spaces.
+    
+    Task timeout: 30 minutes (soft 25 minutes)
+    """
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -174,9 +177,12 @@ async def _generate_keywords_impl(
 # run_rank_tracking_task
 # ---------------------------------------------------------------------------
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60, time_limit=2700, soft_time_limit=2400)
 def run_rank_tracking_task(self, project_id: str) -> dict:
-    """Check SERP rankings for all project keywords and persist results."""
+    """Check SERP rankings for all project keywords and persist results.
+    
+    Task timeout: 45 minutes (soft 40 minutes)
+    """
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -215,6 +221,7 @@ async def _run_rank_tracking_impl(project_id: str) -> dict:
             project_id=project_id,
             keywords=kw_dicts,
             domain=domain,
+            concurrency=10,  # Increased from default 5 for better performance
         )
 
         # Persist Ranking rows
@@ -260,9 +267,12 @@ async def _run_rank_tracking_impl(project_id: str) -> dict:
 # run_seo_audit_task
 # ---------------------------------------------------------------------------
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60, time_limit=1800, soft_time_limit=1500)
 def run_seo_audit_task(self, project_id: str, url: str | None = None) -> dict:
-    """Run on-page + technical SEO audit and persist results to Spaces."""
+    """Run on-page + technical SEO audit and persist results to Spaces.
+    
+    Task timeout: 30 minutes (soft 25 minutes)
+    """
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)

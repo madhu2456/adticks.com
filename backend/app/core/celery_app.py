@@ -47,8 +47,8 @@ celery_app.conf.update(
     task_reject_on_worker_lost=True,  # Re-queue if worker dies
     
     # Task Timeouts
-    task_soft_time_limit=5 * 60,  # 5 minutes soft timeout (raise exception)
-    task_time_limit=10 * 60,  # 10 minutes hard timeout (kill task)
+    task_soft_time_limit=30 * 60,  # 30 minutes soft timeout (raise exception)
+    task_time_limit=45 * 60,  # 45 minutes hard timeout (kill task)
     
     # Retry Configuration
     task_max_retries=3,  # Maximum retry attempts

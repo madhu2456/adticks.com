@@ -194,40 +194,66 @@ async def bulk_rank_check(
     keywords: List[Dict[str, Any]],
     domain: str,
     serpapi_key: Optional[str] = None,
-    concurrency: int = 5,
+    concurrency: int = 10,
 ) -> List[Dict[str, Any]]:
     """
-    Batch rank checking for a list of keywords.
+    Batch rank checking for a list of keywords with improved performance.
 
     Args:
         project_id: The project ID for logging/storage reference
         keywords: List of keyword dicts (must contain 'keyword' field)
         domain: Target domain
         serpapi_key: Optional SerpAPI key
-        concurrency: Max concurrent requests
+        concurrency: Max concurrent requests (default 10 for better throughput)
 
     Returns:
         List of ranking result dicts (same shape as check_rankings output)
     """
-    logger.info(f"Bulk rank check: project_id={project_id} keywords={len(keywords)} domain={domain}")
+    logger.info(f"Bulk rank check: project_id={project_id} keywords={len(keywords)} domain={domain} concurrency={concurrency}")
     results = []
     semaphore = asyncio.Semaphore(concurrency)
 
-    async def _check_one(kw_dict: Dict[str, Any]) -> Dict[str, Any]:
+    async def _check_one_with_retry(kw_dict: Dict[str, Any], max_retries: int = 3) -> Dict[str, Any]:
         async with semaphore:
             kw_text = kw_dict.get("keyword", "")
-            result = await check_rankings(kw_text, domain, serpapi_key)
-            result["keyword_id"] = kw_dict.get("id")
-            result["project_id"] = project_id
-            return result
+            for attempt in range(max_retries):
+                try:
+                    result = await check_rankings(kw_text, domain, serpapi_key)
+                    result["keyword_id"] = kw_dict.get("id")
+                    result["project_id"] = project_id
+                    return result
+                except asyncio.TimeoutError:
+                    if attempt < max_retries - 1:
+                        wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                        logger.warning(f"Timeout checking '{kw_text}', retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(wait_time)
+                    else:
+                        logger.error(f"Failed to check '{kw_text}' after {max_retries} attempts")
+                        return {
+                            "keyword": kw_text,
+                            "domain": domain,
+                            "position": None,
+                            "url": None,
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "source": "error",
+                            "keyword_id": kw_dict.get("id"),
+                            "project_id": project_id,
+                        }
+                except Exception as e:
+                    logger.warning(f"Error checking '{kw_text}': {e}")
+                    return {
+                        "keyword": kw_text,
+                        "domain": domain,
+                        "position": None,
+                        "url": None,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "source": "error",
+                        "keyword_id": kw_dict.get("id"),
+                        "project_id": project_id,
+                    }
 
-    tasks = [_check_one(kw) for kw in keywords]
+    tasks = [_check_one_with_retry(kw) for kw in keywords]
     results = await asyncio.gather(*tasks, return_exceptions=False)
-    failed = [r for r in results if isinstance(r, Exception)]
-    successful = [r for r in results if not isinstance(r, Exception)]
 
-    if failed:
-        logger.warning(f"{len(failed)} rank checks failed")
-
-    logger.info(f"Bulk rank check complete: {len(successful)} results")
-    return successful
+    logger.info(f"Bulk rank check complete: {len(results)} results processed")
+    return results
