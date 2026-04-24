@@ -9,18 +9,28 @@ from uuid import UUID
 from datetime import datetime, timezone
 
 from celery import group
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 
 from app.core.celery_app import celery_app
 from app.core.database import AsyncSessionLocal
 from app.core.storage import StorageService
+from app.core.progress import ScanProgress, ScanStage
+from app.core.differential_updates import DifferentialUpdateDetector
 from app.models.project import Project
 from app.models.competitor import Competitor
 from app.models.prompt import Prompt
 from app.models.score import Score
 from app.models.gsc import GSCData
 from app.models.ads import AdsData
+from app.models.keyword import Keyword
 from app.models.recommendation import Recommendation
+from app.core.scan_cache import (
+    has_scan_cache,
+    get_cached_scan_results,
+    should_invalidate_cache,
+    save_scan_results,
+    get_cache_status,
+)
 from app.services.insights.insight_engine import InsightEngine
 from app.services.insights.recommendation_generator import generate_recommendations
 from app.tasks.seo_tasks import (
@@ -57,24 +67,40 @@ async def _load_competitors(session, project_id: str):
     return result.scalars().all()
 
 
-from celery import group, chain, chord
+from celery import chain, chord
 
 # ---------------------------------------------------------------------------
 # run_full_scan_task — master orchestration
 # ---------------------------------------------------------------------------
 
-@celery_app.task(bind=True, max_retries=2, default_retry_delay=120)
-def run_full_scan_task(self, project_id: str) -> dict:
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=120, time_limit=3600, soft_time_limit=3300)
+def run_full_scan_task(self, project_id: str, force_refresh: bool = False) -> dict:
     """
     Master task: orchestrate the full AdTicks pipeline for a project using non-blocking chains.
-
+    
+    Task timeout: 60 minutes (soft 55 minutes)
+    
     Workflow:
-      1. Keyword Generation (Initial)
-      2. Group of Parallel tasks (SEO audit, rank tracking, gaps, prompts, GSC, Ads)
-      3. LLM Scan (depends on prompts)
-      4. Score Computation
-      5. Insight Generation
+      1. Check if valid cached results exist (unless force_refresh=True)
+      2. If cache miss or invalid: Keyword Generation (Initial)
+      3. Group of Parallel tasks (SEO audit, rank tracking, gaps, prompts, GSC, Ads)
+      4. LLM Scan (depends on prompts)
+      5. Score Computation
+      6. Insight Generation
+      7. Cache results in Redis (24 hour TTL)
+    
+    Args:
+        project_id: Project UUID string
+        force_refresh: If True, bypass cache and re-run full scan
     """
+    # Initialize progress tracking
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    progress = ScanProgress(project_id, self.request.id)
+    loop.run_until_complete(progress.initialize())
+    loop.close()
+    
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -88,6 +114,43 @@ def run_full_scan_task(self, project_id: str) -> dict:
         logger.warning("run_full_scan_task: project %s not found", project_id)
         return {"project_id": project_id, "status": "project_not_found"}
 
+    # Check if we can use cached results
+    if not force_refresh:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            # Check if cache exists and is still valid
+            cache_exists = loop.run_until_complete(has_scan_cache(project_id))
+            cache_invalid = loop.run_until_complete(should_invalidate_cache(project_id))
+            
+            loop.close()
+            
+            if cache_exists and not cache_invalid:
+                logger.info(f"Using cached scan results for project {project_id}")
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
+                    loop.run_until_complete(progress.update(ScanStage.COMPLETED, 100, "Using cached results"))
+                    cached_results = loop.run_until_complete(get_cached_scan_results(project_id))
+                    loop.close()
+                    
+                    if cached_results:
+                        return {
+                            "project_id": project_id,
+                            "status": "cached",
+                            "from_cache": True,
+                            "message": "Results from cache (24 hour TTL)",
+                        }
+                except Exception as e:
+                    logger.warning(f"Error retrieving cached results: {e}")
+            elif cache_invalid:
+                logger.info(f"Scan cache invalidated for project {project_id} (project state changed)")
+        except Exception as e:
+            logger.warning(f"Error checking scan cache: {e}")
+            # Continue with fresh scan
+
     domain = project_info["domain"]
     brand_name = project_info["brand_name"]
     industry = project_info["industry"] or "Technology"
@@ -95,12 +158,13 @@ def run_full_scan_task(self, project_id: str) -> dict:
     seed_keywords = [brand_name, industry.lower()] + competitor_domains[:3]
 
     logger.info(
-        "Starting non-blocking full scan pipeline for project=%s",
+        "Starting non-blocking full scan pipeline for project=%s (force_refresh=%s)",
         project_id,
+        force_refresh,
     )
 
     # We build a chain: 
-    # generate_keywords -> group(parallel_tasks) -> run_llm_scan_task -> compute_scores_task -> generate_insights_task
+    # generate_keywords -> group(parallel_tasks) -> run_llm_scan_task -> compute_scores_task -> generate_insights_task -> cache_results
     
     workflow = chain(
         generate_keywords_task.s(
@@ -126,6 +190,7 @@ def run_full_scan_task(self, project_id: str) -> dict:
         run_llm_scan_task.s(project_id=project_id, prompt_limit=100),
         compute_scores_task.s(project_id=project_id),
         generate_insights_task.s(project_id=project_id),
+        cache_scan_results_task.s(project_id=project_id),
     )
 
     # Launch the chain
@@ -134,6 +199,7 @@ def run_full_scan_task(self, project_id: str) -> dict:
     return {
         "project_id": project_id,
         "status": "started",
+        "from_cache": False,
         "started_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -339,6 +405,91 @@ async def _generate_insights_impl(project_id: str) -> dict:
         "recommendations": len(recommendations),
         "status": "completed",
     }
+
+
+# ---------------------------------------------------------------------------
+# cache_scan_results_task — cache the final scan results
+# ---------------------------------------------------------------------------
+
+@celery_app.task(bind=True, max_retries=1, default_retry_delay=30)
+def cache_scan_results_task(self, project_id: str, scan_results: dict | None = None) -> dict:
+    """
+    Cache the final scan results to Redis (24 hour TTL).
+    
+    This task runs at the end of the workflow chain to persist
+    results for quick retrieval on subsequent scans (if nothing changed).
+    """
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(_cache_scan_results_impl(project_id, scan_results))
+        loop.close()
+        return result
+    except Exception as exc:
+        logger.exception("cache_scan_results_task failed for project %s: %s", project_id, exc)
+        raise self.retry(exc=exc)
+
+
+async def _cache_scan_results_impl(project_id: str, scan_results: dict | None = None) -> dict:
+    """
+    Cache scan results to Redis.
+    
+    Builds a minimal but useful result object containing latest data from DB.
+    """
+    logger.info("Caching scan results for project %s", project_id)
+    
+    try:
+        # Build a results dict with latest data
+        async with AsyncSessionLocal() as session:
+            # Get latest score
+            score_result = await session.execute(
+                select(Score)
+                .where(Score.project_id == project_id)
+                .order_by(Score.timestamp.desc())
+                .limit(1)
+            )
+            latest_score = score_result.scalar_one_or_none()
+            
+            # Get latest keywords count
+            kw_result = await session.execute(
+                select(func.count(Keyword.id))
+                .where(Keyword.project_id == project_id)
+            )
+            keyword_count = kw_result.scalar() or 0
+            
+            # Build cache object
+            cache_data = {
+                "project_id": project_id,
+                "scan_completed_at": datetime.now(timezone.utc).isoformat(),
+                "scores": {
+                    "visibility_score": latest_score.visibility_score if latest_score else 0.0,
+                    "impact_score": latest_score.impact_score if latest_score else 0.0,
+                    "sov_score": latest_score.sov_score if latest_score else 0.0,
+                } if latest_score else {},
+                "keyword_count": keyword_count,
+                "status": "complete",
+            }
+        
+        # Save to Redis cache
+        success = await save_scan_results(project_id, cache_data)
+        
+        if success:
+            logger.info("Successfully cached scan results for project %s (24h TTL)", project_id)
+            return {
+                "project_id": project_id,
+                "status": "cached",
+                "message": "Scan results cached to Redis (24 hour TTL)",
+            }
+        else:
+            logger.warning("Failed to cache scan results for project %s", project_id)
+            return {
+                "project_id": project_id,
+                "status": "cache_failed",
+                "message": "Could not save to cache (Redis unavailable?)",
+            }
+    except Exception as exc:
+        logger.error("Error caching scan results: %s", exc)
+        raise
 
 
 # ---------------------------------------------------------------------------

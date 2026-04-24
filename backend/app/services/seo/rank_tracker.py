@@ -189,6 +189,46 @@ async def check_rankings(
     return result
 
 
+async def _batch_check_via_serpapi(
+    keywords: List[str],
+    domain: str,
+    api_key: str,
+    timeout: float = 30.0,
+) -> Dict[str, Optional[int]]:
+    """
+    Batch check multiple keywords via SerpAPI.
+    Makes individual requests but with optimized concurrency control.
+    
+    Args:
+        keywords: List of keywords to check
+        domain: Target domain
+        api_key: SerpAPI key
+        timeout: Request timeout
+    
+    Returns:
+        Dict mapping keyword -> position (or None if not ranked)
+    """
+    results = {}
+    semaphore = asyncio.Semaphore(5)  # SerpAPI rate limiting: 5 concurrent
+    
+    async def _check_one(keyword: str) -> tuple[str, Optional[int]]:
+        async with semaphore:
+            try:
+                position = await _check_via_serpapi(keyword, domain, api_key)
+                return keyword, position
+            except Exception as e:
+                logger.warning(f"Batch check error for '{keyword}': {e}")
+                return keyword, None
+    
+    tasks = [_check_one(kw) for kw in keywords]
+    batch_results = await asyncio.gather(*tasks, return_exceptions=False)
+    
+    for keyword, position in batch_results:
+        results[keyword] = position
+    
+    return results
+
+
 async def bulk_rank_check(
     project_id: str,
     keywords: List[Dict[str, Any]],

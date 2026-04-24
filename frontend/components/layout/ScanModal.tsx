@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, Check, AlertCircle, Zap } from 'lucide-react'
+import { X, Loader2, Check, AlertCircle, Zap, ArrowRight } from 'lucide-react'
 import { api } from '@/lib/api'
+import { useScanProgress } from '@/hooks/useScanProgress'
 
 interface ScanModalProps {
   isOpen: boolean
@@ -12,13 +13,27 @@ interface ScanModalProps {
   featureType?: 'seo' | 'ai' | 'geo' | 'gsc' | 'ads' | 'full'
 }
 
-type ScanStatus = 'starting' | 'scanning' | 'completed' | 'error'
+type ScanStatus = 'starting' | 'scanning' | 'cached' | 'completed' | 'error' | 'background'
 
 export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: ScanModalProps) {
   const [status, setStatus] = useState<ScanStatus>('starting')
   const [taskId, setTaskId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [progress, setProgress] = useState(0)
+  const [fromCache, setFromCache] = useState(false)
+  const [pollProgress, setPollProgress] = useState(0)
+  
+  // Get auth token (adjust based on your auth system)
+  const authToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+  
+  // Use WebSocket + HTTP polling for real-time progress
+  const {
+    progress: wsProgress,
+    stage,
+    message,
+    elapsedSeconds,
+    estimatedCompletionAt,
+    isConnected: wsConnected,
+  } = useScanProgress(taskId, authToken)
 
   const featureLabels = {
     seo: 'SEO Scan',
@@ -36,17 +51,29 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
       try {
         setStatus('starting')
         setError(null)
-        setProgress(0)
+        setPollProgress(0)
 
-        // For now, use the full scan endpoint
-        // In future, can have feature-specific endpoints
+        // Start the full scan
         const response = await api.ai.runScan(projectId)
         const newTaskId = response.task_id
+        const cached = response.from_cache || false
 
         if (newTaskId) {
           setTaskId(newTaskId)
-          setStatus('scanning')
-          pollTaskStatus(newTaskId)
+          setFromCache(cached)
+          
+          // If results are from cache, show them immediately
+          if (cached) {
+            setStatus('cached')
+            setPollProgress(100)
+            // Auto-close after 3 seconds
+            setTimeout(() => {
+              setStatus('background')
+            }, 3000)
+          } else {
+            setStatus('scanning')
+            pollTaskStatus(newTaskId)
+          }
         } else {
           throw new Error('No task ID received from server')
         }
@@ -61,7 +88,8 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
   }, [isOpen, projectId])
 
   const pollTaskStatus = async (taskId: string) => {
-    const maxAttempts = 300 // 5 minutes
+    // Allow 60 minutes of polling, but user can close modal before then
+    const maxAttempts = 3600 // 60 minutes (3600 seconds / 1 second interval)
     let attempts = 0
 
     const interval = setInterval(async () => {
@@ -77,7 +105,7 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
         const taskStatus = response.status.toLowerCase()
 
         if (taskStatus === 'completed' || taskStatus === 'success') {
-          setProgress(100)
+          setPollProgress(100)
           setStatus('completed')
           clearInterval(interval)
         } else if (taskStatus === 'failed' || taskStatus === 'error' || taskStatus === 'failure') {
@@ -89,7 +117,7 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
           // 0-70: fast-ish
           // 70-90: slow
           // 90-99: very slow
-          setProgress(prev => {
+          setPollProgress(prev => {
             if (prev < 70) return prev + (Math.random() * 10 + 5)
             if (prev < 90) return prev + (Math.random() * 2 + 0.5)
             if (prev < 99) return prev + (Math.random() * 0.5 + 0.1)
@@ -108,9 +136,13 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
   }
 
   const handleClose = () => {
-    if (status === 'completed' || status === 'error') {
-      onClose()
-    }
+    onClose()
+  }
+
+  const handleMinimize = () => {
+    // User can click "Run in background" to close and let scan continue
+    setStatus('background')
+    onClose()
   }
 
   return (
@@ -140,6 +172,9 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
                 {status === 'scanning' && (
                   <Loader2 className="h-5 w-5 animate-spin text-primary" />
                 )}
+                {status === 'cached' && (
+                  <Check className="h-5 w-5 text-green-500" />
+                )}
                 {status === 'completed' && (
                   <Check className="h-5 w-5 text-green-500" />
                 )}
@@ -149,14 +184,19 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
                 {status === 'starting' && (
                   <Zap className="h-5 w-5 text-primary" />
                 )}
+                {status === 'background' && (
+                  <ArrowRight className="h-5 w-5 text-blue-400" />
+                )}
                 <h3 className="text-lg font-bold text-[#f1f5f9]">
                   {status === 'scanning' && `Running ${featureLabels[featureType]}...`}
+                  {status === 'cached' && `${featureLabels[featureType]} Results (Cached)`}
                   {status === 'completed' && `${featureLabels[featureType]} Completed`}
                   {status === 'error' && `${featureLabels[featureType]} Failed`}
                   {status === 'starting' && `Starting ${featureLabels[featureType]}...`}
+                  {status === 'background' && `${featureLabels[featureType]} Running in Background`}
                 </h3>
               </div>
-              {status === 'completed' || status === 'error' ? (
+              {(status === 'completed' || status === 'error' || status === 'cached' || status === 'background') ? (
                 <button
                   onClick={handleClose}
                   className="text-[#94a3b8] hover:text-[#f1f5f9] transition-colors p-1"
@@ -184,28 +224,84 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
                     <Loader2 className="h-12 w-12 text-primary animate-spin" />
                   </div>
                   <p className="text-center text-[#f1f5f9] font-medium">Running {featureLabels[featureType]}</p>
-                  <p className="text-center text-[#94a3b8] text-sm">
-                    Analyzing data across multiple sources...
-                  </p>
+                  
+                  {/* Show real-time stage if WebSocket connected */}
+                  {wsConnected && stage && (
+                    <p className="text-center text-primary text-sm font-medium">{stage}</p>
+                  )}
+                  
+                  {/* Show message if available */}
+                  {message && (
+                    <p className="text-center text-[#94a3b8] text-sm">
+                      {message}
+                    </p>
+                  )}
+                  
+                  {!message && (
+                    <p className="text-center text-[#94a3b8] text-sm">
+                      Analyzing data across multiple sources...
+                    </p>
+                  )}
 
                   {/* Progress bar */}
                   <div className="mt-6 space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-xs text-[#94a3b8]">Progress</span>
-                      <span className="text-xs text-primary font-semibold">{Math.floor(progress)}%</span>
+                      <span className="text-xs text-primary font-semibold">{Math.floor(wsProgress || pollProgress)}%</span>
                     </div>
                     <div className="w-full h-2 bg-[#334155] rounded-full overflow-hidden">
                       <motion.div
                         initial={{ width: 0 }}
-                        animate={{ width: `${progress}%` }}
+                        animate={{ width: `${wsProgress || pollProgress}%` }}
                         transition={{ duration: 0.3 }}
                         className="h-full bg-gradient-to-r from-primary to-indigo-400"
                       />
                     </div>
                   </div>
 
+                  {/* Show ETA if available */}
+                  {estimatedCompletionAt && (
+                    <p className="text-center text-[#64748b] text-xs mt-2">
+                      Estimated completion: {new Date(estimatedCompletionAt).toLocaleTimeString()}
+                    </p>
+                  )}
+
                   <p className="text-center text-[#64748b] text-xs mt-4">
-                    This may take a few moments. Please don't close this dialog.
+                    This may take several minutes. You can close this dialog to continue working.
+                  </p>
+                </div>
+              )}
+
+              {status === 'cached' && (
+                <div className="text-center space-y-3">
+                  <div className="flex justify-center">
+                    <div className="relative">
+                      <div className="h-12 w-12 rounded-full bg-blue-500/20 flex items-center justify-center">
+                        <Check className="h-6 w-6 text-blue-500" />
+                      </div>
+                      <motion.div
+                        initial={{ scale: 0, opacity: 1 }}
+                        animate={{ scale: 1.5, opacity: 0 }}
+                        transition={{ duration: 0.5 }}
+                        className="absolute inset-0 rounded-full border-2 border-blue-500"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[#f1f5f9] font-semibold">Results from Cache</p>
+                  <p className="text-[#94a3b8] text-sm">
+                    Using recent scan results (nothing changed in your project).
+                  </p>
+                </div>
+              )}
+
+              {status === 'background' && (
+                <div className="text-center space-y-3">
+                  <div className="flex justify-center">
+                    <ArrowRight className="h-12 w-12 text-blue-400" />
+                  </div>
+                  <p className="text-[#f1f5f9] font-semibold">Scan Running in Background</p>
+                  <p className="text-[#94a3b8] text-sm">
+                    Your scan is now running in the background. You'll receive an email when it completes.
                   </p>
                 </div>
               )}
@@ -246,7 +342,18 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
             </div>
 
             {/* Footer */}
-            {(status === 'completed' || status === 'error') && (
+            {status === 'scanning' && (
+              <div className="px-6 py-4 border-t border-[#334155]">
+                <button
+                  onClick={handleMinimize}
+                  className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  <ArrowRight className="h-4 w-4" />
+                  Run in Background
+                </button>
+              </div>
+            )}
+            {(status === 'completed' || status === 'error' || status === 'cached' || status === 'background') && (
               <div className="px-6 py-4 border-t border-[#334155]">
                 <button
                   onClick={handleClose}

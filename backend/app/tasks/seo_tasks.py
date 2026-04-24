@@ -22,11 +22,7 @@ from app.services.seo.rank_tracker import bulk_rank_check
 from app.services.seo.on_page_analyzer import analyze_url
 from app.services.seo.technical_seo import check_technical
 from app.services.seo.content_gap_analyzer import find_gaps
-from app.services.gsc.gsc_service import sync_gsc_data as gsc_sync
-from app.services.ads.ads_service import sync_ads_data as ads_sync
-
-logger = logging.getLogger(__name__)
-storage = StorageService()
+from app.core.component_cache import ComponentCache
 
 
 # ---------------------------------------------------------------------------
@@ -147,6 +143,13 @@ async def _generate_keywords_impl(
             session.add(new_cluster)
 
         await session.commit()
+        
+        # Cache keywords and clusters
+        try:
+            component_cache = ComponentCache(project_id)
+            await component_cache.cache_keywords(keywords_raw, list(clusters_raw.values()))
+        except Exception as e:
+            logger.warning(f"Error caching keywords: {e}")
 
         # Store to Spaces
         payload = {
@@ -239,6 +242,13 @@ async def _run_rank_tracking_impl(project_id: str) -> dict:
             session.add(ranking)
 
         await session.commit()
+        
+        # Cache rankings
+        try:
+            component_cache = ComponentCache(project_id)
+            await component_cache.cache_rankings(ranking_results)
+        except Exception as e:
+            logger.warning(f"Error caching rankings: {e}")
 
         # Store to Spaces
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -314,6 +324,13 @@ async def _run_seo_audit_impl(project_id: str, url: str | None) -> dict:
             + len(technical.get("issues", []))
         ),
     }
+    
+    # Cache audit results
+    try:
+        component_cache = ComponentCache(project_id)
+        await component_cache.cache_audit(on_page, technical)
+    except Exception as e:
+        logger.warning(f"Error caching audit: {e}")
 
     try:
         storage.upload_json(
@@ -379,6 +396,13 @@ async def _find_content_gaps_impl(project_id: str) -> dict:
         brand_name=project.brand_name,
     )
     logger.info("Found %d content gaps", len(gaps))
+    
+    # Cache gaps
+    try:
+        component_cache = ComponentCache(project_id)
+        await component_cache.cache_gaps(gaps)
+    except Exception as e:
+        logger.warning(f"Error caching gaps: {e}")
 
     payload = {
         "project_id": project_id,
