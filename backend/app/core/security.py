@@ -129,7 +129,7 @@ def create_access_token(
 
 def create_refresh_token(subject: str | UUID) -> str:
     """
-    Create a long-lived refresh token (7 days).
+    Create a long-lived refresh token (30 days).
     
     Parameters
     ----------
@@ -137,7 +137,7 @@ def create_refresh_token(subject: str | UUID) -> str:
         The user's UUID.
     """
     now = datetime.now(tz=timezone.utc)
-    expire = now + timedelta(days=7)
+    expire = now + timedelta(days=30)
     payload: dict[str, Any] = {
         "sub": str(subject),
         "iat": int(now.timestamp()),

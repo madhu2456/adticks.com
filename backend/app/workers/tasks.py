@@ -57,6 +57,8 @@ async def _load_competitors(session, project_id: str):
     return result.scalars().all()
 
 
+from celery import group, chain, chord
+
 # ---------------------------------------------------------------------------
 # run_full_scan_task — master orchestration
 # ---------------------------------------------------------------------------
@@ -64,19 +66,14 @@ async def _load_competitors(session, project_id: str):
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=120)
 def run_full_scan_task(self, project_id: str) -> dict:
     """
-    Master task: orchestrate the full AdTicks pipeline for a project.
+    Master task: orchestrate the full AdTicks pipeline for a project using non-blocking chains.
 
-    Pipeline:
-      1. generate_keywords_task
-      2. run_rank_tracking_task (after keywords)  [parallel]
-      3. run_seo_audit_task                       [parallel]
-      4. find_content_gaps_task                   [parallel]
-      5. generate_prompts_task                    [parallel]
-      6. sync_gsc_data_task                       [parallel]
-      7. sync_ads_data_task                       [parallel]
-      8. run_llm_scan_task (after prompts)
-      9. compute_scores_task (after LLM scan)
-     10. generate_insights_task (final)
+    Workflow:
+      1. Keyword Generation (Initial)
+      2. Group of Parallel tasks (SEO audit, rank tracking, gaps, prompts, GSC, Ads)
+      3. LLM Scan (depends on prompts)
+      4. Score Computation
+      5. Insight Generation
     """
     try:
         loop = asyncio.new_event_loop()
@@ -98,77 +95,48 @@ def run_full_scan_task(self, project_id: str) -> dict:
     seed_keywords = [brand_name, industry.lower()] + competitor_domains[:3]
 
     logger.info(
-        "Starting full scan pipeline for project=%s brand=%s domain=%s",
-        project_id, brand_name, domain,
+        "Starting non-blocking full scan pipeline for project=%s",
+        project_id,
     )
 
-    # Step 1: Generate keywords (must complete before rank tracking)
-    kw_result = generate_keywords_task.delay(
-        project_id=project_id,
-        domain=domain,
-        industry=industry,
-        seed_keywords=seed_keywords,
-    )
-    try:
-        kw_result.get(timeout=300)
-        logger.info("Keywords generated for project %s", project_id)
-    except Exception as exc:
-        logger.warning("Keyword generation had an issue (continuing): %s", exc)
-
-    # Step 2-7: Parallel tasks (SEO audit, rank tracking, gaps, prompts, GSC, Ads)
-    parallel_tasks = [
-        run_rank_tracking_task.s(project_id=project_id),
-        run_seo_audit_task.s(project_id=project_id),
-        find_content_gaps_task.s(project_id=project_id),
-        generate_prompts_task.s(
+    # We build a chain: 
+    # generate_keywords -> group(parallel_tasks) -> run_llm_scan_task -> compute_scores_task -> generate_insights_task
+    
+    workflow = chain(
+        generate_keywords_task.s(
             project_id=project_id,
-            brand_name=brand_name,
             domain=domain,
             industry=industry,
-            competitors=competitor_domains,
+            seed_keywords=seed_keywords,
         ),
-        sync_gsc_data_task.s(project_id=project_id),
-        sync_ads_data_task.s(project_id=project_id),
-    ]
+        group(
+            run_rank_tracking_task.s(project_id=project_id),
+            run_seo_audit_task.s(project_id=project_id),
+            find_content_gaps_task.s(project_id=project_id),
+            generate_prompts_task.s(
+                project_id=project_id,
+                brand_name=brand_name,
+                domain=domain,
+                industry=industry,
+                competitors=competitor_domains,
+            ),
+            sync_gsc_data_task.s(project_id=project_id),
+            sync_ads_data_task.s(project_id=project_id),
+        ),
+        run_llm_scan_task.s(project_id=project_id, prompt_limit=100),
+        compute_scores_task.s(project_id=project_id),
+        generate_insights_task.s(project_id=project_id),
+    )
 
-    parallel_group = group(parallel_tasks)
-    parallel_result = parallel_group.apply_async()
-    try:
-        parallel_result.get(timeout=600, propagate=False)
-        logger.info("Parallel tasks complete for project %s", project_id)
-    except Exception as exc:
-        logger.warning("Some parallel tasks had issues (continuing): %s", exc)
+    # Launch the chain
+    workflow.apply_async()
 
-    # Step 8: Run LLM scan (after prompts were generated)
-    llm_result = run_llm_scan_task.delay(project_id=project_id, prompt_limit=100)
-    try:
-        llm_result.get(timeout=600)
-        logger.info("LLM scan complete for project %s", project_id)
-    except Exception as exc:
-        logger.warning("LLM scan had an issue (continuing): %s", exc)
-
-    # Step 9: Compute scores
-    scores_result = compute_scores_task.delay(project_id=project_id)
-    try:
-        scores_result.get(timeout=120)
-        logger.info("Scores computed for project %s", project_id)
-    except Exception as exc:
-        logger.warning("Score computation had an issue (continuing): %s", exc)
-
-    # Step 10: Generate insights
-    insights_result = generate_insights_task.delay(project_id=project_id)
-    try:
-        insights_result.get(timeout=120)
-        logger.info("Insights generated for project %s", project_id)
-    except Exception as exc:
-        logger.warning("Insight generation had an issue (continuing): %s", exc)
-
-    logger.info("Full scan pipeline complete for project %s", project_id)
     return {
         "project_id": project_id,
-        "status": "completed",
-        "completed_at": datetime.now(timezone.utc).isoformat(),
+        "status": "started",
+        "started_at": datetime.now(timezone.utc).isoformat(),
     }
+
 
 
 async def _get_project_info(project_id: str) -> dict | None:

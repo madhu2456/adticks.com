@@ -43,10 +43,13 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
         const response = await api.ai.runScan(projectId)
         const newTaskId = response.task_id
 
-        setTaskId(newTaskId)
-        setStatus('scanning')
-
-        pollTaskStatus(newTaskId)
+        if (newTaskId) {
+          setTaskId(newTaskId)
+          setStatus('scanning')
+          pollTaskStatus(newTaskId)
+        } else {
+          throw new Error('No task ID received from server')
+        }
       } catch (err: any) {
         console.error('Scan failed:', err)
         setStatus('error')
@@ -77,13 +80,21 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
           setProgress(100)
           setStatus('completed')
           clearInterval(interval)
-        } else if (taskStatus === 'failed' || taskStatus === 'error') {
+        } else if (taskStatus === 'failed' || taskStatus === 'error' || taskStatus === 'failure') {
           setStatus('error')
           setError(response.error || 'Scan failed. Please try again.')
           clearInterval(interval)
-        } else if (taskStatus === 'running' || taskStatus === 'pending' || taskStatus === 'started') {
-          // Slow progress increase to show activity during long scans
-          setProgress(prev => Math.min(95, prev + (Math.random() * 5 + 2)))
+        } else {
+          // Creeping progress:
+          // 0-70: fast-ish
+          // 70-90: slow
+          // 90-99: very slow
+          setProgress(prev => {
+            if (prev < 70) return prev + (Math.random() * 10 + 5)
+            if (prev < 90) return prev + (Math.random() * 2 + 0.5)
+            if (prev < 99) return prev + (Math.random() * 0.5 + 0.1)
+            return 99
+          })
         }
 
         attempts++
