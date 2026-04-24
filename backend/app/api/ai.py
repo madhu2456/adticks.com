@@ -76,11 +76,16 @@ async def run_scan(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Trigger a full AI visibility scan for a project.
+    Trigger a full comprehensive scan for a project across all channels.
     
-    Initiates a comprehensive background scan that uses AI to analyze brand visibility,
-    search for mentions, and generate insights. Includes prompt generation, LLM execution,
-    and mention detection. This is an asynchronous operation.
+    Initiates a background scan pipeline that includes:
+    - SEO: keyword discovery, rank tracking, on-page audits, content gap analysis
+    - AI Visibility: LLM-based brand mention detection across ChatGPT, Claude, Gemini
+    - GSC: Google Search Console data import (impressions, clicks, CTR)
+    - Ads: Google Ads performance data import (spend, conversions, ROAS)
+    - Insights: Cross-channel AI recommendations (P1-P3 prioritized)
+    
+    This is an asynchronous operation that returns immediately.
     
     **Authentication:** Required (Bearer token)
     
@@ -96,12 +101,12 @@ async def run_scan(
     - 401 Unauthorized: Missing or invalid authentication
     - 404 Not Found: Project not found or not owned by user
     
-    **Example:** Performs comprehensive brand visibility analysis across multiple search angles
+    **Example:** Performs comprehensive multi-channel brand visibility analysis
     """
     project = await _assert_owner(project_id, current_user, db)
     try:
-        from app.tasks.ai_tasks import run_llm_scan_task
-        task = run_llm_scan_task.delay(project_id=str(project.id))
+        from app.workers.tasks import run_full_scan_task
+        task = run_full_scan_task.delay(project_id=str(project.id))
         return {"status": "queued", "task_id": task.id}
     except Exception:
         return {"status": "queued", "task_id": None}

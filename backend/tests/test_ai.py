@@ -58,7 +58,7 @@ async def test_run_scan_returns_202(client, test_project, auth_headers):
     """POST /api/scan/run returns 202 and queued status."""
     mock_task = MagicMock()
     mock_task.id = "scan-task-002"
-    with patch("app.tasks.ai_tasks.run_llm_scan_task.delay", return_value=mock_task):
+    with patch("app.workers.tasks.run_full_scan_task.delay", return_value=mock_task):
         response = await client.post(
             f"/api/scan/run?project_id={test_project.id}",
             headers=auth_headers,
