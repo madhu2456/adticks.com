@@ -202,6 +202,7 @@ async def _run_llm_scan_impl(project_id: str, prompt_limit: int) -> dict:
                 resp_row = Response(
                     id=resp_id,
                     prompt_id=prompt_uuid,
+                    response_text=resp_data.get("response_text", ""),
                     storage_path=storage_path,
                     model=resp_data.get("model"),
                     timestamp=datetime.now(timezone.utc),

@@ -55,6 +55,7 @@ class Response(Base):
         nullable=False,
         index=True,
     )
+    response_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
     storage_path: Mapped[str] = mapped_column(String(1024), nullable=False)
     model: Mapped[str | None] = mapped_column(String(128), nullable=True)
     timestamp: Mapped[datetime] = mapped_column(

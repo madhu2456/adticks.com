@@ -14,6 +14,7 @@ class PromptResponse(BaseModel):
 class ResponseResponse(BaseModel):
     id: UUID
     prompt_id: UUID
+    response_text: str
     storage_path: str
     model: str | None
     timestamp: datetime
