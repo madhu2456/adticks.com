@@ -9,15 +9,25 @@ interface ScanModalProps {
   isOpen: boolean
   onClose: () => void
   projectId?: string
+  featureType?: 'seo' | 'ai' | 'geo' | 'gsc' | 'ads' | 'full'
 }
 
 type ScanStatus = 'starting' | 'scanning' | 'completed' | 'error'
 
-export function ScanModal({ isOpen, onClose, projectId }: ScanModalProps) {
+export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: ScanModalProps) {
   const [status, setStatus] = useState<ScanStatus>('starting')
   const [taskId, setTaskId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
+
+  const featureLabels = {
+    seo: 'SEO Scan',
+    ai: 'AI Visibility Scan',
+    geo: 'Location Sync',
+    gsc: 'GSC Sync',
+    ads: 'Ads Sync',
+    full: 'Full Scan',
+  }
 
   useEffect(() => {
     if (!isOpen || !projectId) return
@@ -28,6 +38,8 @@ export function ScanModal({ isOpen, onClose, projectId }: ScanModalProps) {
         setError(null)
         setProgress(0)
 
+        // For now, use the full scan endpoint
+        // In future, can have feature-specific endpoints
         const response = await api.ai.runScan(projectId)
         const newTaskId = response.task_id
 
@@ -46,7 +58,7 @@ export function ScanModal({ isOpen, onClose, projectId }: ScanModalProps) {
   }, [isOpen, projectId])
 
   const pollTaskStatus = async (taskId: string) => {
-    const maxAttempts = 300 // 5 minutes instead of 1 minute
+    const maxAttempts = 300 // 5 minutes
     let attempts = 0
 
     const interval = setInterval(async () => {
@@ -127,10 +139,10 @@ export function ScanModal({ isOpen, onClose, projectId }: ScanModalProps) {
                   <Zap className="h-5 w-5 text-primary" />
                 )}
                 <h3 className="text-lg font-bold text-[#f1f5f9]">
-                  {status === 'scanning' && 'Running Scan...'}
-                  {status === 'completed' && 'Scan Completed'}
-                  {status === 'error' && 'Scan Failed'}
-                  {status === 'starting' && 'Starting Scan...'}
+                  {status === 'scanning' && `Running ${featureLabels[featureType]}...`}
+                  {status === 'completed' && `${featureLabels[featureType]} Completed`}
+                  {status === 'error' && `${featureLabels[featureType]} Failed`}
+                  {status === 'starting' && `Starting ${featureLabels[featureType]}...`}
                 </h3>
               </div>
               {status === 'completed' || status === 'error' ? (
@@ -160,9 +172,9 @@ export function ScanModal({ isOpen, onClose, projectId }: ScanModalProps) {
                   <div className="flex justify-center">
                     <Loader2 className="h-12 w-12 text-primary animate-spin" />
                   </div>
-                  <p className="text-center text-[#f1f5f9] font-medium">Scanning your website</p>
+                  <p className="text-center text-[#f1f5f9] font-medium">Running {featureLabels[featureType]}</p>
                   <p className="text-center text-[#94a3b8] text-sm">
-                    Analyzing content, rankings, and AI visibility...
+                    Analyzing data across multiple sources...
                   </p>
 
                   {/* Progress bar */}
@@ -204,7 +216,7 @@ export function ScanModal({ isOpen, onClose, projectId }: ScanModalProps) {
                   </div>
                   <p className="text-[#f1f5f9] font-semibold">Scan Completed Successfully!</p>
                   <p className="text-[#94a3b8] text-sm">
-                    Your website scan is now complete. Check your dashboard for updated results.
+                    Your scan is complete. Check the results below for updated data.
                   </p>
                 </div>
               )}

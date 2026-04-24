@@ -2,8 +2,9 @@
 import React, { useState } from "react";
 import {
   Megaphone, Link2, DollarSign, MousePointerClick,
-  TrendingUp, BarChart2, RefreshCw,
+  TrendingUp, BarChart2, RefreshCw, Zap,
 } from "lucide-react";
+import { ScanModal } from "@/components/layout/ScanModal";
 import { PerformanceChart } from "@/components/ads/PerformanceChart";
 import { CampaignTable } from "@/components/ads/CampaignTable";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,6 +48,7 @@ export default function AdsPage() {
   const { showAlert, AlertModal } = useAlertModal();
   const [isConnected, setIsConnected] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
 
   // Fetch real data
   const { data: performanceData, isLoading: performanceLoading } = useAdsPerformance(activeProject?.id || "");
@@ -146,14 +148,23 @@ export default function AdsPage() {
           <h1 className="text-2xl font-bold text-[#f1f5f9]">Ads Performance</h1>
           <p className="text-sm text-[#94a3b8] mt-1">Google Ads · Last 30 days</p>
         </div>
-        <button
-          onClick={handleSync}
-          disabled={syncing}
-          className="flex items-center gap-2 bg-[#f97316]/10 hover:bg-[#f97316]/20 border border-[#f97316]/30 text-[#f97316] rounded-xl px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-          {syncing ? "Syncing..." : "Sync Google Ads"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsScanModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all"
+          >
+            <Zap size={16} />
+            <span>Sync Ads Data</span>
+          </button>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="flex items-center gap-2 bg-[#f97316]/10 hover:bg-[#f97316]/20 border border-[#f97316]/30 text-[#f97316] rounded-xl px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Syncing..." : "Sync Google Ads"}
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -183,6 +194,13 @@ export default function AdsPage() {
       {/* Campaigns */}
       <CampaignTable campaigns={EXTENDED_CAMPAIGNS} />
       {AlertModal}
+
+      <ScanModal
+        isOpen={isScanModalOpen}
+        onClose={() => setIsScanModalOpen(false)}
+        projectId={activeProject?.id}
+        featureType="ads"
+      />
     </div>
   );
 }

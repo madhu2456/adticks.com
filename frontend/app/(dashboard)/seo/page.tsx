@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Zap } from "lucide-react";
 import { KeywordTable } from "@/components/seo/KeywordTable";
 import { RankTracker } from "@/components/seo/RankTracker";
 import { OnPageScore } from "@/components/seo/OnPageScore";
@@ -8,6 +9,7 @@ import { ContentGaps } from "@/components/seo/ContentGaps";
 import { TechnicalSEO } from "@/components/seo/TechnicalSEO";
 import { BacklinkDashboard } from "@/components/seo/BacklinkDashboard";
 import { CompetitorAnalysis } from "@/components/seo/CompetitorAnalysis";
+import { ScanModal } from "@/components/layout/ScanModal";
 import { useActiveProject } from "@/hooks/useProject";
 import { useKeywords, useContentGaps, useTechnicalChecks } from "@/hooks/useSEO";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +18,7 @@ export default function SEOPage() {
   const { activeProject } = useActiveProject();
   const [tab, setTab] = useState("keywords");
   const [search, setSearch] = useState("");
+  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
 
   // Fetch real data from backend
   const { data: keywordResponse, isLoading: keywordsLoading } = useKeywords(activeProject?.id || "", search);
@@ -39,9 +42,18 @@ export default function SEOPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-text-primary">SEO Hub</h1>
-        <p className="text-text-muted text-sm mt-1">Track rankings, audit pages, and discover content opportunities</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary">SEO Hub</h1>
+          <p className="text-text-muted text-sm mt-1">Track rankings, audit pages, and discover content opportunities</p>
+        </div>
+        <button
+          onClick={() => setIsScanModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all"
+        >
+          <Zap size={16} />
+          <span>Run SEO Scan</span>
+        </button>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
@@ -110,6 +122,13 @@ export default function SEOPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <ScanModal
+        isOpen={isScanModalOpen}
+        onClose={() => setIsScanModalOpen(false)}
+        projectId={activeProject?.id}
+        featureType="seo"
+      />
     </div>
   );
 }

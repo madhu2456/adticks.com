@@ -3,9 +3,10 @@ import React, { useState } from "react";
 import { 
   MapPin, Star, Search, Globe, 
   CheckCircle2, AlertTriangle, TrendingUp,
-  Map as MapIcon, MessageSquare, ClipboardCheck
+  Map as MapIcon, MessageSquare, ClipboardCheck, Zap
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ScanModal } from "@/components/layout/ScanModal";
 import { LocationList } from "@/components/geo/LocationList";
 import { LocalRankCards } from "@/components/geo/LocalRankCards";
 import { ReviewDashboard } from "@/components/geo/ReviewDashboard";
@@ -15,6 +16,7 @@ import { useActiveProject } from "@/hooks/useProject";
 export default function GeoPage() {
   const { activeProject } = useActiveProject();
   const [tab, setTab] = useState("locations");
+  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
 
   if (!activeProject) {
     return (
@@ -27,11 +29,20 @@ export default function GeoPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-text-primary">Local SEO & Geo</h1>
-        <p className="text-text-muted text-sm mt-1">
-          Manage physical locations, track Google Maps rankings, and monitor local reputation.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary">Local SEO & Geo</h1>
+          <p className="text-text-muted text-sm mt-1">
+            Manage physical locations, track Google Maps rankings, and monitor local reputation.
+          </p>
+        </div>
+        <button
+          onClick={() => setIsScanModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all"
+        >
+          <Zap size={16} />
+          <span>Sync Locations</span>
+        </button>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
@@ -82,6 +93,13 @@ export default function GeoPage() {
           <CitationAudit projectId={activeProject.id} />
         </TabsContent>
       </Tabs>
+
+      <ScanModal
+        isOpen={isScanModalOpen}
+        onClose={() => setIsScanModalOpen(false)}
+        projectId={activeProject?.id}
+        featureType="geo"
+      />
     </div>
   );
 }

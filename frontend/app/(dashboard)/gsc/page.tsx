@@ -2,8 +2,9 @@
 import React, { useState } from "react";
 import {
   BarChart2, RefreshCw, Link2, MousePointerClick,
-  Eye, Percent, Hash, TrendingUp,
+  Eye, Percent, Hash, TrendingUp, Zap,
 } from "lucide-react";
+import { ScanModal } from "@/components/layout/ScanModal";
 import { ImpressionsChart } from "@/components/gsc/ImpressionsChart";
 import { CTRChart } from "@/components/gsc/CTRChart";
 import { QueryTable } from "@/components/gsc/QueryTable";
@@ -35,6 +36,7 @@ export default function GSCPage() {
   const [isConnected, setIsConnected] = useState(false);
   const [activeTab, setActiveTab] = useState<"queries" | "pages">("queries");
   const [syncing, setSyncing] = useState(false);
+  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
 
   // Fetch real data
   const { data: queriesData, isLoading: queriesLoading } = useGSCQueries(activeProject?.id || "");
@@ -156,14 +158,23 @@ export default function GSCPage() {
           <h1 className="text-2xl font-bold text-[#f1f5f9]">Google Search Console</h1>
           <p className="text-sm text-[#94a3b8] mt-1">Last synced: 2 hours ago</p>
         </div>
-        <button
-          onClick={handleSync}
-          disabled={syncing}
-          className="flex items-center gap-2 bg-[#6366f1]/10 hover:bg-[#6366f1]/20 border border-[#6366f1]/30 text-[#6366f1] rounded-xl px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-          {syncing ? "Syncing..." : "Sync Now"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsScanModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all"
+          >
+            <Zap size={16} />
+            <span>Sync GSC Data</span>
+          </button>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="flex items-center gap-2 bg-[#6366f1]/10 hover:bg-[#6366f1]/20 border border-[#6366f1]/30 text-[#6366f1] rounded-xl px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Syncing..." : "Sync Now"}
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -222,6 +233,13 @@ export default function GSCPage() {
         )}
       </div>
       {AlertModal}
+
+      <ScanModal
+        isOpen={isScanModalOpen}
+        onClose={() => setIsScanModalOpen(false)}
+        projectId={activeProject?.id}
+        featureType="gsc"
+      />
     </div>
   );
 }

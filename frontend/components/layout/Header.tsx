@@ -17,7 +17,6 @@ import { clearTokens, getUser } from '@/lib/auth'
 import { useProjects, useActiveProject } from '@/hooks/useProject'
 import { useAlertModal } from '@/hooks/useAlertModal'
 import { ProjectModal } from '@/components/projects/ProjectModal'
-import { ScanModal } from '@/components/layout/ScanModal'
 import { CommandPalette } from '@/components/layout/CommandPalette'
 import { Project, User as UserType } from '@/lib/types'
 
@@ -76,7 +75,6 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
   const [projectOpen,      setProjectOpen]      = useState(false)
   const [notifOpen,        setNotifOpen]        = useState(false)
   const [userOpen,         setUserOpen]         = useState(false)
-  const [isScanModalOpen,  setScanModalOpen]    = useState(false)
   const [isModalOpen,      setModalOpen]        = useState(false)
   const [isCommandOpen,    setCommandOpen]      = useState(false)
   
@@ -105,11 +103,6 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
     color: '#64748b', 
     initials: '?',
     brand_name: 'No Project'
-  }
-
-  const handleScan = () => {
-    if (!activeProject) return
-    setScanModalOpen(true)
   }
 
   const markAllRead = () => setNotifications(prev => prev.map(n => ({ ...n, read: true })))
@@ -298,24 +291,6 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
           <span>Live</span>
         </div>
 
-        {/* Run Full Scan */}
-        <button
-          onClick={handleScan}
-          disabled={!activeProject}
-          title={!activeProject ? "Select a project to run scan" : "Run AI Scan"}
-          className={cn(
-            'flex items-center gap-1.5 h-8 px-3 rounded-lg text-[13px] font-semibold text-white transition-all',
-            'disabled:opacity-40 disabled:cursor-not-allowed',
-          )}
-          style={{
-            background: 'linear-gradient(135deg, #6366f1, #7c3aed)',
-            boxShadow: '0 0 12px rgba(99,102,241,0.25), 0 2px 8px rgba(0,0,0,0.3)',
-          }}
-        >
-          <Zap size={13} />
-          <span className="hidden sm:inline">Run Scan</span>
-        </button>
-
         {/* Notification bell */}
         <div ref={notifRef} className="relative">
           <button
@@ -490,12 +465,6 @@ function Header({ sidebarCollapsed, currentPage = 'Overview' }: HeaderProps) {
         isOpen={isModalOpen} 
         onClose={() => setModalOpen(false)} 
         onSuccess={(id) => setActiveId(id)}
-      />
-
-      <ScanModal 
-        isOpen={isScanModalOpen} 
-        onClose={() => setScanModalOpen(false)} 
-        projectId={activeProject?.id}
       />
 
       <CommandPalette 
