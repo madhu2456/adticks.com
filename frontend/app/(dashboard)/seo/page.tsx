@@ -8,16 +8,25 @@ import { ContentGaps } from "@/components/seo/ContentGaps";
 import { TechnicalSEO } from "@/components/seo/TechnicalSEO";
 import { BacklinkDashboard } from "@/components/seo/BacklinkDashboard";
 import { CompetitorAnalysis } from "@/components/seo/CompetitorAnalysis";
-import { mockKeywords, mockContentGaps, mockTechnicalChecks } from "@/lib/mockData";
 import { useActiveProject } from "@/hooks/useProject";
+import { useKeywords, useContentGaps, useTechnicalChecks } from "@/hooks/useSEO";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function SEOPage() {
   const { activeProject } = useActiveProject();
   const [tab, setTab] = useState("keywords");
   const [search, setSearch] = useState("");
 
-  const filteredKeywords = mockKeywords.filter((k) =>
-    search ? k.keyword.toLowerCase().includes(search.toLowerCase()) : true
+  // Fetch real data from backend
+  const { data: keywordResponse, isLoading: keywordsLoading } = useKeywords(activeProject?.id || "", search);
+  const { data: gaps, isLoading: gapsLoading } = useContentGaps(activeProject?.id || "");
+  const { data: technicalChecks, isLoading: technicalLoading } = useTechnicalChecks(activeProject?.id || "");
+
+  // Extract keywords from paginated response
+  const keywords = (keywordResponse?.data || []) as any[];
+
+  const filteredKeywords = keywords.filter((k) =>
+    search ? k.keyword?.toLowerCase().includes(search.toLowerCase()) : true
   );
 
   if (!activeProject) {
@@ -47,7 +56,14 @@ export default function SEOPage() {
         </TabsList>
 
         <TabsContent value="keywords">
-          <KeywordTable keywords={filteredKeywords} onSearch={setSearch} />
+          {keywordsLoading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-64 w-full" />
+            </div>
+          ) : (
+            <KeywordTable keywords={filteredKeywords} onSearch={setSearch} />
+          )}
         </TabsContent>
 
         <TabsContent value="rankings">
@@ -72,7 +88,11 @@ export default function SEOPage() {
               <h2 className="text-lg font-semibold text-text-primary">Content Gaps</h2>
               <p className="text-sm text-text-muted">Topics your competitors rank for but you don&apos;t</p>
             </div>
-            <ContentGaps gaps={mockContentGaps} />
+            {gapsLoading ? (
+              <Skeleton className="h-64 w-full" />
+            ) : (
+              <ContentGaps gaps={gaps || []} />
+            )}
           </div>
         </TabsContent>
 
@@ -82,7 +102,11 @@ export default function SEOPage() {
               <h2 className="text-lg font-semibold text-text-primary">Technical Audit</h2>
               <p className="text-sm text-text-muted">Core technical health checks for your domain</p>
             </div>
-            <TechnicalSEO checks={mockTechnicalChecks} />
+            {technicalLoading ? (
+              <Skeleton className="h-64 w-full" />
+            ) : (
+              <TechnicalSEO checks={technicalChecks || []} />
+            )}
           </div>
         </TabsContent>
       </Tabs>

@@ -140,23 +140,23 @@ export const api = {
   // SEO
   seo: {
     generateKeywords: (projectId: string) =>
-      axiosInstance.post<{ job_id: string }>(`/seo/${projectId}/keywords/generate`).then(unwrap),
+      axiosInstance.post<{ task_id: string }>(`/seo/keywords?project_id=${projectId}`).then(unwrap),
     getKeywords: (projectId: string, page = 1, search?: string) =>
       axiosInstance
         .get<PaginatedResponse<Keyword>>(
-          `/seo/${projectId}/keywords?page=${page}${search ? `&search=${search}` : ""}`
+          `/seo/rankings/${projectId}?skip=${(page - 1) * 50}&limit=50`
         )
         .then(unwrap),
-    getRankings: (projectId: string, keywordId: string, days = 30) =>
+    getRankings: (projectId: string, days = 30) =>
       axiosInstance
-        .get<RankingHistory>(`/seo/${projectId}/keywords/${keywordId}/rankings?days=${days}`)
+        .get<PaginatedResponse<Keyword>>(`/seo/rankings/${projectId}?skip=0&limit=100`)
         .then(unwrap),
     getGaps: (projectId: string) =>
-      axiosInstance.get<ContentGap[]>(`/seo/${projectId}/gaps`).then(unwrap),
+      axiosInstance.get(`/seo/gaps/${projectId}`).then(unwrap),
     runAudit: (projectId: string, url: string) =>
-      axiosInstance.post<OnPageAudit>(`/seo/${projectId}/audit`, { url }).then(unwrap),
+      axiosInstance.post<{ task_id: string }>(`/seo/audit?project_id=${projectId}`, { url }).then(unwrap),
     getTechnicalChecks: (projectId: string) =>
-      axiosInstance.get<TechnicalCheck[]>(`/seo/${projectId}/technical`).then(unwrap),
+      axiosInstance.get(`/seo/technical/${projectId}`).then(unwrap),
   },
 
   // AI Visibility
@@ -165,6 +165,8 @@ export const api = {
       axiosInstance.post<{ task_id: string; status: string }>(`/prompts/generate?project_id=${projectId}`).then(unwrap),
     runScan: (projectId: string) =>
       axiosInstance.post<{ task_id: string; status: string }>(`/scan/run?project_id=${projectId}`).then(unwrap),
+    getTaskStatus: (taskId: string) =>
+      axiosInstance.get<{ task_id: string; status: string; result?: unknown; error?: string }>(`/scan/status/${taskId}`).then(unwrap),
     getResults: (projectId: string, skip = 0, limit = 50) =>
       axiosInstance
         .get<PaginatedResponse<AIPromptResult>>(`/results/${projectId}?skip=${skip}&limit=${limit}`)
@@ -184,21 +186,21 @@ export const api = {
     getAuthUrl: (projectId: string) =>
       axiosInstance.get<{ auth_url: string }>(`/gsc/auth`).then(unwrap),
     sync: (projectId: string) =>
-      axiosInstance.post<{ job_id: string }>(`/gsc/${projectId}/sync`).then(unwrap),
+      axiosInstance.post<{ task_id: string }>(`/gsc/sync/${projectId}`).then(unwrap),
     getQueries: (projectId: string, days = 28) =>
-      axiosInstance.get<GSCQuery[]>(`/gsc/${projectId}/queries?days=${days}`).then(unwrap),
+      axiosInstance.get<PaginatedResponse<GSCQuery>>(`/gsc/queries/${projectId}?skip=0&limit=100`).then(unwrap),
     getPages: (projectId: string) =>
-      axiosInstance.get<GSCPage[]>(`/gsc/${projectId}/pages`).then(unwrap),
+      axiosInstance.get<PaginatedResponse<GSCQuery>>(`/gsc/queries/${projectId}?skip=0&limit=100`).then(unwrap),
     getMetrics: (projectId: string, days = 28) =>
-      axiosInstance.get<GSCMetrics[]>(`/gsc/${projectId}/metrics?days=${days}`).then(unwrap),
+      axiosInstance.get<PaginatedResponse<GSCQuery>>(`/gsc/queries/${projectId}?skip=0&limit=100`).then(unwrap),
   },
 
   // Ads
   ads: {
     getPerformance: (projectId: string, days = 30) =>
-      axiosInstance.get<AdsPerformance[]>(`/ads/${projectId}/performance?days=${days}`).then(unwrap),
+      axiosInstance.get<PaginatedResponse<AdsPerformance>>(`/ads/performance/${projectId}?skip=0&limit=100`).then(unwrap),
     getCampaigns: (projectId: string) =>
-      axiosInstance.get<AdCampaign[]>(`/ads/${projectId}/campaigns`).then(unwrap),
+      axiosInstance.get<PaginatedResponse<AdCampaign>>(`/ads/performance/${projectId}?skip=0&limit=100`).then(unwrap),
   },
 
   // Insights

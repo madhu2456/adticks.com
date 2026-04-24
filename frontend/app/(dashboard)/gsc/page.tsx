@@ -7,8 +7,10 @@ import {
 import { ImpressionsChart } from "@/components/gsc/ImpressionsChart";
 import { CTRChart } from "@/components/gsc/CTRChart";
 import { QueryTable } from "@/components/gsc/QueryTable";
+import { Skeleton } from "@/components/ui/skeleton";
 import { mockGSCQueries, mockGSCPages, mockGSCMetrics } from "@/lib/mockData";
 import { useActiveProject } from "@/hooks/useProject";
+import { useGSCQueries, useGSCMetrics } from "@/hooks/useGSC";
 import { useAlertModal } from "@/hooks/useAlertModal";
 import { api } from "@/lib/api";
 
@@ -34,10 +36,18 @@ export default function GSCPage() {
   const [activeTab, setActiveTab] = useState<"queries" | "pages">("queries");
   const [syncing, setSyncing] = useState(false);
 
-  const totalClicks = mockGSCQueries.reduce((s, q) => s + q.clicks, 0);
-  const totalImpressions = mockGSCMetrics.reduce((s, m) => s + m.impressions, 0);
-  const avgCTR = (mockGSCMetrics.reduce((s, m) => s + m.ctr, 0) / mockGSCMetrics.length).toFixed(2);
-  const avgPosition = (mockGSCMetrics.reduce((s, m) => s + m.position, 0) / mockGSCMetrics.length).toFixed(1);
+  // Fetch real data
+  const { data: queriesData, isLoading: queriesLoading } = useGSCQueries(activeProject?.id || "");
+  const { data: metricsData, isLoading: metricsLoading } = useGSCMetrics(activeProject?.id || "");
+
+  // Extract data from paginated responses
+  const queries = (queriesData?.data || []) as any[];
+  const metrics = (metricsData?.data || mockGSCMetrics) as any[];
+
+  const totalClicks = queries.reduce((s: number, q: any) => s + (q.clicks || 0), 0);
+  const totalImpressions = metrics.reduce((s: number, m: any) => s + (m.impressions || 0), 0);
+  const avgCTR = metrics.length > 0 ? (metrics.reduce((s: number, m: any) => s + (m.ctr || 0), 0) / metrics.length).toFixed(2) : "0";
+  const avgPosition = metrics.length > 0 ? (metrics.reduce((s: number, m: any) => s + (m.position || 0), 0) / metrics.length).toFixed(1) : "0";
 
   async function handleConnect() {
     if (!activeProject) {
@@ -63,9 +73,28 @@ export default function GSCPage() {
     }
   }
 
-  function handleSync() {
+  async function handleSync() {
+    if (!activeProject) return;
     setSyncing(true);
-    setTimeout(() => setSyncing(false), 2000);
+    try {
+      await api.gsc.sync(activeProject.id);
+      showAlert({
+        title: "Sync Started",
+        message: "GSC data sync has started. Check back in a moment for updates.",
+        type: "success",
+        confirmText: "OK",
+      });
+    } catch (err) {
+      console.error("Sync failed:", err);
+      showAlert({
+        title: "Sync Failed",
+        message: "Failed to sync GSC data. Please try again.",
+        type: "error",
+        confirmText: "Close",
+      });
+    } finally {
+      setSyncing(false);
+    }
   }
 
   if (!isConnected) {
@@ -139,19 +168,30 @@ export default function GSCPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={MousePointerClick} label="Total Clicks" value={totalClicks.toLocaleString()} sub="Last 28 days" />
-        <StatCard icon={Eye} label="Total Impressions" value={totalImpressions.toLocaleString()} sub="Last 28 days" />
-        <StatCard icon={Percent} label="Avg CTR" value={`${avgCTR}%`} sub="Click-through rate" />
-        <StatCard icon={Hash} label="Avg Position" value={`#${avgPosition}`} sub="Search ranking" />
+        {queriesLoading || metricsLoading ? (
+          <>
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </>
+        ) : (
+          <>
+            <StatCard icon={MousePointerClick} label="Total Clicks" value={totalClicks.toLocaleString()} sub="Last 28 days" />
+            <StatCard icon={Eye} label="Total Impressions" value={totalImpressions.toLocaleString()} sub="Last 28 days" />
+            <StatCard icon={Percent} label="Avg CTR" value={`${avgCTR}%`} sub="Click-through rate" />
+            <StatCard icon={Hash} label="Avg Position" value={`#${avgPosition}`} sub="Search ranking" />
+          </>
+        )}
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2">
-          <ImpressionsChart data={mockGSCMetrics} />
+          {metricsLoading ? <Skeleton className="h-80 w-full" /> : <ImpressionsChart data={metrics} />}
         </div>
         <div>
-          <CTRChart data={mockGSCMetrics} />
+          {metricsLoading ? <Skeleton className="h-80 w-full" /> : <CTRChart data={metrics} />}
         </div>
       </div>
 
@@ -172,10 +212,14 @@ export default function GSCPage() {
             </button>
           ))}
         </div>
-        <QueryTable
-          data={activeTab === "queries" ? mockGSCQueries : mockGSCPages}
-          title={activeTab === "queries" ? "Top Queries" : "Top Pages"}
-        />
+        {queriesLoading ? (
+          <Skeleton className="h-96 w-full" />
+        ) : (
+          <QueryTable
+            data={queries.length > 0 ? queries : (activeTab === "queries" ? mockGSCQueries : mockGSCPages)}
+            title={activeTab === "queries" ? "Top Queries" : "Top Pages"}
+          />
+        )}
       </div>
       {AlertModal}
     </div>

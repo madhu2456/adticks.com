@@ -6,6 +6,9 @@ import {
 } from "lucide-react";
 import { PerformanceChart } from "@/components/ads/PerformanceChart";
 import { CampaignTable } from "@/components/ads/CampaignTable";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useActiveProject } from "@/hooks/useProject";
+import { useAdsPerformance } from "@/hooks/useAds";
 import { useAlertModal } from "@/hooks/useAlertModal";
 import { mockAdsPerformance } from "@/lib/mockData";
 
@@ -39,19 +42,48 @@ function StatCard({ icon: Icon, label, value, sub, color = "#6366f1" }: {
 }
 
 export default function AdsPage() {
+  const { activeProject } = useActiveProject();
   const { showAlert, AlertModal } = useAlertModal();
   const [isConnected, setIsConnected] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
-  const totalSpend = mockAdsPerformance.reduce((s, d) => s + d.spend, 0);
-  const totalClicks = mockAdsPerformance.reduce((s, d) => s + d.clicks, 0);
-  const totalConversions = mockAdsPerformance.reduce((s, d) => s + d.conversions, 0);
-  const avgROAS = (mockAdsPerformance.reduce((s, d) => s + d.roas, 0) / mockAdsPerformance.length).toFixed(1);
-  const avgCPC = (mockAdsPerformance.reduce((s, d) => s + d.cpc, 0) / mockAdsPerformance.length).toFixed(2);
+  // Fetch real data
+  const { data: performanceData, isLoading: performanceLoading } = useAdsPerformance(activeProject?.id || "");
+  const performance = (performanceData?.data || mockAdsPerformance) as any[];
 
-  function handleSync() {
+  const totalSpend = performance.reduce((s: number, d: any) => s + (d.spend || 0), 0);
+  const totalClicks = performance.reduce((s: number, d: any) => s + (d.clicks || 0), 0);
+  const totalConversions = performance.reduce((s: number, d: any) => s + (d.conversions || 0), 0);
+  const avgROAS = performance.length > 0 ? (performance.reduce((s: number, d: any) => s + (d.roas || 0), 0) / performance.length).toFixed(1) : "0";
+  const avgCPC = performance.length > 0 ? (performance.reduce((s: number, d: any) => s + (d.cpc || 0), 0) / performance.length).toFixed(2) : "0";
+
+  async function handleSync() {
+    if (!activeProject) return;
     setSyncing(true);
-    setTimeout(() => setSyncing(false), 2000);
+    try {
+      await fetch(`/api/ads/sync/${activeProject.id}`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("access_token") || ""}`,
+        },
+      });
+      showAlert({
+        title: "Sync Started",
+        message: "Ads data sync has started. Check back in a moment for updates.",
+        type: "success",
+        confirmText: "OK",
+      });
+    } catch (err) {
+      console.error("Sync failed:", err);
+      showAlert({
+        title: "Sync Failed",
+        message: "Failed to sync Ads data. Please try again.",
+        type: "error",
+        confirmText: "Close",
+      });
+    } finally {
+      setSyncing(false);
+    }
   }
 
   if (!isConnected) {
@@ -130,15 +162,27 @@ export default function AdsPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatCard icon={DollarSign} label="Total Spend" value={`$${totalSpend.toLocaleString()}`} sub="Last 30 days" color="#f97316" />
-        <StatCard icon={MousePointerClick} label="Clicks" value={totalClicks.toLocaleString()} sub="Total clicks" color="#6366f1" />
-        <StatCard icon={TrendingUp} label="Conversions" value={totalConversions.toString()} sub="Total goals" color="#10b981" />
-        <StatCard icon={BarChart2} label="Avg ROAS" value={`${avgROAS}x`} sub="Return on ad spend" color="#8b5cf6" />
-        <StatCard icon={DollarSign} label="Avg CPC" value={`$${avgCPC}`} sub="Cost per click" color="#f59e0b" />
+        {performanceLoading ? (
+          <>
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </>
+        ) : (
+          <>
+            <StatCard icon={DollarSign} label="Total Spend" value={`$${totalSpend.toLocaleString()}`} sub="Last 30 days" color="#f97316" />
+            <StatCard icon={MousePointerClick} label="Clicks" value={totalClicks.toLocaleString()} sub="Total clicks" color="#6366f1" />
+            <StatCard icon={TrendingUp} label="Conversions" value={totalConversions.toString()} sub="Total goals" color="#10b981" />
+            <StatCard icon={BarChart2} label="Avg ROAS" value={`${avgROAS}x`} sub="Return on ad spend" color="#8b5cf6" />
+            <StatCard icon={DollarSign} label="Avg CPC" value={`$${avgCPC}`} sub="Cost per click" color="#f59e0b" />
+          </>
+        )}
       </div>
 
       {/* Chart */}
-      <PerformanceChart data={mockAdsPerformance} />
+      {performanceLoading ? <Skeleton className="h-80 w-full" /> : <PerformanceChart data={performance} />}
 
       {/* Campaigns */}
       <CampaignTable campaigns={EXTENDED_CAMPAIGNS} />

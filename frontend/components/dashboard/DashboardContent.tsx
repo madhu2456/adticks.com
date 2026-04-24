@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import {
   Search, Bot, BarChart2, DollarSign,
   TrendingUp, TrendingDown, ArrowUpRight, ArrowRight,
@@ -11,8 +12,10 @@ import { VisibilityScore } from "@/components/dashboard/VisibilityScore";
 import { ChannelBreakdown } from "@/components/dashboard/ChannelBreakdown";
 import { TopInsights } from "@/components/dashboard/TopInsights";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatNumber, formatCurrency, cn } from "@/lib/utils";
 import { useActiveProject } from "@/hooks/useProject";
+import { useInsights } from "@/hooks/useInsights";
 import { useAlertModal } from "@/hooks/useAlertModal";
 import { getUser } from "@/lib/auth";
 import { 
@@ -135,11 +138,39 @@ export function DashboardContent() {
     setUser(getUser());
   }, []);
 
-  const stats    = mockStats;
-  const score    = mockScore;
+  const projectId = activeProject?.id || "";
+  
+  // Fetch real data from backend
+  const { data: scoreData, isLoading: scoreLoading } = useQuery({
+    queryKey: ["dashboard-score", projectId],
+    queryFn: async () => {
+      if (!projectId) return null;
+      const response = await fetch(`/api/scores/${projectId}`, {
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("access_token") || ""}`,
+        },
+      });
+      if (!response.ok) return null;
+      return response.json();
+    },
+    enabled: !!projectId,
+  });
+
+  const { data: insightsData, isLoading: insightsLoading } = useInsights(projectId);
+
+  // Use mock data as fallback
+  const stats    = { 
+    organic_traffic: mockStats.organic_traffic,
+    organic_traffic_change: mockStats.organic_traffic_change,
+    visibility_score: scoreData?.seo_score || mockStats.visibility_score,
+    visibility_score_change: mockStats.visibility_score_change,
+    ad_spend: mockStats.ad_spend,
+    ad_spend_change: mockStats.ad_spend_change,
+  };
+  const score    = scoreData || mockScore;
   const channels = mockChannelPerformance;
   const activity = mockActivity;
-  const insights = mockInsights;
+  const insights = insightsData?.data?.slice(0, 3) || mockInsights;
 
   const greeting = getGreeting();
   const { showAlert, AlertModal } = useAlertModal();
@@ -180,6 +211,9 @@ export function DashboardContent() {
         return;
       }
 
+      const data = await response.json();
+      const taskId = data.task_id;
+
       showAlert({
         title: "Scan Queued",
         message: "Your scan has been queued and will complete in a few moments. Check back shortly for updated data.",
@@ -187,10 +221,60 @@ export function DashboardContent() {
         confirmText: "OK",
       });
 
-      // Refresh data after a delay to allow scan to complete
-      setTimeout(() => {
-        window.location.reload();
-      }, 5000);
+      // Poll for task completion
+      let isComplete = false;
+      let pollCount = 0;
+      const maxPolls = 120; // 2 minutes max with 1 second interval
+      
+      while (!isComplete && pollCount < maxPolls) {
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before polling
+        
+        try {
+          const statusResponse = await fetch(`/api/scan/status/${taskId}`, {
+            headers: {
+              "Authorization": `Bearer ${localStorage.getItem("access_token") || ""}`,
+            },
+          });
+          
+          if (statusResponse.ok) {
+            const statusData = await statusResponse.json();
+            
+            if (statusData.status === "SUCCESS") {
+              isComplete = true;
+              showAlert({
+                title: "Scan Complete",
+                message: "Your scan has completed successfully! The data is now being displayed.",
+                type: "success",
+                confirmText: "OK",
+              });
+              // Refresh page to show new data
+              window.location.reload();
+            } else if (statusData.status === "FAILURE") {
+              isComplete = true;
+              showAlert({
+                title: "Scan Failed",
+                message: `Scan failed: ${statusData.error || "Unknown error"}`,
+                type: "error",
+                confirmText: "Close",
+              });
+              break;
+            }
+          }
+        } catch (err) {
+          console.error("Poll error:", err);
+        }
+        
+        pollCount++;
+      }
+      
+      if (!isComplete && pollCount >= maxPolls) {
+        showAlert({
+          title: "Scan Timeout",
+          message: "The scan is taking longer than expected. Results may still be processing. Please check back in a moment.",
+          type: "warning",
+          confirmText: "OK",
+        });
+      }
     } catch (err) {
       console.error("Scan error:", err);
       showAlert({

@@ -24,6 +24,45 @@ async def _assert_owner(project_id: UUID, user: User, db: AsyncSession) -> Proje
     return project
 
 
+@router.get("/scan/status/{task_id}")
+async def get_scan_status(task_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Get the status of a running or completed scan task.
+    
+    **Authentication:** Required (Bearer token)
+    
+    **Path parameters:**
+    - **task_id**: Celery task ID returned by /scan/run (required)
+    
+    **Returns:**
+    - **status**: Task status ("PENDING", "STARTED", "SUCCESS", "FAILURE", "RETRY")
+    - **result**: Task result (dict or None if still running)
+    - **error**: Error message if task failed (None if successful)
+    
+    **Responses:**
+    - 200 OK: Task status retrieved
+    - 401 Unauthorized: Missing or invalid authentication
+    - 404 Not Found: Task not found
+    
+    **Example:** Check if a scan task with ID "abc123" is complete: GET /api/scan/status/abc123
+    """
+    from app.core.celery_app import celery_app
+    
+    try:
+        result = celery_app.AsyncResult(task_id)
+        return {
+            "task_id": task_id,
+            "status": result.state,
+            "result": result.result if result.successful() else None,
+            "error": str(result.info) if result.failed() else None,
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task not found: {str(e)}"
+        )
+
+
 @router.post("/prompts/generate", status_code=status.HTTP_202_ACCEPTED)
 async def generate_prompts(
     project_id: UUID,
