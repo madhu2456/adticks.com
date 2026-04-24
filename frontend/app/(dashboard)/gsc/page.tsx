@@ -50,8 +50,8 @@ export default function GSCPage() {
       return;
     }
     try {
-      const { url } = await api.gsc.getAuthUrl(activeProject.id);
-      window.location.href = url;
+      const { auth_url } = await api.gsc.getAuthUrl(activeProject.id);
+      window.location.href = auth_url;
     } catch (err) {
       console.error("Failed to get GSC auth URL:", err);
       showAlert({

@@ -119,7 +119,7 @@ export const api = {
     create: (data: Partial<Project>) =>
       axiosInstance.post<Project>("/projects", data).then(unwrap),
     update: (id: string, data: Partial<Project>) =>
-      axiosInstance.patch<Project>(`/projects/${id}`, data).then(unwrap),
+      axiosInstance.put<Project>(`/projects/${id}`, data).then(unwrap),
     delete: (id: string) => axiosInstance.delete(`/projects/${id}`).then(unwrap),
   },
 
@@ -182,7 +182,7 @@ export const api = {
   // GSC
   gsc: {
     getAuthUrl: (projectId: string) =>
-      axiosInstance.get<{ url: string }>(`/gsc/${projectId}/auth-url`).then(unwrap),
+      axiosInstance.get<{ auth_url: string }>(`/gsc/auth`).then(unwrap),
     sync: (projectId: string) =>
       axiosInstance.post<{ job_id: string }>(`/gsc/${projectId}/sync`).then(unwrap),
     getQueries: (projectId: string, days = 28) =>
