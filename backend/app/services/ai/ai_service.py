@@ -45,7 +45,7 @@ async def run_ai_visibility_scan(
     start_time = datetime.now(timezone.utc)
 
     competitors = competitors or []
-    models = models or ["openai", "claude"]
+    models = ["openai"]
 
     # Step 1: Generate prompts
     logger.info(f"[{project_id}] Step 1: Generating prompts")

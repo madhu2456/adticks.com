@@ -10,6 +10,7 @@ export interface User {
   full_name?: string;
   company_name?: string;
   avatar?: string;
+  avatar_url?: string;
   plan: "free" | "starter" | "pro" | "enterprise";
   trial_ends_at?: string;
   created_at: string;
@@ -38,6 +39,8 @@ export interface Project {
   name: string;
   brand_name?: string;
   domain: string;
+  industry?: string;
+  ai_scans_enabled?: boolean;
   color?: string;
   initials?: string;
   favicon?: string;
@@ -50,6 +53,7 @@ export interface Project {
 // Visibility Scores
 export interface VisibilityScore {
   overall: number;
+  seo_score?: number;
   seo: number;
   ai: number;
   gsc: number;
@@ -251,6 +255,10 @@ export interface Recommendation {
 
 // Stats
 export interface DashboardStats {
+  organic_traffic?: number;
+  organic_traffic_change?: number;
+  visibility_score?: number;
+  visibility_score_change?: number;
   total_keywords: number;
   keywords_change: number;
   ai_mentions: number;
@@ -259,7 +267,9 @@ export interface DashboardStats {
   gsc_impressions_change: number;
   ad_spend: number;
   ad_spend_change: number;
+  [key: string]: any; // Allow indexing
 }
+
 
 // GEO Module
 export interface Location {

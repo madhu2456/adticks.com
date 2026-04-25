@@ -12,7 +12,7 @@ interface ScanModalProps {
   isOpen: boolean
   onClose: () => void
   projectId?: string
-  featureType?: 'seo' | 'ai' | 'geo' | 'gsc' | 'ads' | 'full' | 'keywords_gsc' | 'on_page'
+  featureType?: 'seo' | 'ai' | 'geo' | 'gsc' | 'ads' | 'full' | 'keywords_gsc' | 'on_page' | 'technical' | 'gaps'
   url?: string
 }
 
@@ -24,7 +24,7 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full', ur
   const [error, setError] = useState<string | null>(null)
   const [fromCache, setFromCache] = useState(false)
   const [pollProgress, setPollProgress] = useState(0)
-  const { addScan, updateScan } = useBackgroundScans()
+  const { addScan, updateScan, scans } = useBackgroundScans()
   const { toast } = useToast()
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
   
@@ -40,6 +40,21 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full', ur
     estimatedCompletionAt,
     isConnected: wsConnected,
   } = useScanProgress(taskId, authToken)
+
+  // Sync WebSocket progress with the background scan store
+  useEffect(() => {
+    if (taskId && wsProgress > 0) {
+      // Find the active scan that matches this task
+      const activeScan = scans.find(s => s.id.startsWith(projectId || '') && s.status === 'scanning');
+      if (activeScan) {
+        updateScan(activeScan.id, {
+          progress: wsProgress,
+          stage: stage || 'Scanning...',
+          message: message || '',
+        });
+      }
+    }
+  }, [wsProgress, stage, message, taskId, projectId, updateScan, scans]);
 
   const featureLabels = {
     seo: 'SEO Scan',
@@ -154,6 +169,7 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full', ur
     // Allow 60 minutes of polling, but user can close modal before then
     const maxAttempts = 3600 // 60 minutes (3600 seconds / 1 second interval)
     let attempts = 0
+    let currentPollProgress = 0 // Track progress locally in the closure
 
     const interval = setInterval(async () => {
       if (attempts >= maxAttempts) {
@@ -175,6 +191,19 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full', ur
       try {
         const response = await api.ai.getTaskStatus(taskId)
         const taskStatus = response.status.toLowerCase()
+        
+        // Use backend progress if available, otherwise use creeping progress
+        const backendProgress = (response as any).progress;
+        
+        if (backendProgress && backendProgress.progress > 0) {
+           currentPollProgress = backendProgress.progress
+           setPollProgress(currentPollProgress)
+           updateScan(scanId, {
+             progress: backendProgress.progress,
+             stage: backendProgress.stage || 'Scanning...',
+             message: backendProgress.message || '',
+           })
+        }
 
         if (taskStatus === 'completed' || taskStatus === 'success') {
           setPollProgress(100)
@@ -182,6 +211,7 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full', ur
           updateScan(scanId, {
             status: 'completed',
             progress: 100,
+            stage: 'Scan Complete',
           })
           toast({
             title: 'Scan Complete',
@@ -195,6 +225,7 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full', ur
           updateScan(scanId, {
             status: 'error',
             error: response.error,
+            stage: 'Scan Failed',
           })
           toast({
             title: 'Scan Failed',
@@ -202,19 +233,22 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full', ur
             variant: 'destructive',
           })
           clearInterval(interval)
-        } else {
-          // Creeping progress:
-          // 0-70: fast-ish
-          // 70-90: slow
-          // 90-99: very slow
-          setPollProgress(prev => {
-            if (prev < 70) return prev + (Math.random() * 10 + 5)
-            if (prev < 90) return prev + (Math.random() * 2 + 0.5)
-            if (prev < 99) return prev + (Math.random() * 0.5 + 0.1)
-            return 99
-          })
+        } else if (!backendProgress || backendProgress.progress === 0) {
+          // Creeping progress logic ONLY if backend hasn't provided real progress yet
+          let next;
+          if (currentPollProgress < 70) next = currentPollProgress + (Math.random() * 5 + 2);
+          else if (currentPollProgress < 90) next = currentPollProgress + (Math.random() * 1 + 0.5);
+          else if (currentPollProgress < 99) next = currentPollProgress + (Math.random() * 0.2 + 0.1);
+          else next = 99;
+          
+          currentPollProgress = next;
+          setPollProgress(currentPollProgress);
+          
+          // Ensure we update the background scan store with the SAME value
+          // Also update the stage to indicate analysis has begun
           updateScan(scanId, {
-            progress: Math.floor(pollProgress),
+            progress: Math.floor(next),
+            stage: 'Analyzing data across multiple sources...'
           })
         }
 

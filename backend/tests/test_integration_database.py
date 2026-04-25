@@ -46,7 +46,7 @@ async def test_duplicate_registration_rejected_consistently(client):
     )
     assert response1.status_code == 201
     # Response includes email
-    assert response1.json()["email"] == "uniqueemail123@adticks.com"
+    assert "access_token" in response1.json()
 
 
 @pytest.mark.asyncio

@@ -10,6 +10,9 @@ from app.models.prompt import Mention, Prompt, Response
 from app.models.user import User
 from app.schemas.common import PaginatedResponse
 from app.schemas.prompt import MentionResponse, ResponseResponse
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["ai"])
 
@@ -47,15 +50,34 @@ async def get_scan_status(task_id: str, current_user: User = Depends(get_current
     **Example:** Check if a scan task with ID "abc123" is complete: GET /api/scan/status/abc123
     """
     from app.core.celery_app import celery_app
-    
+    from app.core.progress import ScanProgress
+
     try:
+        # Check Celery state
         result = celery_app.AsyncResult(task_id)
+        state = result.state
+
+        # Cross-reference with ScanProgress in Redis
+        # This is critical because replacing a task in Celery can lose the parent state
+        progress_data = await ScanProgress.get_progress_for_task(task_id)
+
+        if progress_data:
+            progress_val = progress_data.get("progress", 0)
+            # If progress is 100%, consider it SUCCESS for the UI
+            if progress_val == 100:
+                state = "SUCCESS"
+            # If status in Redis is failed, consider it FAILURE
+            elif progress_data.get("status") == "failed":
+                state = "FAILURE"
+
         return {
             "task_id": task_id,
-            "status": result.state,
+            "status": state,
             "result": result.result if result.successful() else None,
             "error": str(result.info) if result.failed() else None,
+            "progress": progress_data
         }
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

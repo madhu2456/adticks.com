@@ -1,5 +1,4 @@
 """SEO Celery tasks — full implementation."""
-import asyncio
 import hashlib
 import logging
 import uuid

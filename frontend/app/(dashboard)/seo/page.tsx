@@ -20,7 +20,7 @@ export default function SEOPage() {
   const [tab, setTab] = useState("keywords");
   const [search, setSearch] = useState("");
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
-  const [currentFeature, setCurrentFeature] = useState<'seo' | 'technical' | 'gaps' | 'full'>('seo');
+  const [currentFeature, setCurrentFeature] = useState<'seo' | 'ai' | 'geo' | 'gsc' | 'ads' | 'full' | 'keywords_gsc' | 'on_page' | 'technical' | 'gaps'>('seo');
 
   // Fetch real data from backend
   const { data: keywordResponse, isLoading: keywordsLoading, refetch: refetchKeywords } = useKeywords(activeProject?.id || "", search);
@@ -63,6 +63,15 @@ export default function SEOPage() {
         <div>
           <h1 className="text-2xl font-bold text-text-primary">SEO Hub</h1>
           <p className="text-text-muted text-sm mt-1">Track rankings, audit pages, and discover content opportunities</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={() => triggerScan('full')}
+            className="gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 border-0 shadow-lg shadow-indigo-500/20"
+          >
+            <Zap size={16} />
+            Run Full SEO Scan
+          </Button>
         </div>
       </div>
 

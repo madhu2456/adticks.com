@@ -14,7 +14,7 @@ Detectable Changes:
 import hashlib
 import json
 import logging
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from datetime import datetime, timezone
 
 from app.core.caching import get_redis_client

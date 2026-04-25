@@ -15,7 +15,6 @@ from app.schemas.keyword import KeywordCreate, RankingResponse
 router = APIRouter(prefix="/seo", tags=["seo"])
 
 
-from app.core.scan_cache import save_scan_results
 from app.core.component_cache import ComponentCache
 
 

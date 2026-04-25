@@ -1,7 +1,5 @@
 """Tests to verify run_full_scan_task is called with correct channels."""
-import uuid
-from unittest.mock import MagicMock, patch, call
-import pytest
+from unittest.mock import MagicMock, patch
 
 
 async def test_run_scan_endpoint_calls_full_scan_task(client, test_project, auth_headers):

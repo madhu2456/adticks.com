@@ -39,6 +39,9 @@ class Project(Base):
     gsc_connected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     gsc_property_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
+    # AI Settings
+    ai_scans_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
     # Relationships
     owner = relationship("User", back_populates="projects")
     competitors = relationship(

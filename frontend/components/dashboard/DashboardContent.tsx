@@ -174,7 +174,7 @@ export function DashboardContent() {
   const score    = scoreData || mockScore;
   const channels = mockChannelPerformance;
   const activity = mockActivity;
-  const insights = insightsData?.data?.slice(0, 3) || mockInsights;
+  const insights = (insightsData as any)?.slice ? (insightsData as any).slice(0, 3) : (insightsData as any)?.data?.slice(0, 3) || mockInsights;
 
   const greeting = getGreeting();
   const { showAlert, AlertModal } = useAlertModal();
@@ -418,8 +418,8 @@ export function DashboardContent() {
           {/* Stat cards — 2×2 grid */}
           <div className="lg:col-span-2 grid grid-cols-2 gap-4">
             {STAT_CARDS.map((card, idx) => {
-              const value  = stats[card.key];
-              const change = stats[card.change_key];
+              const value  = (stats as any)[card.key];
+              const change = (stats as any)[card.change_key];
               const positive = change >= 0;
               const Icon     = card.icon;
               const sparkData = SPARKLINES[card.key];

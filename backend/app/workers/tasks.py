@@ -2,7 +2,6 @@
 AdTicks — Main orchestration tasks.
 Master tasks that chain sub-tasks for full project scans.
 """
-import asyncio
 import logging
 import uuid
 from uuid import UUID
@@ -16,7 +15,6 @@ from app.core.celery_utils import run_async
 from app.core.database import AsyncSessionLocal, engine
 from app.core.storage import StorageService
 from app.core.progress import ScanProgress, ScanStage
-from app.core.differential_updates import DifferentialUpdateDetector
 from app.models.project import Project
 from app.models.competitor import Competitor
 from app.models.prompt import Prompt
@@ -30,7 +28,6 @@ from app.core.scan_cache import (
     get_cached_scan_results,
     should_invalidate_cache,
     save_scan_results,
-    get_cache_status,
 )
 from app.services.insights.insight_engine import InsightEngine
 from app.services.insights.recommendation_generator import generate_recommendations
@@ -68,7 +65,7 @@ async def _load_competitors(session, project_id: str):
     return result.scalars().all()
 
 
-from celery import chain, chord
+from celery import chain
 
 # ---------------------------------------------------------------------------
 # run_full_scan_task — master orchestration
@@ -148,19 +145,21 @@ def run_full_scan_task(self, project_id: str, force_refresh: bool = False) -> di
     # generate_keywords -> group(parallel_tasks) -> run_llm_scan_task -> compute_scores_task -> generate_insights_task -> cache_results
     master_task_id = self.request.id
 
-    from celery import group
-    workflow = chain(
-        generate_keywords_task.s(
-            project_id=project_id,
-            domain=domain,
-            industry=industry,
-            seed_keywords=seed_keywords,
-            parent_task_id=master_task_id,
-        ),
-        group(
-            run_rank_tracking_task.si(project_id=project_id, parent_task_id=master_task_id),
-            run_seo_audit_task.si(project_id=project_id, parent_task_id=master_task_id),
-            find_content_gaps_task.si(project_id=project_id, parent_task_id=master_task_id),
+    
+    # 4. Filter AI tasks if disabled
+    ai_enabled = project_info.get("ai_scans_enabled", True)
+    
+    # Define parallel group
+    parallel_tasks = [
+        run_rank_tracking_task.si(project_id=project_id, parent_task_id=master_task_id),
+        run_seo_audit_task.si(project_id=project_id, parent_task_id=master_task_id),
+        find_content_gaps_task.si(project_id=project_id, parent_task_id=master_task_id),
+        sync_gsc_data_task.si(project_id=project_id, parent_task_id=master_task_id),
+        sync_ads_data_task.si(project_id=project_id, parent_task_id=master_task_id),
+    ]
+    
+    if ai_enabled:
+        parallel_tasks.append(
             generate_prompts_task.si(
                 project_id=project_id,
                 brand_name=brand_name,
@@ -168,15 +167,32 @@ def run_full_scan_task(self, project_id: str, force_refresh: bool = False) -> di
                 industry=industry,
                 competitors=competitor_domains,
                 parent_task_id=master_task_id,
-            ),
-            sync_gsc_data_task.si(project_id=project_id, parent_task_id=master_task_id),
-            sync_ads_data_task.si(project_id=project_id, parent_task_id=master_task_id),
+            )
+        )
+    else:
+        logger.info(f"[{project_id}] AI scans disabled for this project. Skipping prompt generation.")
+
+    chain_steps = [
+        generate_keywords_task.s(
+            project_id=project_id,
+            domain=domain,
+            industry=industry,
+            seed_keywords=seed_keywords,
+            parent_task_id=master_task_id,
         ),
-        run_llm_scan_task.si(project_id=project_id, prompt_limit=100, parent_task_id=master_task_id),
+        group(parallel_tasks),
+    ]
+    
+    if ai_enabled:
+        chain_steps.append(run_llm_scan_task.si(project_id=project_id, prompt_limit=100, parent_task_id=master_task_id))
+    
+    chain_steps.extend([
         compute_scores_task.si(project_id=project_id, parent_task_id=master_task_id),
         generate_insights_task.si(project_id=project_id, parent_task_id=master_task_id),
         cache_scan_results_task.si(project_id=project_id, parent_task_id=master_task_id),
-    )
+    ])
+    
+    workflow = chain(*chain_steps)
 
     # Launch the chain
     # By returning self.replace, we make the master task's ID represent the entire chain

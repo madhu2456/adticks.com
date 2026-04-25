@@ -97,7 +97,7 @@ export function useAlertModal() {
             <Button
               onClick={handleConfirm}
               disabled={isLoading}
-              variant={config.type === "error" ? "destructive" : "default"}
+              variant={config.type === "error" ? "danger" : "default"}
             >
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {config.confirmText || "OK"}
@@ -162,7 +162,7 @@ export function AlertModal({
           <Button
             onClick={handleConfirm}
             disabled={isLoading}
-            variant={type === "error" ? "destructive" : "default"}
+            variant={type === "error" ? "danger" : "default"}
           >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {confirmText || "OK"}

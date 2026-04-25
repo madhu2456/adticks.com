@@ -70,6 +70,7 @@ function ProfileTab() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [purging, setPurging] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
@@ -137,6 +138,42 @@ function ProfileTab() {
     }
   }
 
+  async function handlePurgeEverything() {
+    showAlert({
+      title: "Purge Everything?",
+      message: "This will clear all cached data and background task states across the entire system. This action cannot be undone.",
+      type: "warning",
+      confirmText: "Purge All",
+      cancelText: "Cancel",
+      onConfirm: async () => {
+        setPurging(true);
+        try {
+          await api.cache.purgeAll();
+          // Delay success alert slightly to ensure previous modal is closed
+          setTimeout(() => {
+            showAlert({
+              title: "Success",
+              message: "System-wide cache has been purged successfully.",
+              type: "success",
+            });
+          }, 500);
+        } catch (err: any) {
+          console.error("Purge failed:", err);
+          setTimeout(() => {
+            showAlert({
+              title: "Purge Failed",
+              message: err.response?.data?.detail || "You may not have permission to perform this action.",
+              type: "error",
+            });
+          }, 500);
+        } finally {
+          setPurging(false);
+        }
+      }
+    });
+  }
+
+  // Update the return statement to use handlePurgeEverything and show loading state
   return (
     <div className="space-y-6">
       <div>
@@ -200,38 +237,47 @@ function ProfileTab() {
       {/* Danger Zone */}
       <div className="pt-6 border-t border-[#334155]">
         <h3 className="text-sm font-semibold text-[#ef4444] mb-1">Danger Zone</h3>
-        <p className="text-xs text-[#94a3b8] mb-4">Actions here are permanent and affect the entire system cache.</p>
+        <p className="text-xs text-[#94a3b8] mb-4">Reset the entire background processing system.</p>
         
         <button
           onClick={async () => {
             showAlert({
-              title: "Purge Everything?",
-              message: "This will clear all cached data and background task states across the entire system. This action cannot be undone.",
+              title: "Stop All Tasks & Purge Cache?",
+              message: "This will immediately terminate all running background tasks and clear all cached data. This is useful for 'unsticking' the system.",
               type: "warning",
-              confirmText: "Purge All",
+              confirmText: "Nuclear Reset",
               cancelText: "Cancel",
               onConfirm: async () => {
+                setPurging(true);
                 try {
                   await api.cache.purgeAll();
-                  showAlert({
-                    title: "Success",
-                    message: "System-wide cache has been purged successfully.",
-                    type: "success",
-                  });
+                  setTimeout(() => {
+                    showAlert({
+                      title: "System Reset Successful",
+                      message: "All background tasks stopped and system-wide cache purged.",
+                      type: "success",
+                    });
+                  }, 500);
                 } catch (err: any) {
-                  showAlert({
-                    title: "Purge Failed",
-                    message: err.response?.data?.detail || "You may not have permission to perform this action.",
-                    type: "error",
-                  });
+                  console.error("Reset failed:", err);
+                  setTimeout(() => {
+                    showAlert({
+                      title: "Reset Failed",
+                      message: err.response?.data?.detail || "You may not have permission to perform this action.",
+                      type: "error",
+                    });
+                  }, 500);
+                } finally {
+                  setPurging(false);
                 }
               }
             });
           }}
-          className="flex items-center gap-2 bg-[#ef4444]/10 hover:bg-[#ef4444]/20 text-[#ef4444] border border-[#ef4444]/20 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all active:scale-95"
+          disabled={purging}
+          className="flex items-center gap-2 bg-[#ef4444]/10 hover:bg-[#ef4444]/20 text-[#ef4444] border border-[#ef4444]/20 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
         >
-          <XCircle className="h-4 w-4" />
-          Purge Everything
+          {purging ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+          {purging ? "Resetting..." : "Stop All Tasks & Purge Cache"}
         </button>
       </div>
       {AlertModal}
@@ -247,7 +293,8 @@ function ProjectTab() {
   const [form, setForm] = useState({ 
     brand_name: "", 
     domain: "", 
-    industry: "SaaS / Marketing" 
+    industry: "SaaS / Marketing",
+    ai_scans_enabled: true
   });
   
   const [competitors, setCompetitors] = useState(["Competitor A", "Competitor B"]);
@@ -261,6 +308,7 @@ function ProjectTab() {
         brand_name: activeProject.brand_name || activeProject.name || "",
         domain: activeProject.domain || "",
         industry: activeProject.industry || "SaaS / Marketing",
+        ai_scans_enabled: activeProject.ai_scans_enabled !== false,
       });
     }
   }, [activeProject]);
@@ -282,7 +330,12 @@ function ProjectTab() {
     try {
       await updateProject.mutateAsync({
         id: activeProject.id,
-        data: form
+        data: {
+          brand_name: form.brand_name,
+          domain: form.domain,
+          industry: form.industry,
+          ai_scans_enabled: form.ai_scans_enabled
+        }
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -338,6 +391,29 @@ function ProjectTab() {
             ))}
           </select>
           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#475569] pointer-events-none" />
+        </div>
+      </div>
+
+      <div className="bg-[#0f172a]/50 border border-[#334155] rounded-xl p-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <h4 className="text-sm font-medium text-[#f1f5f9]">Enable AI Visibility Scans</h4>
+            <p className="text-xs text-[#94a3b8]">Automatically track brand mentions in LLMs during full scans.</p>
+          </div>
+          <button
+            onClick={() => setForm({ ...form, ai_scans_enabled: !form.ai_scans_enabled })}
+            className={cn(
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#6366f1] focus:ring-offset-2 focus:ring-offset-[#1e293b]",
+              form.ai_scans_enabled ? "bg-[#6366f1]" : "bg-[#334155]"
+            )}
+          >
+            <span
+              className={cn(
+                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                form.ai_scans_enabled ? "translate-x-6" : "translate-x-1"
+              )}
+            />
+          </button>
         </div>
       </div>
 
@@ -433,8 +509,8 @@ function IntegrationsTab() {
         return;
       }
       try {
-        const { url } = await api.gsc.getAuthUrl(activeProject.id);
-        window.location.href = url;
+        const { auth_url } = await api.gsc.getAuthUrl(activeProject.id);
+        window.location.href = auth_url;
       } catch (err) {
         showAlert({
           title: "Connection Failed",

@@ -1,5 +1,4 @@
 """AI visibility Celery tasks — full implementation."""
-import asyncio
 import logging
 import uuid
 from uuid import UUID
@@ -165,6 +164,7 @@ async def _run_llm_scan_impl(project_id: str, prompt_limit: int, task_id: str) -
         industry=project.industry or "Technology",
         competitors=competitor_domains,
         prompt_limit=prompt_limit,
+        models=["openai"],
     )
 
     prompt_results = scan_result.get("prompt_results", [])

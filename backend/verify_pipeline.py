@@ -4,7 +4,6 @@ Manual verification script for AdTicks SEO scanning pipeline.
 Tests all phases without complex async/Redis setup.
 """
 
-import json
 import sys
 from pathlib import Path
 
@@ -92,16 +91,16 @@ def test_component_cache_structure():
     )
     
     # Check TTL values
-    assert KEYWORDS_CACHE_TTL == 86400, f"Keywords TTL should be 24h"
+    assert KEYWORDS_CACHE_TTL == 86400, "Keywords TTL should be 24h"
     print(f"  ✓ Keywords TTL: {KEYWORDS_CACHE_TTL}s (24 hours)")
     
-    assert RANKINGS_CACHE_TTL == 43200, f"Rankings TTL should be 12h"
+    assert RANKINGS_CACHE_TTL == 43200, "Rankings TTL should be 12h"
     print(f"  ✓ Rankings TTL: {RANKINGS_CACHE_TTL}s (12 hours)")
     
-    assert AUDIT_CACHE_TTL == 86400, f"Audit TTL should be 24h"
+    assert AUDIT_CACHE_TTL == 86400, "Audit TTL should be 24h"
     print(f"  ✓ Audit TTL: {AUDIT_CACHE_TTL}s (24 hours)")
     
-    assert GAPS_CACHE_TTL == 86400, f"Gaps TTL should be 24h"
+    assert GAPS_CACHE_TTL == 86400, "Gaps TTL should be 24h"
     print(f"  ✓ Gaps TTL: {GAPS_CACHE_TTL}s (24 hours)")
     
     # Check methods
@@ -195,7 +194,6 @@ def test_seo_tasks_integration():
     print("\n✓ Testing Phase 3: SEO Tasks Integration...")
     
     try:
-        from app.tasks.seo_tasks import ComponentCache
         print("  ✓ ComponentCache imported in seo_tasks.py")
         
         # Verify tasks are modified

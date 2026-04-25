@@ -8,7 +8,6 @@ Provides endpoints for:
 """
 
 import logging
-from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,7 +17,6 @@ from app.core.database import get_db
 from app.core.scan_cache import get_cache_status, invalidate_scan_cache
 from app.core.component_cache import ComponentCache
 from app.models.project import Project
-from app.models.user import User
 from app.core.security import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -39,12 +37,28 @@ async def purge_all_cache(current_user=Depends(get_current_user)):
         )
     
     try:
+        from app.core.celery_app import celery_app
         from app.core.progress import ScanProgress
+        
+        # 1. Revoke all active and reserved tasks in Celery
+        # broadcast() sends the command to all workers
+        celery_app.control.purge() # Clears the queue
+        celery_app.control.discard_all() # Discards all tasks
+        
+        # Revoke all tasks (broadcast to all workers)
+        # We use terminate=True to kill currently running tasks
+        celery_app.control.revoke(
+            task_id="*", # Dummy ID for broad revoke if supported, or we just purge/discard
+            terminate=True,
+            signal='SIGKILL'
+        )
+        
+        # 2. Flush Redis (clears progress data, cache, and the broker queue)
         redis_client = await ScanProgress._get_redis()
         if redis_client:
             await redis_client.flushall()
-            logger.warning(f"SYSTEM PURGE: User {current_user.email} purged all Redis data.")
-            return {"status": "success", "message": "System-wide cache purged successfully."}
+            logger.warning(f"SYSTEM RESET: User {current_user.email} purged all Redis data and stopped all tasks.")
+            return {"status": "success", "message": "All background tasks stopped and cache purged successfully."}
         else:
             raise Exception("Could not connect to Redis")
     except Exception as e:

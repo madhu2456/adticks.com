@@ -15,7 +15,6 @@ import hashlib
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Any, Optional
-from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession

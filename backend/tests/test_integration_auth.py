@@ -97,7 +97,8 @@ async def test_register_multiple_users_isolation(client):
         },
     )
     assert response1.status_code == 201
-    user1_id = response1.json()["id"]
+    me1 = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {response1.json()['access_token']}"})
+    user1_id = me1.json()["id"]
 
     # Register second user
     response2 = await client.post(
@@ -109,8 +110,8 @@ async def test_register_multiple_users_isolation(client):
         },
     )
     assert response2.status_code == 201
-    user2_id = response2.json()["id"]
-
+    me2 = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {response2.json()['access_token']}"})
+    user2_id = me2.json()["id"]
     # Both have different IDs
     assert user1_id != user2_id
 
@@ -194,7 +195,8 @@ async def test_registration_login_access_flow(client, db_session):
         },
     )
     assert register_response.status_code == 201
-    user_id = register_response.json()["id"]
+    me_resp = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {register_response.json()['access_token']}"})
+    user_id = me_resp.json()["id"]
 
     # Step 2: Login
     login_response = await client.post(
@@ -517,3 +519,4 @@ async def test_bearer_token_case_sensitive(client, test_user):
         headers={"Authorization": f"InvalidPrefix {token}"},
     )
     assert response.status_code == 401
+

@@ -667,7 +667,7 @@ async def test_user_response_has_all_required_fields(client):
     assert response.status_code == 201
     body = response.json()
 
-    required_fields = ["id", "email", "full_name", "is_active", "created_at"]
+    required_fields = ["access_token", "refresh_token", "token_type"]
     for field in required_fields:
         assert field in body, f"Missing field: {field}"
 

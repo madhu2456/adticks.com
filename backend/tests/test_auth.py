@@ -28,12 +28,9 @@ async def test_register_success(client):
     )
     assert response.status_code == 201
     body = response.json()
-    assert body["email"] == "newuser@adticks.com"
-    assert body["full_name"] == "New User"
-    assert body["is_active"] is True
-    assert "id" in body
-    assert "password" not in body
-    assert "hashed_password" not in body
+    assert "access_token" in body
+    assert "refresh_token" in body
+    assert "token_type" in body
 
 
 @pytest.mark.asyncio

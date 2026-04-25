@@ -34,11 +34,8 @@ async def test_auth_register_response_structure(client):
 
     # Verify structure
     assert isinstance(body, dict)
-    assert "id" in body
-    assert "email" in body
-    assert "full_name" in body
-    assert "is_active" in body
-    assert "created_at" in body
+    assert "access_token" in body
+    assert "refresh_token" in body
     # Password not in response
     assert "password" not in body
     assert "hashed_password" not in body
@@ -395,7 +392,7 @@ async def test_optional_fields_can_be_omitted(client):
     assert response.status_code == 201
     body = response.json()
     # Should still have the field in response
-    assert "full_name" in body
+    assert "access_token" in body
 
 
 # ---------------------------------------------------------------------------

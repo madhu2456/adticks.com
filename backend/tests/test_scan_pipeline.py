@@ -3,18 +3,13 @@ Test suite for AdTicks SEO scanning pipeline.
 Tests Phase 1-4 functionality: caching, progress, components, differential updates.
 """
 
-import asyncio
 import pytest
-import json
-from datetime import datetime, timezone
-from unittest.mock import Mock, AsyncMock, patch
 
 from app.core.scan_cache import (
     has_scan_cache,
     get_cached_scan_results,
     save_scan_results,
     should_invalidate_cache,
-    get_cache_status,
 )
 from app.core.component_cache import ComponentCache
 from app.core.progress import ScanProgress, ScanStage
@@ -99,7 +94,7 @@ async def test_progress_updates():
     # Update to different stages
     await progress.update(ScanStage.KEYWORD_GENERATION, 10, "Generating keywords")
     await progress.update(ScanStage.RANK_TRACKING, 40, "Checking 40/100 keywords")
-    await progress.update(ScanStage.SEO_AUDIT, 60, "Running technical audit")
+    await progress.update(ScanStage.TECHNICAL_AUDIT, 60, "Running technical audit")
     
     # All updates should complete without error
     assert True

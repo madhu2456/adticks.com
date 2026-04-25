@@ -9,10 +9,8 @@ Usage:
 """
 
 import logging
-import json
 import asyncio
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, status
-from app.core.security import get_current_user
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from app.models.user import User
 from app.core.progress import ScanProgress
 
