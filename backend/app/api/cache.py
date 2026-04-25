@@ -10,16 +10,16 @@ Provides endpoints for:
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.core.database import get_db, AsyncSessionLocal
+from app.core.database import get_db
 from app.core.scan_cache import get_cache_status, invalidate_scan_cache
 from app.core.component_cache import ComponentCache
 from app.models.project import Project
 from app.models.user import User
 from app.core.security import get_current_user
-from sqlalchemy import select, status
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/cache", tags=["cache"])
