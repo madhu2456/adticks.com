@@ -33,7 +33,7 @@ export default function SEOPage() {
   const technicalChecks = (technicalResponse?.data || []) as any[];
 
   const filteredKeywords = keywords.filter((k) =>
-    search ? k.keyword?.toLowerCase().includes(search.toLowerCase()) : true
+    search ? (k.keyword || "").toLowerCase().includes(search.toLowerCase()) : true
   );
 
   const triggerScan = (feature: 'seo' | 'technical' | 'gaps' | 'full' | 'keywords_gsc') => {
