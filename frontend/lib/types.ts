@@ -41,6 +41,7 @@ export interface Project {
   domain: string;
   industry?: string;
   ai_scans_enabled?: boolean;
+  competitors: string[];
   color?: string;
   initials?: string;
   favicon?: string;

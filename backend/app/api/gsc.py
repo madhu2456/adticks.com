@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -75,19 +76,25 @@ async def gsc_auth(current_user: User = Depends(get_current_user)):
     return {"auth_url": auth_url}
 
 
-@router.get("/callback")
-async def gsc_callback(
-    code: str,
+class GSCAuthComplete(BaseModel):
+    code: str
+
+@router.post("/complete")
+async def complete_gsc_auth(
+    payload: GSCAuthComplete,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
-    Handle the Google OAuth2 callback and store the access token.
+    Complete the Google OAuth2 flow using the authorization code.
+    
+    The frontend should call this endpoint after receiving the 'code' from Google's
+    redirect. This request must be authenticated with the user's AdTicks JWT.
     """
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Google OAuth is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in the backend environment."
+            detail="Google OAuth is not configured."
         )
 
     from google_auth_oauthlib.flow import Flow
@@ -106,21 +113,32 @@ async def gsc_callback(
         scopes=_SCOPES,
     )
     flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
-    token = flow.fetch_token(code=code)
+    
+    try:
+        flow.fetch_token(code=payload.code)
+        token = flow.credentials
+    except Exception as e:
+        logger.error(f"Failed to fetch Google token: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to exchange authorization code for tokens."
+        )
     
     # Persist token to user record
-    current_user.gsc_access_token = token.get("access_token")
-    if token.get("refresh_token"):
-        current_user.gsc_refresh_token = token.get("refresh_token")
+    current_user.gsc_access_token = token.token
+    if token.refresh_token:
+        current_user.gsc_refresh_token = token.refresh_token
     
-    expires_in = token.get("expires_in", 3600)
-    current_user.gsc_token_expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+    if token.expiry:
+        # credentials.expiry is often a datetime object
+        if hasattr(token.expiry, "replace"):
+            current_user.gsc_token_expiry = token.expiry.replace(tzinfo=timezone.utc)
+        else:
+            current_user.gsc_token_expiry = datetime.now(timezone.utc) + timedelta(seconds=3600)
     
     db.add(current_user)
     await db.commit()
     
-    # Redirect to GSC page in frontend
-    # In a real app, this would be a 302 redirect
     return {"status": "authorized", "message": "Google Search Console connected successfully"}
 
 

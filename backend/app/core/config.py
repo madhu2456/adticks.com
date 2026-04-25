@@ -71,8 +71,8 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = Field(
-        default="https://adticks.com/api/gsc/callback",
-        description="Google OAuth callback URL"
+        default="https://adticks.com/gsc-callback",
+        description="Google OAuth callback URL (frontend route)"
     )
 
     # ------------------------------------------------------------------

@@ -302,7 +302,7 @@ function ProjectTab() {
     ai_scans_enabled: true
   });
   
-  const [competitors, setCompetitors] = useState(["Competitor A", "Competitor B"]);
+  const [competitors, setCompetitors] = useState<string[]>([]);
   const [newComp, setNewComp] = useState("");
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -315,6 +315,7 @@ function ProjectTab() {
         industry: activeProject.industry || "SaaS / Marketing",
         ai_scans_enabled: activeProject.ai_scans_enabled !== false,
       });
+      setCompetitors(activeProject.competitors || []);
     }
   }, [activeProject]);
 
@@ -339,7 +340,8 @@ function ProjectTab() {
           brand_name: form.brand_name,
           domain: form.domain,
           industry: form.industry,
-          ai_scans_enabled: form.ai_scans_enabled
+          ai_scans_enabled: form.ai_scans_enabled,
+          competitors: competitors
         }
       });
       setSaved(true);

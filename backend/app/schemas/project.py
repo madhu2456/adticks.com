@@ -7,12 +7,14 @@ class ProjectCreate(BaseModel):
     brand_name: str
     domain: str
     industry: str | None = None
+    competitors: list[str] | None = None
 
 class ProjectUpdate(BaseModel):
     brand_name: str | None = None
     domain: str | None = None
     industry: str | None = None
     ai_scans_enabled: bool | None = None
+    competitors: list[str] | None = None
 
 class ProjectResponse(BaseModel):
     id: UUID
@@ -21,5 +23,15 @@ class ProjectResponse(BaseModel):
     domain: str
     industry: str | None
     ai_scans_enabled: bool
+    competitors: list[str] = []
     created_at: datetime
+    
+    @classmethod
+    def model_validate(cls, obj, **kwargs):
+        # Extract competitor domains for the response
+        res = super().model_validate(obj, **kwargs)
+        if hasattr(obj, "competitors") and obj.competitors:
+            res.competitors = [c.domain for c in obj.competitors]
+        return res
+
     model_config = {"from_attributes": True}

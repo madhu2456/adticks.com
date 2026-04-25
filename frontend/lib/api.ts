@@ -215,6 +215,8 @@ export const api = {
   gsc: {
     getAuthUrl: (projectId: string) =>
       axiosInstance.get<{ auth_url: string }>(`/gsc/auth`).then(unwrap),
+    completeAuth: (code: string) =>
+      axiosInstance.post<{ status: string }>(`/gsc/complete`, { code }).then(unwrap),
     listProperties: () =>
       axiosInstance.get<any[]>(`/gsc/properties`).then(unwrap),
     connectProperty: (projectId: string, propertyUrl: string) =>
