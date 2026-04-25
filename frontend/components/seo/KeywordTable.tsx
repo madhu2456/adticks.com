@@ -38,7 +38,7 @@ export function KeywordTable({ keywords = [], loading, onSearch }: KeywordTableP
   };
 
   const filtered = keywords
-    .filter((k) => k.keyword.toLowerCase().includes(search.toLowerCase()))
+    .filter((k) => (k.keyword || "").toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
       const va = sortKey === "keyword" ? a.keyword : (a[sortKey] ?? 999);
       const vb = sortKey === "keyword" ? b.keyword : (b[sortKey] ?? 999);
