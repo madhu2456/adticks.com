@@ -39,6 +39,11 @@ class User(Base):
         nullable=False,
     )
 
+    # GSC Integration
+    gsc_access_token: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    gsc_refresh_token: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    gsc_token_expiry: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # Relationships
     projects = relationship("Project", back_populates="owner", cascade="all, delete-orphan")
 

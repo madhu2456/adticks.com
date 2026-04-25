@@ -5,7 +5,7 @@ AdTicks — Project model.
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, String, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -34,6 +34,10 @@ class Project(Base):
         default=lambda: datetime.now(tz=timezone.utc),
         nullable=False,
     )
+
+    # GSC Settings
+    gsc_connected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    gsc_property_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     # Relationships
     owner = relationship("User", back_populates="projects")

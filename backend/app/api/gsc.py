@@ -69,32 +69,15 @@ async def gsc_auth(current_user: User = Depends(get_current_user)):
 @router.get("/callback")
 async def gsc_callback(
     code: str,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Handle the Google OAuth2 callback and store the access token.
-    
-    Processes the OAuth2 callback after user authorizes GSC access. Exchanges the
-    authorization code for an access token and stores it for future API requests.
-    This endpoint is the redirect_uri configured in Google OAuth settings.
-    
-    **Authentication:** Required (Bearer token)
-    
-    **Query parameters:**
-    - **code**: Authorization code from Google OAuth2 flow (required)
-    
-    **Returns:**
-    - **status**: Authorization status ("authorized")
-    - **user_id**: UUID of the authenticated user
-    
-    **Responses:**
-    - 200 OK: Authorization successful
-    - 401 Unauthorized: Missing or invalid authentication
-    - 400 Bad Request: Invalid or expired authorization code
-    
-    **Note:** In production, the token should be persisted securely for the user
     """
     from google_auth_oauthlib.flow import Flow
+    from datetime import datetime, timezone, timedelta
+    
     flow = Flow.from_client_config(
         {
             "web": {
@@ -108,9 +91,69 @@ async def gsc_callback(
         scopes=_SCOPES,
     )
     flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
-    flow.fetch_token(code=code)
-    # Token would be persisted to user record or secure store in production
-    return {"status": "authorized", "user_id": str(current_user.id)}
+    token = flow.fetch_token(code=code)
+    
+    # Persist token to user record
+    current_user.gsc_access_token = token.get("access_token")
+    if token.get("refresh_token"):
+        current_user.gsc_refresh_token = token.get("refresh_token")
+    
+    expires_in = token.get("expires_in", 3600)
+    current_user.gsc_token_expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+    
+    db.add(current_user)
+    await db.commit()
+    
+    # Redirect to GSC page in frontend
+    # In a real app, this would be a 302 redirect
+    return {"status": "authorized", "message": "Google Search Console connected successfully"}
+
+
+@router.get("/properties")
+async def list_gsc_properties(
+    current_user: User = Depends(get_current_user),
+):
+    """List all Google Search Console properties available to the user."""
+    if not current_user.gsc_access_token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="GSC not connected")
+
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+
+    creds = Credentials(
+        token=current_user.gsc_access_token,
+        refresh_token=current_user.gsc_refresh_token,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=settings.GOOGLE_CLIENT_ID,
+        client_secret=settings.GOOGLE_CLIENT_SECRET,
+    )
+
+    try:
+        service = build("webmasters", "v3", credentials=creds)
+        site_list = service.sites().list().execute()
+        return site_list.get("siteEntry", [])
+    except Exception as e:
+        logger.error(f"Failed to fetch GSC properties: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to fetch GSC properties")
+
+
+@router.post("/connect/{project_id}")
+async def connect_gsc_property(
+    project_id: UUID,
+    property_url: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Link a specific GSC property to a project."""
+    project = await _assert_owner(project_id, current_user, db)
+    
+    project.gsc_connected = True
+    project.gsc_property_url = property_url
+    
+    db.add(project)
+    await db.commit()
+    
+    return {"status": "success", "message": f"Connected to {property_url}"}
 
 
 @router.get("/queries/{project_id}", response_model=PaginatedResponse[GSCDataResponse])

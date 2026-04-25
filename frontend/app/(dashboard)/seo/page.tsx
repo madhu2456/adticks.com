@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Zap } from "lucide-react";
+import { Zap, RefreshCw, Search, ShieldCheck, FileSearch } from "lucide-react";
 import { KeywordTable } from "@/components/seo/KeywordTable";
 import { RankTracker } from "@/components/seo/RankTracker";
 import { OnPageScore } from "@/components/seo/OnPageScore";
@@ -13,17 +13,19 @@ import { ScanModal } from "@/components/layout/ScanModal";
 import { useActiveProject } from "@/hooks/useProject";
 import { useKeywords, useContentGaps, useTechnicalChecks } from "@/hooks/useSEO";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 
 export default function SEOPage() {
   const { activeProject } = useActiveProject();
   const [tab, setTab] = useState("keywords");
   const [search, setSearch] = useState("");
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+  const [currentFeature, setCurrentFeature] = useState<'seo' | 'technical' | 'gaps' | 'full'>('seo');
 
   // Fetch real data from backend
-  const { data: keywordResponse, isLoading: keywordsLoading } = useKeywords(activeProject?.id || "", search);
-  const { data: gapsResponse, isLoading: gapsLoading } = useContentGaps(activeProject?.id || "");
-  const { data: technicalResponse, isLoading: technicalLoading } = useTechnicalChecks(activeProject?.id || "");
+  const { data: keywordResponse, isLoading: keywordsLoading, refetch: refetchKeywords } = useKeywords(activeProject?.id || "", search);
+  const { data: gapsResponse, isLoading: gapsLoading, refetch: refetchGaps } = useContentGaps(activeProject?.id || "");
+  const { data: technicalResponse, isLoading: technicalLoading, refetch: refetchTechnical } = useTechnicalChecks(activeProject?.id || "");
 
   // Extract data from paginated responses
   const keywords = (keywordResponse?.data || []) as any[];
@@ -33,6 +35,19 @@ export default function SEOPage() {
   const filteredKeywords = keywords.filter((k) =>
     search ? k.keyword?.toLowerCase().includes(search.toLowerCase()) : true
   );
+
+  const triggerScan = (feature: 'seo' | 'technical' | 'gaps' | 'full' | 'keywords_gsc') => {
+    setCurrentFeature(feature as any);
+    setIsScanModalOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setIsScanModalOpen(false);
+    // Refresh data based on which scan was run
+    if (currentFeature === 'seo' || currentFeature === 'keywords_gsc') refetchKeywords();
+    if (currentFeature === 'technical') refetchTechnical();
+    if (currentFeature === 'gaps') refetchGaps();
+  };
 
   if (!activeProject) {
     return (
@@ -49,13 +64,6 @@ export default function SEOPage() {
           <h1 className="text-2xl font-bold text-text-primary">SEO Hub</h1>
           <p className="text-text-muted text-sm mt-1">Track rankings, audit pages, and discover content opportunities</p>
         </div>
-        <button
-          onClick={() => setIsScanModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all"
-        >
-          <Zap size={16} />
-          <span>Run SEO Scan</span>
-        </button>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
@@ -69,7 +77,30 @@ export default function SEOPage() {
           <TabsTrigger value="technical">Technical</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="keywords">
+        <TabsContent value="keywords" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-text-primary">Keyword Discovery</h2>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => triggerScan('keywords_gsc')} 
+                variant="outline" 
+                size="sm" 
+                className="gap-2 border-indigo-500/20 hover:border-indigo-500/40"
+              >
+                <Globe size={14} />
+                Sync from GSC
+              </Button>
+              <Button 
+                onClick={() => triggerScan('seo')} 
+                variant="outline" 
+                size="sm" 
+                className="gap-2 border-primary/20 hover:border-primary/40"
+              >
+                <RefreshCw size={14} className={keywordsLoading ? "animate-spin" : ""} />
+                Refresh AI Keywords
+              </Button>
+            </div>
+          </div>
           {keywordsLoading ? (
             <div className="space-y-4">
               <Skeleton className="h-12 w-full" />
@@ -96,42 +127,59 @@ export default function SEOPage() {
           <CompetitorAnalysis projectId={activeProject.id} />
         </TabsContent>
 
-        <TabsContent value="gaps">
-          <div className="space-y-4">
+        <TabsContent value="gaps" className="space-y-4">
+          <div className="flex justify-between items-center">
             <div>
               <h2 className="text-lg font-semibold text-text-primary">Content Gaps</h2>
               <p className="text-sm text-text-muted">Topics your competitors rank for but you don&apos;t</p>
             </div>
-            {gapsLoading ? (
-              <Skeleton className="h-64 w-full" />
-            ) : (
-              <ContentGaps gaps={gaps || []} />
-            )}
+            <Button 
+              onClick={() => triggerScan('gaps')} 
+              variant="outline" 
+              size="sm" 
+              className="gap-2 border-indigo-500/20 hover:border-indigo-500/40"
+            >
+              <FileSearch size={14} className={gapsLoading ? "animate-spin" : ""} />
+              Find Gaps
+            </Button>
           </div>
+          {gapsLoading ? (
+            <Skeleton className="h-64 w-full" />
+          ) : (
+            <ContentGaps gaps={gaps || []} />
+          )}
         </TabsContent>
 
-        <TabsContent value="technical">
-          <div className="space-y-4">
+        <TabsContent value="technical" className="space-y-4">
+          <div className="flex justify-between items-center">
             <div>
               <h2 className="text-lg font-semibold text-text-primary">Technical Audit</h2>
               <p className="text-sm text-text-muted">Core technical health checks for your domain</p>
             </div>
-            {technicalLoading ? (
-              <Skeleton className="h-64 w-full" />
-            ) : (
-              <TechnicalSEO checks={technicalChecks || []} />
-            )}
+            <Button 
+              onClick={() => triggerScan('technical')} 
+              variant="outline" 
+              size="sm" 
+              className="gap-2 border-success/20 hover:border-success/40"
+            >
+              <ShieldCheck size={14} className={technicalLoading ? "animate-spin" : ""} />
+              Run Technical Audit
+            </Button>
           </div>
+          {technicalLoading ? (
+            <Skeleton className="h-64 w-full" />
+          ) : (
+            <TechnicalSEO checks={technicalChecks || []} />
+          )}
         </TabsContent>
       </Tabs>
 
       <ScanModal
         isOpen={isScanModalOpen}
-        onClose={() => setIsScanModalOpen(false)}
+        onClose={handleModalClose}
         projectId={activeProject?.id}
-        featureType="seo"
+        featureType={currentFeature}
       />
     </div>
   );
 }
-

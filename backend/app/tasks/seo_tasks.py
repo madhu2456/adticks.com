@@ -279,14 +279,11 @@ async def _run_rank_tracking_impl(project_id: str) -> dict:
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60, time_limit=1800, soft_time_limit=1500)
 def run_seo_audit_task(self, project_id: str, url: str | None = None) -> dict:
-    """Run on-page + technical SEO audit and persist results to Spaces.
-    
-    Task timeout: 30 minutes (soft 25 minutes)
-    """
+    """Run full SEO audit (on-page + technical)."""
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_run_seo_audit_impl(project_id, url))
+        result = loop.run_until_complete(_run_seo_audit_impl(project_id, url, audit_type="full"))
         loop.close()
         return result
     except Exception as exc:
@@ -294,8 +291,36 @@ def run_seo_audit_task(self, project_id: str, url: str | None = None) -> dict:
         raise self.retry(exc=exc)
 
 
-async def _run_seo_audit_impl(project_id: str, url: str | None) -> dict:
-    logger.info("Running SEO audit for project=%s url=%s", project_id, url)
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def run_seo_onpage_task(self, project_id: str, url: str) -> dict:
+    """Run on-page SEO audit only."""
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(_run_seo_audit_impl(project_id, url, audit_type="on_page"))
+        loop.close()
+        return result
+    except Exception as exc:
+        logger.exception("run_seo_onpage_task failed for project %s: %s", project_id, exc)
+        raise self.retry(exc=exc)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def run_seo_technical_task(self, project_id: str) -> dict:
+    """Run technical SEO audit only."""
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(_run_seo_audit_impl(project_id, None, audit_type="technical"))
+        loop.close()
+        return result
+    except Exception as exc:
+        logger.exception("run_seo_technical_task failed for project %s: %s", project_id, exc)
+        raise self.retry(exc=exc)
+
+
+async def _run_seo_audit_impl(project_id: str, url: str | None, audit_type: str = "full") -> dict:
+    logger.info("Running SEO audit type=%s for project=%s url=%s", audit_type, project_id, url)
 
     async with AsyncSessionLocal() as session:
         project = await _load_project(session, project_id)
@@ -304,10 +329,25 @@ async def _run_seo_audit_impl(project_id: str, url: str | None) -> dict:
     target_url = url or f"https://{domain}"
     url_hash = hashlib.md5(target_url.encode()).hexdigest()[:12]
 
-    # Run on-page analysis
-    on_page = await analyze_url(target_url)
-    # Run technical SEO check
-    technical = await check_technical(domain)
+    on_page = {}
+    technical = {}
+
+    # Load existing cached audit to merge if doing partial audit
+    try:
+        component_cache = ComponentCache(project_id)
+        cached_audit = await component_cache.get_cached_audit()
+        if cached_audit:
+            on_page = cached_audit.get("on_page", {})
+            technical = cached_audit.get("technical", {})
+    except Exception as e:
+        logger.warning(f"Error loading cached audit for merge: {e}")
+
+    # Run requested checks
+    if audit_type in ("full", "on_page"):
+        on_page = await analyze_url(target_url)
+    
+    if audit_type in ("full", "technical"):
+        technical = await check_technical(domain)
 
     audit = {
         "project_id": project_id,
@@ -423,6 +463,78 @@ async def _find_content_gaps_impl(project_id: str) -> dict:
         "project_id": project_id,
         "gaps_found": len(gaps),
         "top_gap": gaps[0].get("topic") if gaps else None,
+        "status": "completed",
+    }
+
+
+# ---------------------------------------------------------------------------
+# import_gsc_keywords_task
+# ---------------------------------------------------------------------------
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def import_gsc_keywords_task(self, project_id: str) -> dict:
+    """Import search queries from GSC data as keywords for tracking."""
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(_import_gsc_keywords_impl(project_id))
+        loop.close()
+        return result
+    except Exception as exc:
+        logger.exception("import_gsc_keywords_task failed for project %s: %s", project_id, exc)
+        raise self.retry(exc=exc)
+
+
+async def _import_gsc_keywords_impl(project_id: str) -> dict:
+    logger.info("Importing GSC queries as keywords for project=%s", project_id)
+
+    async with AsyncSessionLocal() as session:
+        # Get all unique queries from GSCData for this project
+        result = await session.execute(
+            select(GSCData.query)
+            .where(GSCData.project_id == project_id)
+            .distinct()
+        )
+        gsc_queries = [r[0] for r in result.all() if r[0]]
+        
+        if not gsc_queries:
+            return {
+                "project_id": project_id,
+                "keywords_imported": 0,
+                "status": "no_gsc_data",
+                "message": "No GSC data found. Run GSC sync first."
+            }
+
+        # Get existing keywords to avoid duplicates
+        result = await session.execute(
+            select(Keyword.keyword)
+            .where(Keyword.project_id == project_id)
+        )
+        existing_kws = {r[0].lower() for r in result.all()}
+        
+        new_kws_count = 0
+        for query in gsc_queries:
+            if query.lower() not in existing_kws:
+                new_kw = Keyword(
+                    id=uuid.uuid4(),
+                    project_id=UUID(project_id),
+                    keyword=query,
+                    intent="informational", # Default intent
+                    difficulty=20.0,        # Lower default for found keywords
+                    volume=0,               # GSC doesn't give global volume
+                )
+                session.add(new_kw)
+                new_kws_count += 1
+                # To prevent memory issues with thousands of keywords
+                if new_kws_count % 100 == 0:
+                    await session.flush()
+
+        await session.commit()
+        logger.info("Imported %d new keywords from GSC for project %s", new_kws_count, project_id)
+
+    return {
+        "project_id": project_id,
+        "keywords_imported": new_kws_count,
         "status": "completed",
     }
 

@@ -12,12 +12,13 @@ interface ScanModalProps {
   isOpen: boolean
   onClose: () => void
   projectId?: string
-  featureType?: 'seo' | 'ai' | 'geo' | 'gsc' | 'ads' | 'full'
+  featureType?: 'seo' | 'ai' | 'geo' | 'gsc' | 'ads' | 'full' | 'keywords_gsc' | 'on_page'
+  url?: string
 }
 
 type ScanStatus = 'starting' | 'scanning' | 'cached' | 'completed' | 'error' | 'background'
 
-export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: ScanModalProps) {
+export function ScanModal({ isOpen, onClose, projectId, featureType = 'full', url = '' }: ScanModalProps) {
   const [status, setStatus] = useState<ScanStatus>('starting')
   const [taskId, setTaskId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -47,6 +48,10 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
     gsc: 'GSC Sync',
     ads: 'Ads Sync',
     full: 'Full Scan',
+    keywords_gsc: 'GSC Keyword Import',
+    on_page: 'On-Page Audit',
+    technical: 'Technical SEO Audit',
+    gaps: 'Content Gap Analysis',
   }
 
   useEffect(() => {
@@ -63,6 +68,18 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
         switch (featureType) {
           case 'seo':
             response = await api.seo.runAudit(projectId, '');
+            break;
+          case 'on_page':
+            response = await api.seo.runOnPageAudit(projectId, url);
+            break;
+          case 'keywords_gsc':
+            response = await api.seo.runGscKeywordSync(projectId);
+            break;
+          case 'technical':
+            response = await api.seo.runTechnicalAudit(projectId);
+            break;
+          case 'gaps':
+            response = await api.seo.runGapSync(projectId);
             break;
           case 'gsc':
             response = await api.gsc.sync(projectId);

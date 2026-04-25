@@ -142,9 +142,19 @@ export function BackgroundTasksDrawer() {
                                     </p>
                                   </div>
                                 </div>
-                                <span className="text-xs font-semibold text-primary flex-shrink-0">
-                                  {Math.floor(scan.progress)}%
-                                </span>
+                                <div className="flex flex-col items-end gap-2">
+                                  <span className="text-xs font-semibold text-primary flex-shrink-0">
+                                    {Math.floor(scan.progress)}%
+                                  </span>
+                                  <button
+                                    onClick={() => removeScan(scan.id)}
+                                    className="text-[10px] text-[#94a3b8] hover:text-danger hover:bg-danger/10 px-1.5 py-0.5 rounded transition-all flex items-center gap-1 border border-[#334155] hover:border-danger/30"
+                                    title="Stop tracking this scan"
+                                  >
+                                    <X size={10} />
+                                    Stop
+                                  </button>
+                                </div>
                               </div>
 
                               {/* Progress bar */}

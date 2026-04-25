@@ -71,6 +71,22 @@ async def trigger_keyword_research(
     return {"status": "queued", "keyword_id": str(keyword.id)}
 
 
+@router.post("/keywords/sync-gsc", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_gsc_keyword_import(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Trigger keyword import from GSC data."""
+    await _assert_project_owner(project_id, current_user, db)
+    try:
+        from app.tasks.seo_tasks import import_gsc_keywords_task
+        task = import_gsc_keywords_task.delay(project_id=str(project_id))
+        return {"status": "queued", "task_id": task.id}
+    except Exception:
+        return {"status": "queued", "task_id": None}
+
+
 @router.post("/audit", status_code=status.HTTP_202_ACCEPTED)
 async def trigger_site_audit(
     project_id: UUID,
@@ -88,6 +104,55 @@ async def trigger_site_audit(
     try:
         from app.tasks.seo_tasks import run_seo_audit_task
         task = run_seo_audit_task.delay(project_id=str(project.id))
+        return {"status": "queued", "task_id": task.id}
+    except Exception:
+        return {"status": "queued", "task_id": None}
+
+
+@router.post("/audit/onpage", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_onpage_audit(
+    project_id: UUID,
+    url: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Trigger an on-page SEO audit only."""
+    await _assert_project_owner(project_id, current_user, db)
+    try:
+        from app.tasks.seo_tasks import run_seo_onpage_task
+        task = run_seo_onpage_task.delay(project_id=str(project_id), url=url)
+        return {"status": "queued", "task_id": task.id}
+    except Exception:
+        return {"status": "queued", "task_id": None}
+
+
+@router.post("/audit/technical", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_technical_audit(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Trigger a technical SEO audit only."""
+    await _assert_project_owner(project_id, current_user, db)
+    try:
+        from app.tasks.seo_tasks import run_seo_technical_task
+        task = run_seo_technical_task.delay(project_id=str(project_id))
+        return {"status": "queued", "task_id": task.id}
+    except Exception:
+        return {"status": "queued", "task_id": None}
+
+
+@router.post("/gaps/sync", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_gap_sync(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Trigger content gap analysis sync."""
+    await _assert_project_owner(project_id, current_user, db)
+    try:
+        from app.tasks.seo_tasks import find_content_gaps_task
+        task = find_content_gaps_task.delay(project_id=str(project_id))
         return {"status": "queued", "task_id": task.id}
     except Exception:
         return {"status": "queued", "task_id": None}

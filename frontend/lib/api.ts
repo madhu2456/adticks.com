@@ -159,6 +159,14 @@ export const api = {
       axiosInstance.get(`/seo/onpage/${projectId}`).then(unwrap),
     runAudit: (projectId: string, url: string) =>
       axiosInstance.post<{ task_id: string }>(`/seo/audit?project_id=${projectId}`, { url }).then(unwrap),
+    runOnPageAudit: (projectId: string, url: string) =>
+      axiosInstance.post<{ task_id: string }>(`/seo/audit/onpage?project_id=${projectId}&url=${encodeURIComponent(url)}`).then(unwrap),
+    runTechnicalAudit: (projectId: string) =>
+      axiosInstance.post<{ task_id: string }>(`/seo/audit/technical?project_id=${projectId}`).then(unwrap),
+    runGapSync: (projectId: string) =>
+      axiosInstance.post<{ task_id: string }>(`/seo/gaps/sync?project_id=${projectId}`).then(unwrap),
+    runGscKeywordSync: (projectId: string) =>
+      axiosInstance.post<{ task_id: string }>(`/seo/keywords/sync-gsc?project_id=${projectId}`).then(unwrap),
     getTechnicalChecks: (projectId: string) =>
       axiosInstance.get(`/seo/technical/${projectId}`).then(unwrap),
   },
@@ -189,8 +197,12 @@ export const api = {
   gsc: {
     getAuthUrl: (projectId: string) =>
       axiosInstance.get<{ auth_url: string }>(`/gsc/auth`).then(unwrap),
+    listProperties: () =>
+      axiosInstance.get<any[]>(`/gsc/properties`).then(unwrap),
+    connectProperty: (projectId: string, propertyUrl: string) =>
+      axiosInstance.post<{ status: string }>(`/gsc/connect/${projectId}?property_url=${encodeURIComponent(propertyUrl)}`).then(unwrap),
     sync: (projectId: string) =>
-      axiosInstance.post<{ task_id: string }>(`/gsc/sync/${projectId}`).then(unwrap),
+      axiosInstance.post<{ status: string; task_id: string }>(`/gsc/sync/${projectId}`).then(unwrap),
     getQueries: (projectId: string, days = 28) =>
       axiosInstance.get<PaginatedResponse<GSCQuery>>(`/gsc/queries/${projectId}?skip=0&limit=100`).then(unwrap),
     getPages: (projectId: string) =>
