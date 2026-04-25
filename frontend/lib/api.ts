@@ -297,12 +297,12 @@ export const api = {
 
   // Advanced SEO Suite
   seoSuite: {
-    getBacklinks: (projectId: string) =>
-      axiosInstance.get<PaginatedResponse<any>>(`/seo-suite/projects/${projectId}/backlinks`).then(unwrap),
-    getCompetitorKeywords: (projectId: string) =>
-      axiosInstance.get<PaginatedResponse<any>>(`/seo-suite/projects/${projectId}/competitors/keywords`).then(unwrap),
+    getBacklinks: (projectId: string, skip = 0, limit = 50) =>
+      axiosInstance.get<PaginatedResponse<any>>(`/seo/projects/${projectId}/backlinks?skip=${skip}&limit=${limit}`).then(unwrap),
+    getCompetitorKeywords: (projectId: string, skip = 0, limit = 50) =>
+      axiosInstance.get<PaginatedResponse<any>>(`/seo/projects/${projectId}/competitors/keywords?skip=${skip}&limit=${limit}`).then(unwrap),
     getSerpFeatures: (keywordId: string) =>
-      axiosInstance.get<any>(`/seo-suite/keywords/${keywordId}/serp-features`).then(unwrap),
+      axiosInstance.get<any>(`/seo/keywords/${keywordId}/serp-features`).then(unwrap),
   },
 };
 

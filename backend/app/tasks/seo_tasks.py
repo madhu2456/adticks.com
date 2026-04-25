@@ -11,6 +11,7 @@ from sqlalchemy import select, delete
 from app.core.celery_app import celery_app
 from app.core.database import AsyncSessionLocal
 from app.core.storage import StorageService
+from app.core.progress import ScanProgress, ScanStage
 from app.models.cluster import Cluster
 from app.models.keyword import Keyword, Ranking
 from app.models.project import Project
@@ -23,6 +24,8 @@ from app.services.seo.on_page_analyzer import analyze_url
 from app.services.seo.technical_seo import check_technical
 from app.services.seo.content_gap_analyzer import find_gaps
 from app.core.component_cache import ComponentCache
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +64,7 @@ def generate_keywords_task(
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         result = loop.run_until_complete(
-            _generate_keywords_impl(project_id, domain, industry, seed_keywords or [])
+            _generate_keywords_impl(project_id, domain, industry, seed_keywords or [], self.request.id)
         )
         loop.close()
         return result
@@ -75,11 +78,17 @@ async def _generate_keywords_impl(
     domain: str,
     industry: str,
     seed_keywords: list,
+    task_id: str,
 ) -> dict:
+    # Initialize progress tracking
+    progress = ScanProgress(project_id, task_id)
+    await progress.initialize()
+    
     logger.info(
         "Generating keywords for project=%s domain=%s industry=%s seeds=%s",
         project_id, domain, industry, seed_keywords,
     )
+    await progress.update(ScanStage.KEYWORD_GENERATION, 5, "⏳ Initializing keyword generation...")
 
     async with AsyncSessionLocal() as session:
         # Load project for brand context
@@ -87,14 +96,19 @@ async def _generate_keywords_impl(
         if project:
             domain = project.domain or domain
             industry = project.industry or industry
+            logger.info("Using project context: domain=%s industry=%s", domain, industry)
 
+        await progress.update(ScanStage.KEYWORD_GENERATION, 15, f"🤖 Generating keywords for {industry}...")
         # Call service
         keywords_raw = await generate_keywords(domain, industry, seed_keywords)
         logger.info("Service returned %d keywords", len(keywords_raw))
+        await progress.update(ScanStage.KEYWORD_GENERATION, 35, f"✅ Generated {len(keywords_raw)} keywords • Processing...")
 
         # Upsert keywords into DB
         kw_objects = []
-        for kw_data in keywords_raw:
+        new_count = 0
+        duplicate_count = 0
+        for idx, kw_data in enumerate(keywords_raw):
             text = kw_data.get("keyword", "").strip()
             if not text:
                 continue
@@ -117,11 +131,20 @@ async def _generate_keywords_impl(
                 )
                 session.add(new_kw)
                 kw_objects.append(new_kw)
+                new_count += 1
+            else:
+                duplicate_count += 1
+            
+            # Show progress every 10 keywords
+            if (idx + 1) % 10 == 0:
+                progress_pct = 35 + int((idx + 1) / len(keywords_raw) * 20)
+                await progress.update(ScanStage.KEYWORD_GENERATION, progress_pct, f"📥 Processed {idx+1}/{len(keywords_raw)} • {new_count} new, {duplicate_count} duplicates")
 
         await session.flush()
         keywords_count = len(keywords_raw)
 
         # Cluster keywords
+        await progress.update(ScanStage.KEYWORD_GENERATION, 60, f"Clustering {keywords_count} keywords...")
         clusters_raw = cluster_keywords(keywords_raw)
         logger.info("Clustered into %d groups", len(clusters_raw))
 
@@ -145,6 +168,7 @@ async def _generate_keywords_impl(
         await session.commit()
         
         # Cache keywords and clusters
+        await progress.update(ScanStage.KEYWORD_GENERATION, 80, "Caching keywords...")
         try:
             component_cache = ComponentCache(project_id)
             await component_cache.cache_keywords(keywords_raw, list(clusters_raw.values()))
@@ -152,6 +176,7 @@ async def _generate_keywords_impl(
             logger.warning(f"Error caching keywords: {e}")
 
         # Store to Spaces
+        await progress.update(ScanStage.KEYWORD_GENERATION, 90, "Uploading to storage...")
         payload = {
             "project_id": project_id,
             "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -167,6 +192,7 @@ async def _generate_keywords_impl(
         except Exception as exc:
             logger.warning("Spaces upload failed (non-fatal): %s", exc)
 
+        await progress.complete()
         return {
             "project_id": project_id,
             "keywords_generated": keywords_count,
@@ -189,7 +215,7 @@ def run_rank_tracking_task(self, project_id: str) -> dict:
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_run_rank_tracking_impl(project_id))
+        result = loop.run_until_complete(_run_rank_tracking_impl(project_id, self.request.id))
         loop.close()
         return result
     except Exception as exc:
@@ -197,8 +223,13 @@ def run_rank_tracking_task(self, project_id: str) -> dict:
         raise self.retry(exc=exc)
 
 
-async def _run_rank_tracking_impl(project_id: str) -> dict:
+async def _run_rank_tracking_impl(project_id: str, task_id: str) -> dict:
+    # Initialize progress tracking
+    progress = ScanProgress(project_id, task_id)
+    await progress.initialize()
+    
     logger.info("Running rank tracking for project=%s", project_id)
+    await progress.update(ScanStage.RANK_TRACKING, 5, "⏳ Loading project and keywords...")
 
     async with AsyncSessionLocal() as session:
         project = await _load_project(session, project_id)
@@ -207,28 +238,35 @@ async def _run_rank_tracking_impl(project_id: str) -> dict:
             return {"project_id": project_id, "keywords_checked": 0, "status": "project_not_found"}
 
         domain = project.domain
+        logger.info("Using domain: %s", domain)
 
         kw_result = await session.execute(
             select(Keyword).where(Keyword.project_id == project_id)
         )
         keywords = kw_result.scalars().all()
         logger.info("Loaded %d keywords for ranking check", len(keywords))
+        await progress.update(ScanStage.RANK_TRACKING, 10, f"📊 Loaded {len(keywords)} keywords • Domain: {domain}")
 
         if not keywords:
+            await progress.complete()
             return {"project_id": project_id, "keywords_checked": 0, "status": "no_keywords"}
 
         # Build list for bulk_rank_check
         kw_dicts = [{"id": str(kw.id), "keyword": kw.keyword} for kw in keywords]
 
+        await progress.update(ScanStage.RANK_TRACKING, 15, f"🔍 Checking SERP positions for {len(keywords)} keywords...")
+        logger.info("Starting bulk rank check with %d keywords", len(keywords))
         ranking_results = await bulk_rank_check(
             project_id=project_id,
             keywords=kw_dicts,
             domain=domain,
             concurrency=10,  # Increased from default 5 for better performance
         )
+        logger.info("Completed ranking check: %d results", len(ranking_results))
 
+        await progress.update(ScanStage.RANK_TRACKING, 75, f"💾 Persisting {len(ranking_results)} ranking records...")
         # Persist Ranking rows
-        for res in ranking_results:
+        for idx, res in enumerate(ranking_results):
             kw_id = res.get("keyword_id")
             if not kw_id:
                 continue
@@ -240,13 +278,20 @@ async def _run_rank_tracking_impl(project_id: str) -> dict:
                 timestamp=datetime.now(timezone.utc),
             )
             session.add(ranking)
+            # Show progress during batch inserts
+            if (idx + 1) % 25 == 0:
+                progress_pct = 75 + int((idx + 1) / len(ranking_results) * 15)
+                await progress.update(ScanStage.RANK_TRACKING, progress_pct, f"💾 Saved {idx + 1}/{len(ranking_results)} records...")
 
         await session.commit()
+        logger.info("Persisted all ranking records")
         
         # Cache rankings
+        await progress.update(ScanStage.RANK_TRACKING, 92, "⚡ Caching rankings in Redis...")
         try:
             component_cache = ComponentCache(project_id)
             await component_cache.cache_rankings(ranking_results)
+            logger.info("Cached rankings successfully")
         except Exception as e:
             logger.warning(f"Error caching rankings: {e}")
 
@@ -266,6 +311,7 @@ async def _run_rank_tracking_impl(project_id: str) -> dict:
         except Exception as exc:
             logger.warning("Spaces upload failed (non-fatal): %s", exc)
 
+        await progress.complete()
         return {
             "project_id": project_id,
             "keywords_checked": len(ranking_results),
@@ -283,7 +329,7 @@ def run_seo_audit_task(self, project_id: str, url: str | None = None) -> dict:
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_run_seo_audit_impl(project_id, url, audit_type="full"))
+        result = loop.run_until_complete(_run_seo_audit_impl(project_id, url, audit_type="full", task_id=self.request.id))
         loop.close()
         return result
     except Exception as exc:
@@ -297,7 +343,7 @@ def run_seo_onpage_task(self, project_id: str, url: str) -> dict:
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_run_seo_audit_impl(project_id, url, audit_type="on_page"))
+        result = loop.run_until_complete(_run_seo_audit_impl(project_id, url, audit_type="on_page", task_id=self.request.id))
         loop.close()
         return result
     except Exception as exc:
@@ -311,7 +357,7 @@ def run_seo_technical_task(self, project_id: str) -> dict:
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_run_seo_audit_impl(project_id, None, audit_type="technical"))
+        result = loop.run_until_complete(_run_seo_audit_impl(project_id, None, audit_type="technical", task_id=self.request.id))
         loop.close()
         return result
     except Exception as exc:
@@ -319,7 +365,14 @@ def run_seo_technical_task(self, project_id: str) -> dict:
         raise self.retry(exc=exc)
 
 
-async def _run_seo_audit_impl(project_id: str, url: str | None, audit_type: str = "full") -> dict:
+async def _run_seo_audit_impl(project_id: str, url: str | None, audit_type: str = "full", task_id: str = "") -> dict:
+    # Initialize progress tracking
+    progress = ScanProgress(project_id, task_id)
+    await progress.initialize()
+    
+    audit_stage = ScanStage.ON_PAGE_ANALYSIS if audit_type in ["on_page", "full"] else ScanStage.TECHNICAL_AUDIT
+    await progress.update(audit_stage, 5, f"⏳ Initializing {audit_type} audit...")
+    
     logger.info("Running SEO audit type=%s for project=%s url=%s", audit_type, project_id, url)
 
     async with AsyncSessionLocal() as session:
@@ -328,27 +381,39 @@ async def _run_seo_audit_impl(project_id: str, url: str | None, audit_type: str 
 
     target_url = url or f"https://{domain}"
     url_hash = hashlib.md5(target_url.encode()).hexdigest()[:12]
+    logger.info("Audit target: %s", target_url)
 
     on_page = {}
     technical = {}
 
     # Load existing cached audit to merge if doing partial audit
+    await progress.update(audit_stage, 15, "📂 Loading previous audit results...")
     try:
         component_cache = ComponentCache(project_id)
         cached_audit = await component_cache.get_cached_audit()
         if cached_audit:
             on_page = cached_audit.get("on_page", {})
             technical = cached_audit.get("technical", {})
+            logger.info("Loaded cached audit data")
     except Exception as e:
         logger.warning(f"Error loading cached audit for merge: {e}")
 
     # Run requested checks
     if audit_type in ("full", "on_page"):
+        await progress.update(ScanStage.ON_PAGE_ANALYSIS, 35, f"🔍 Analyzing page elements • URL: {target_url[:50]}...")
+        logger.info("Starting on-page analysis for %s", target_url)
         on_page = await analyze_url(target_url)
+        on_page_issues = len(on_page.get("issues", []))
+        logger.info("On-page analysis complete: %d issues found", on_page_issues)
     
     if audit_type in ("full", "technical"):
+        await progress.update(ScanStage.TECHNICAL_AUDIT, 60, f"⚙️ Running technical checks • Domain: {domain}")
+        logger.info("Starting technical audit for %s", domain)
         technical = await check_technical(domain)
+        tech_issues = len(technical.get("issues", []))
+        logger.info("Technical audit complete: %d issues found", tech_issues)
 
+    await progress.update(audit_stage, 82, "📊 Compiling audit report...")
     audit = {
         "project_id": project_id,
         "domain": domain,
@@ -366,6 +431,7 @@ async def _run_seo_audit_impl(project_id: str, url: str | None, audit_type: str 
     }
     
     # Cache audit results
+    await progress.update(audit_stage, 90, "Caching audit results...")
     try:
         component_cache = ComponentCache(project_id)
         await component_cache.cache_audit(on_page, technical)
@@ -381,6 +447,7 @@ async def _run_seo_audit_impl(project_id: str, url: str | None, audit_type: str 
     except Exception as exc:
         logger.warning("Spaces upload failed (non-fatal): %s", exc)
 
+    await progress.complete()
     return {
         "project_id": project_id,
         "url": target_url,
@@ -402,7 +469,7 @@ def find_content_gaps_task(self, project_id: str) -> dict:
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_find_content_gaps_impl(project_id))
+        result = loop.run_until_complete(_find_content_gaps_impl(project_id, self.request.id))
         loop.close()
         return result
     except Exception as exc:
@@ -410,13 +477,19 @@ def find_content_gaps_task(self, project_id: str) -> dict:
         raise self.retry(exc=exc)
 
 
-async def _find_content_gaps_impl(project_id: str) -> dict:
+async def _find_content_gaps_impl(project_id: str, task_id: str = "") -> dict:
+    # Initialize progress tracking
+    progress = ScanProgress(project_id, task_id)
+    await progress.initialize()
+    
     logger.info("Finding content gaps for project=%s", project_id)
+    await progress.update(ScanStage.GAP_ANALYSIS, 10, "Loading keywords and competitors...")
 
     async with AsyncSessionLocal() as session:
         project = await _load_project(session, project_id)
         if not project:
             logger.warning("Project %s not found", project_id)
+            await progress.complete()
             return {"project_id": project_id, "gaps_found": 0, "status": "project_not_found"}
 
         kw_result = await session.execute(
@@ -426,6 +499,7 @@ async def _find_content_gaps_impl(project_id: str) -> dict:
 
         competitors = await _load_competitors(session, project_id)
 
+    await progress.update(ScanStage.GAP_ANALYSIS, 30, f"Analyzing {len(keywords)} keywords...")
     project_kw_texts = [kw.keyword for kw in keywords]
     competitor_domains = [c.domain for c in competitors]
 
@@ -451,6 +525,8 @@ async def _find_content_gaps_impl(project_id: str) -> dict:
         "competitor_count": len(competitor_domains),
         "gaps": gaps,
     }
+    
+    await progress.update(ScanStage.GAP_ANALYSIS, 90, "Uploading results to storage...")
     try:
         storage.upload_json(
             StorageService.seo_path(project_id, "content_gaps.json"),
@@ -459,6 +535,7 @@ async def _find_content_gaps_impl(project_id: str) -> dict:
     except Exception as exc:
         logger.warning("Spaces upload failed (non-fatal): %s", exc)
 
+    await progress.complete()
     return {
         "project_id": project_id,
         "gaps_found": len(gaps),
@@ -477,7 +554,7 @@ def import_gsc_keywords_task(self, project_id: str) -> dict:
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_import_gsc_keywords_impl(project_id))
+        result = loop.run_until_complete(_import_gsc_keywords_impl(project_id, self.request.id))
         loop.close()
         return result
     except Exception as exc:
@@ -485,8 +562,13 @@ def import_gsc_keywords_task(self, project_id: str) -> dict:
         raise self.retry(exc=exc)
 
 
-async def _import_gsc_keywords_impl(project_id: str) -> dict:
+async def _import_gsc_keywords_impl(project_id: str, task_id: str = "") -> dict:
+    # Initialize progress tracking
+    progress = ScanProgress(project_id, task_id)
+    await progress.initialize()
+    
     logger.info("Importing GSC queries as keywords for project=%s", project_id)
+    await progress.update(ScanStage.KEYWORD_GENERATION, 10, "📂 Loading GSC data...")
 
     async with AsyncSessionLocal() as session:
         # Get all unique queries from GSCData for this project
@@ -496,8 +578,11 @@ async def _import_gsc_keywords_impl(project_id: str) -> dict:
             .distinct()
         )
         gsc_queries = [r[0] for r in result.all() if r[0]]
+        logger.info("Found %d unique GSC queries", len(gsc_queries))
         
         if not gsc_queries:
+            logger.warning("No GSC data found for project %s", project_id)
+            await progress.complete()
             return {
                 "project_id": project_id,
                 "keywords_imported": 0,
@@ -505,15 +590,17 @@ async def _import_gsc_keywords_impl(project_id: str) -> dict:
                 "message": "No GSC data found. Run GSC sync first."
             }
 
+        await progress.update(ScanStage.KEYWORD_GENERATION, 25, f"🔄 Checking {len(gsc_queries)} GSC queries for duplicates...")
         # Get existing keywords to avoid duplicates
         result = await session.execute(
             select(Keyword.keyword)
             .where(Keyword.project_id == project_id)
         )
         existing_kws = {r[0].lower() for r in result.all()}
+        logger.info("Found %d existing keywords in database", len(existing_kws))
         
         new_kws_count = 0
-        for query in gsc_queries:
+        for i, query in enumerate(gsc_queries):
             if query.lower() not in existing_kws:
                 new_kw = Keyword(
                     id=uuid.uuid4(),
@@ -528,10 +615,14 @@ async def _import_gsc_keywords_impl(project_id: str) -> dict:
                 # To prevent memory issues with thousands of keywords
                 if new_kws_count % 100 == 0:
                     await session.flush()
+                    progress_pct = min(80, 30 + int((i / len(gsc_queries)) * 50))
+                    await progress.update(ScanStage.KEYWORD_GENERATION, progress_pct, f"Processed {i+1}/{len(gsc_queries)} queries...")
 
+        await progress.update(ScanStage.KEYWORD_GENERATION, 90, "Committing new keywords...")
         await session.commit()
         logger.info("Imported %d new keywords from GSC for project %s", new_kws_count, project_id)
 
+    await progress.complete()
     return {
         "project_id": project_id,
         "keywords_imported": new_kws_count,
@@ -549,7 +640,7 @@ def sync_gsc_data_task(self, project_id: str) -> dict:
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_sync_gsc_data_impl(project_id))
+        result = loop.run_until_complete(_sync_gsc_data_impl(project_id, self.request.id))
         loop.close()
         return result
     except Exception as exc:
@@ -557,17 +648,24 @@ def sync_gsc_data_task(self, project_id: str) -> dict:
         raise self.retry(exc=exc)
 
 
-async def _sync_gsc_data_impl(project_id: str) -> dict:
+async def _sync_gsc_data_impl(project_id: str, task_id: str = "") -> dict:
+    # Initialize progress tracking
+    progress = ScanProgress(project_id, task_id)
+    await progress.initialize()
+    
     logger.info("Syncing GSC data for project=%s", project_id)
+    await progress.update("gsc_sync", 10, "Loading project data...")
 
     async with AsyncSessionLocal() as session:
         project = await _load_project(session, project_id)
         if not project:
+            await progress.complete()
             return {"project_id": project_id, "rows_synced": 0, "status": "project_not_found"}
 
         competitors = await _load_competitors(session, project_id)
         competitor_names = [c.domain for c in competitors]
 
+    await progress.update("gsc_sync", 30, "Fetching GSC queries...")
     sync_result = await gsc_sync(
         project_id=project_id,
         brand_name=project.brand_name,
@@ -578,6 +676,7 @@ async def _sync_gsc_data_impl(project_id: str) -> dict:
     queries = sync_result.get("queries", [])
     logger.info("GSC returned %d query rows", len(queries))
 
+    await progress.update("gsc_sync", 60, f"Uploading {len(queries)} query records...")
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     try:
         storage.upload_json(
@@ -587,6 +686,7 @@ async def _sync_gsc_data_impl(project_id: str) -> dict:
     except Exception as exc:
         logger.warning("Spaces upload failed (non-fatal): %s", exc)
 
+    await progress.update("gsc_sync", 75, "Persisting to database...")
     # Upsert into GSCData table
     async with AsyncSessionLocal() as session:
         today = datetime.now(timezone.utc).date()
@@ -605,6 +705,7 @@ async def _sync_gsc_data_impl(project_id: str) -> dict:
         await session.commit()
         logger.info("Inserted %d GSCData rows for project %s", len(queries), project_id)
 
+    await progress.complete()
     return {
         "project_id": project_id,
         "rows_synced": len(queries),

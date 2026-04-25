@@ -77,8 +77,20 @@ async def trigger_gsc_keyword_import(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Trigger keyword import from GSC data."""
+    """
+    Trigger keyword import from Google Search Console data.
+    
+    Requires prior GSC authentication via /gsc/auth endpoint.
+    Imports search queries and performance metrics from GSC into keywords.
+    """
     await _assert_project_owner(project_id, current_user, db)
+    
+    if not current_user.gsc_access_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="GSC not authenticated. Please authorize via /gsc/auth first."
+        )
+    
     try:
         from app.tasks.seo_tasks import import_gsc_keywords_task
         task = import_gsc_keywords_task.delay(project_id=str(project_id))
