@@ -50,6 +50,10 @@ const config: Config = {
           DEFAULT: "#ef4444",
           dim:     "rgba(239,68,68,0.12)",
         },
+        popover: {
+          DEFAULT: "#18181b",
+          foreground: "#fafafa",
+        },
         // legacy flat aliases (keep for backward compat with existing pages)
         surface1: "#111113",
         surface2: "#18181b",
