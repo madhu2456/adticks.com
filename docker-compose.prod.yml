@@ -93,6 +93,25 @@ services:
     networks:
       - adticks-network
 
+  celery-worker:
+    build:
+      context: ./backend
+    container_name: adticks-celery-worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-adticks}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-password}@redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      celery -A app.core.celery_app worker --loglevel=info --concurrency=4
+    networks:
+      - adticks-network
+
 networks:
   adticks-network:
     driver: bridge
