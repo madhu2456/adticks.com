@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Zap, RefreshCw, Search, ShieldCheck, FileSearch } from "lucide-react";
+import { Zap, RefreshCw, Search, ShieldCheck, FileSearch, Globe } from "lucide-react";
 import { KeywordTable } from "@/components/seo/KeywordTable";
 import { RankTracker } from "@/components/seo/RankTracker";
 import { OnPageScore } from "@/components/seo/OnPageScore";
