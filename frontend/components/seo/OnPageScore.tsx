@@ -90,29 +90,33 @@ export function OnPageScore({ projectId }: OnPageScoreProps) {
               <p className="text-xs text-text-muted mt-0.5 font-mono">{audit.url}</p>
             </div>
             <div className="text-right">
-              <span className="text-3xl font-bold" style={{ color: getScoreColor(audit.overall_score) }}>
-                {audit.overall_score}
+              <span className="text-3xl font-bold" style={{ color: getScoreColor(audit.overall_score ?? 0) }}>
+                {audit.overall_score ?? "—"}
               </span>
               <p className="text-xs text-text-muted">/ 100</p>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {(audit.items || []).map((item: any) => (
-                <div key={item.check} className={cn(
-                  "flex items-start gap-3 rounded-lg p-3 border",
-                  item.status === "pass" ? "bg-success/5 border-success/20" :
-                  item.status === "fail" ? "bg-danger/5 border-danger/20" :
-                  "bg-warning/5 border-warning/20"
-                )}>
-                  {icons[item.status as keyof typeof icons]}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-text-primary">{item.check}</p>
-                    <p className="text-xs text-text-muted mt-0.5">{item.message}</p>
+              {(audit.items || []).length > 0 ? (
+                audit.items.map((item: any) => (
+                  <div key={item.check} className={cn(
+                    "flex items-start gap-3 rounded-lg p-3 border",
+                    item.status === "pass" ? "bg-success/5 border-success/20" :
+                    item.status === "fail" ? "bg-danger/5 border-danger/20" :
+                    "bg-warning/5 border-warning/20"
+                  )}>
+                    {icons[item.status as keyof typeof icons]}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-text-primary">{item.check}</p>
+                      <p className="text-xs text-text-muted mt-0.5">{item.message}</p>
+                    </div>
+                    <span className="text-xs font-semibold text-text-muted shrink-0">{item.score}/100</span>
                   </div>
-                  <span className="text-xs font-semibold text-text-muted shrink-0">{item.score}/100</span>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-text-muted text-center py-4">No audit items available</p>
+              )}
             </div>
           </CardContent>
         </Card>
