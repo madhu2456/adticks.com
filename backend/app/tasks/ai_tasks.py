@@ -76,7 +76,7 @@ async def _generate_prompts_impl(
 ) -> dict:
     progress = ScanProgress(project_id, task_id)
     # await progress.initialize()
-    await progress.update(ScanStage.AI_VISIBILITY, 10, "⏳ Initializing AI prompt generation...")
+    await progress.update(ScanStage.AI_SCAN, 10, "⏳ Initializing AI prompt generation...")
     
     logger.info(
         "Generating prompts for project=%s brand=%s industry=%s",
@@ -146,7 +146,7 @@ def run_llm_scan_task(self, project_id: str, prompt_limit: int = 100, parent_tas
 
 async def _run_llm_scan_impl(project_id: str, prompt_limit: int, task_id: str) -> dict:
     progress = ScanProgress(project_id, task_id)
-    await progress.update(ScanStage.AI_VISIBILITY, 30, f"🤖 Scanning LLMs (limit: {prompt_limit})...")
+    await progress.update(ScanStage.AI_SCAN, 30, f"🤖 Scanning LLMs (limit: {prompt_limit})...")
     
     logger.info("Running LLM scan for project=%s limit=%d", project_id, prompt_limit)
 

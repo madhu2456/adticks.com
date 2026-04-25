@@ -31,6 +31,7 @@ export function useErrorHandler() {
   }
 
   return useCallback((err: unknown) => {
+    console.error("[useErrorHandler] Caught error:", err);
     setError(normalizeError(err));
   }, []);
 }

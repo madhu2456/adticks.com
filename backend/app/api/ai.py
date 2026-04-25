@@ -148,9 +148,12 @@ async def run_scan(
         task = run_full_scan_task.delay(project_id=str(project.id))
         return {"status": "queued", "task_id": task.id}
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).error(f"Error triggering full scan: {e}", exc_info=True)
-        return {"status": "queued", "task_id": None}
+        logger.error(f"Error triggering full scan: {e}", exc_info=True)
+        # Raise exception so it's not a fake success with task_id=None
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue scan: {str(e)}"
+        )
 
 
 @router.post("/insights/refresh", status_code=status.HTTP_202_ACCEPTED)

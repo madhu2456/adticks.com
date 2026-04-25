@@ -24,9 +24,12 @@ from app.services.seo.rank_tracker import bulk_rank_check
 from app.services.seo.on_page_analyzer import analyze_url
 from app.services.seo.technical_seo import check_technical
 from app.services.seo.content_gap_analyzer import find_gaps
+from app.services.gsc.gsc_service import sync_gsc_data as gsc_sync
+from app.services.ads.ads_service import sync_ads_data as ads_sync
 from app.core.component_cache import ComponentCache
 
 logger = logging.getLogger(__name__)
+storage = StorageService()
 
 
 # ---------------------------------------------------------------------------

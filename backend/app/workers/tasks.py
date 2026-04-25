@@ -158,10 +158,10 @@ def run_full_scan_task(self, project_id: str, force_refresh: bool = False) -> di
             parent_task_id=master_task_id,
         ),
         group(
-            run_rank_tracking_task.s(project_id=project_id, parent_task_id=master_task_id),
-            run_seo_audit_task.s(project_id=project_id, parent_task_id=master_task_id),
-            find_content_gaps_task.s(project_id=project_id, parent_task_id=master_task_id),
-            generate_prompts_task.s(
+            run_rank_tracking_task.si(project_id=project_id, parent_task_id=master_task_id),
+            run_seo_audit_task.si(project_id=project_id, parent_task_id=master_task_id),
+            find_content_gaps_task.si(project_id=project_id, parent_task_id=master_task_id),
+            generate_prompts_task.si(
                 project_id=project_id,
                 brand_name=brand_name,
                 domain=domain,
@@ -169,18 +169,35 @@ def run_full_scan_task(self, project_id: str, force_refresh: bool = False) -> di
                 competitors=competitor_domains,
                 parent_task_id=master_task_id,
             ),
-            sync_gsc_data_task.s(project_id=project_id, parent_task_id=master_task_id),
-            sync_ads_data_task.s(project_id=project_id, parent_task_id=master_task_id),
+            sync_gsc_data_task.si(project_id=project_id, parent_task_id=master_task_id),
+            sync_ads_data_task.si(project_id=project_id, parent_task_id=master_task_id),
         ),
-        run_llm_scan_task.s(project_id=project_id, prompt_limit=100, parent_task_id=master_task_id),
-        compute_scores_task.s(project_id=project_id, parent_task_id=master_task_id),
-        generate_insights_task.s(project_id=project_id, parent_task_id=master_task_id),
-        cache_scan_results_task.s(project_id=project_id, parent_task_id=master_task_id),
+        run_llm_scan_task.si(project_id=project_id, prompt_limit=100, parent_task_id=master_task_id),
+        compute_scores_task.si(project_id=project_id, parent_task_id=master_task_id),
+        generate_insights_task.si(project_id=project_id, parent_task_id=master_task_id),
+        cache_scan_results_task.si(project_id=project_id, parent_task_id=master_task_id),
     )
 
     # Launch the chain
     # By returning self.replace, we make the master task's ID represent the entire chain
     return self.replace(workflow)
+
+
+@celery_app.task(bind=True)
+def on_scan_error(self, request, exc, traceback, project_id: str, master_task_id: str):
+    """
+    Error handler for the full scan chain.
+    Ensures progress is marked as failed so the UI doesn't get stuck.
+    """
+    async def _run():
+        try:
+            progress = ScanProgress(project_id, master_task_id)
+            await progress.fail(str(exc))
+            logger.error(f"Scan failed for project {project_id} (task {master_task_id}): {exc}")
+        finally:
+            await engine.dispose()
+    
+    run_async(_run())
 
 
 
