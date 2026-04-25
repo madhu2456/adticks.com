@@ -16,6 +16,18 @@ export function ContentGaps({ gaps = [], loading }: ContentGapsProps) {
     return <Skeleton className="h-64 w-full" />;
   }
 
+  if (!gaps || gaps.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-12">
+          <p className="text-text-muted text-center">
+            No content gaps found yet. Click "Find Gaps" to discover topics your competitors rank for.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="rounded-xl border border-border overflow-hidden">
       <table className="w-full text-sm">

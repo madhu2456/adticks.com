@@ -27,9 +27,9 @@ export default function SEOPage() {
   const { data: gapsResponse, isLoading: gapsLoading, refetch: refetchGaps } = useContentGaps(activeProject?.id || "");
   const { data: technicalResponse, isLoading: technicalLoading, refetch: refetchTechnical } = useTechnicalChecks(activeProject?.id || "");
 
-  // Extract data from paginated responses
+  // Extract data from responses
   const keywords = (keywordResponse?.data || []) as any[];
-  const gaps = (gapsResponse?.data || []) as any[];
+  const gaps = Array.isArray(gapsResponse) ? gapsResponse : (gapsResponse?.data || []) as any[];
   const technicalChecks = (technicalResponse?.data || []) as any[];
 
   const filteredKeywords = keywords.filter((k) =>
