@@ -3,9 +3,9 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
-import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { api } from '@/lib/api';
 
 interface CompetitorKeywordsData {
   id: string;
@@ -43,10 +43,7 @@ export function CompetitorAnalysis({
   const { data: response, isLoading, error } = useQuery({
     queryKey: ['competitorKeywords', projectId, skip],
     queryFn: async () => {
-      const res = await axios.get(
-        `/api/seo/projects/${projectId}/competitors/keywords?skip=${skip}&limit=${pageSize}`
-      );
-      return res.data as PaginatedResponse<CompetitorKeywordsData>;
+      return await api.seoSuite.getCompetitorKeywords(projectId, skip, pageSize);
     },
     staleTime: 60 * 60 * 1000, // 1 hour
   });
@@ -68,7 +65,10 @@ export function CompetitorAnalysis({
   if (error) {
     return (
       <div className="flex items-center justify-center py-8 text-red-500">
-        Failed to load competitor keywords
+        <div className="text-center">
+          <p>Failed to load competitor keywords</p>
+          <p className="text-sm text-gray-500 mt-1">Please ensure competitor data has been synced</p>
+        </div>
       </div>
     );
   }
