@@ -191,19 +191,29 @@ async def get_rankings(
     )
     total = count_result.scalar() or 0
     
-    # Get paginated results
+    # Get paginated results with keyword info
     result = await db.execute(
-        select(Ranking)
+        select(Ranking, Keyword)
         .join(Keyword, Ranking.keyword_id == Keyword.id)
         .where(Keyword.project_id == project_id)
         .order_by(Ranking.timestamp.desc())
         .offset(skip)
         .limit(limit)
     )
-    rankings = result.scalars().all()
+    
+    # Build response with keyword data
+    rankings_with_keywords = []
+    for ranking, keyword in result.all():
+        response = RankingResponse.model_validate(ranking)
+        # Populate keyword fields
+        response.keyword = keyword.keyword
+        response.intent = keyword.intent
+        response.difficulty = keyword.difficulty
+        response.volume = keyword.volume
+        rankings_with_keywords.append(response)
     
     return PaginatedResponse.create(
-        data=rankings,
+        data=rankings_with_keywords,
         total=total,
         skip=skip,
         limit=limit,

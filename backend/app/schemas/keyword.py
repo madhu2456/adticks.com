@@ -25,4 +25,10 @@ class RankingResponse(BaseModel):
     position: int | None
     url: str | None
     timestamp: datetime
+    # These fields will be populated by the endpoint
+    keyword: str | None = None
+    intent: str | None = None
+    difficulty: float | None = None
+    volume: int | None = None
+    position_change: int | None = None
     model_config = {"from_attributes": True}
