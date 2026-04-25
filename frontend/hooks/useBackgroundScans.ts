@@ -19,6 +19,7 @@ interface BackgroundScansStore {
   updateScan: (id: string, updates: Partial<BackgroundScan>) => void
   removeScan: (id: string) => void
   clearOldScans: () => void
+  clearScans: () => void
 }
 
 export const useBackgroundScans = create<BackgroundScansStore>()(
@@ -48,6 +49,10 @@ export const useBackgroundScans = create<BackgroundScansStore>()(
                 scan.status === 'scanning' || scan.startedAt > oneHourAgo
             ),
           }
+        }),
+      clearScans: () =>
+        set({
+          scans: [],
         }),
     }),
     {

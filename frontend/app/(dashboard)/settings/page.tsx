@@ -251,6 +251,11 @@ function ProfileTab() {
                 setPurging(true);
                 try {
                   await api.cache.purgeAll();
+                  
+                  // Clear local frontend tasks list
+                  const { useBackgroundScans } = await import("@/hooks/useBackgroundScans");
+                  useBackgroundScans.getState().clearScans();
+
                   setTimeout(() => {
                     showAlert({
                       title: "System Reset Successful",
