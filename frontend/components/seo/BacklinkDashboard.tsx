@@ -3,10 +3,10 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
-import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { api } from '@/lib/api';
 
 interface BacklinksData {
   id: string;
@@ -43,18 +43,11 @@ export function BacklinkDashboard({
   const { data: response, isLoading, error } = useQuery({
     queryKey: ['backlinks', projectId, skip, minAuthority],
     queryFn: async () => {
-      const params = new URLSearchParams({
-        skip: skip.toString(),
-        limit: pageSize.toString(),
-      });
-      if (minAuthority !== null) {
-        params.append('min_authority', minAuthority.toString());
+      try {
+        return await api.seoSuite.getBacklinks(projectId, skip, pageSize);
+      } catch (err) {
+        throw err;
       }
-
-      const res = await axios.get(
-        `/api/seo/projects/${projectId}/backlinks?${params}`
-      );
-      return res.data as PaginatedResponse<BacklinksData>;
     },
     staleTime: 60 * 60 * 1000, // 1 hour
   });
@@ -90,7 +83,10 @@ export function BacklinkDashboard({
   if (error) {
     return (
       <div className="flex items-center justify-center py-8 text-red-500">
-        Failed to load backlinks
+        <div className="text-center">
+          <p>Failed to load backlinks</p>
+          <p className="text-sm text-gray-500 mt-1">Please ensure GSC is connected and backlinks have been synced</p>
+        </div>
       </div>
     );
   }
