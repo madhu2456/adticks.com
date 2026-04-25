@@ -5,15 +5,21 @@ All settings are loaded from environment variables (or a .env file)
 using pydantic-settings so that no secrets are hard-coded.
 """
 
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, Field
 
+# Determine the directory of this file
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+# Navigate to the backend root where .env is located
+_backend_root = os.path.abspath(os.path.join(_current_dir, "..", ".."))
+_env_file = os.path.join(_backend_root, ".env")
 
 class Settings(BaseSettings):
     """Central settings object for the AdTicks backend."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_env_file if os.path.exists(_env_file) else ".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",

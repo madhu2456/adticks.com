@@ -48,6 +48,12 @@ async def gsc_auth(current_user: User = Depends(get_current_user)):
     
     **Example:** Redirect user to the returned auth_url to begin OAuth flow
     """
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Google OAuth is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in the backend environment."
+        )
+
     from google_auth_oauthlib.flow import Flow
     flow = Flow.from_client_config(
         {
@@ -75,6 +81,12 @@ async def gsc_callback(
     """
     Handle the Google OAuth2 callback and store the access token.
     """
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Google OAuth is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in the backend environment."
+        )
+
     from google_auth_oauthlib.flow import Flow
     from datetime import datetime, timezone, timedelta
     
