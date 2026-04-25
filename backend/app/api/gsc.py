@@ -2,6 +2,7 @@
 import logging
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
@@ -74,6 +75,30 @@ async def gsc_auth(current_user: User = Depends(get_current_user)):
     flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
     auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline")
     return {"auth_url": auth_url}
+
+
+@router.get("/callback")
+async def gsc_legacy_callback(
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+):
+    """
+    Legacy GET callback handler.
+    
+    If Google redirects here (due to old configuration), we redirect the user
+    to the frontend /gsc-callback route which will handle the code properly.
+    """
+    params = []
+    if code: params.append(f"code={code}")
+    if state: params.append(f"state={state}")
+    if error: params.append(f"error={error}")
+    
+    query_string = "&".join(params)
+    frontend_url = f"{settings.BASE_URL.rstrip('/')}/gsc-callback?{query_string}"
+    
+    logger.info(f"Redirecting legacy GSC callback to frontend: {frontend_url}")
+    return RedirectResponse(url=frontend_url)
 
 
 class GSCAuthComplete(BaseModel):

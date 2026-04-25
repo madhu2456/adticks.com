@@ -323,6 +323,8 @@ export const api = {
       axiosInstance.get<PaginatedResponse<any>>(`/seo/projects/${projectId}/competitors/keywords?skip=${skip}&limit=${limit}`).then(unwrap),
     getSerpFeatures: (keywordId: string) =>
       axiosInstance.get<any>(`/seo/keywords/${keywordId}/serp-features`).then(unwrap),
+    getRankHistory: (projectId: string, keywordId?: string, days = 30, skip = 0, limit = 50, device?: string) =>
+      axiosInstance.get<PaginatedResponse<any>>(`/seo/projects/${projectId}/keywords/history?days=${days}&skip=${skip}&limit=${limit}${keywordId ? `&keyword_id=${keywordId}` : ''}${device ? `&device=${device}` : ''}`).then(unwrap),
   },
 
   // Cache

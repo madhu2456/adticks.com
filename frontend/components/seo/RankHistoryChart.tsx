@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
-import axios from 'axios';
+import { api } from '@/lib/api';
 import {
   LineChart,
   Line,
@@ -44,24 +44,15 @@ export function RankHistoryChart({
   const days = timeRange === '6mo' ? 180 : 365;
 
   // Fetch rank history data
-  const { data: historyData, isLoading, error } = useQuery({
+  const { data: historyResponse, isLoading, error } = useQuery({
     queryKey: ['rankHistory', projectId, keywordId, device, days],
     queryFn: async () => {
-      const params = new URLSearchParams({
-        days: days.toString(),
-        limit: '500',
-      });
-
-      if (keywordId) params.append('keyword_id', keywordId);
-      if (device) params.append('device', device);
-
-      const response = await axios.get(
-        `/api/seo/projects/${projectId}/keywords/history?${params}`
-      );
-      return response.data.data as RankHistoryData[];
+      return await api.seoSuite.getRankHistory(projectId, keywordId, days, 0, 500, device);
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  const historyData = historyResponse?.data as RankHistoryData[] | undefined;
 
   // Process data for chart
   const chartData = useMemo(() => {
@@ -90,18 +81,18 @@ export function RankHistoryChart({
       date: data.date,
       rank:
         data.ranks.length > 0
-          ? Math.round(data.ranks.reduce((a, b) => a + b) / data.ranks.length)
+          ? Math.round(data.ranks.reduce((a, b) => a + b, 0) / data.ranks.length)
           : null,
       volume:
         data.volumes.length > 0
           ? Math.round(
-              data.volumes.reduce((a, b) => a + b) / data.volumes.length
+              data.volumes.reduce((a, b) => a + b, 0) / data.volumes.length
             )
           : null,
       cpc:
         data.cpcs.length > 0
           ? Number(
-              (data.cpcs.reduce((a, b) => a + b) / data.cpcs.length).toFixed(2)
+              (data.cpcs.reduce((a, b) => a + b, 0) / data.cpcs.length).toFixed(2)
             )
           : null,
     }));
@@ -118,6 +109,7 @@ export function RankHistoryChart({
       </div>
     );
   }
+
 
   return (
     <div className="w-full space-y-4">

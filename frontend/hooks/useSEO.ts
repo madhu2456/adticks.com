@@ -50,3 +50,12 @@ export function useTechnicalChecks(projectId: string) {
     enabled: !!projectId,
   });
 }
+
+export function useRankHistory(projectId: string, keywordId?: string, days = 30) {
+  return useQuery({
+    queryKey: ["rankHistory", projectId, keywordId, days],
+    queryFn: () => api.seoSuite.getRankHistory(projectId, keywordId, days, 0, 100),
+    staleTime: 5 * 60 * 1000,
+    enabled: !!projectId,
+  });
+}
