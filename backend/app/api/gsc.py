@@ -1,4 +1,5 @@
 """AdTicks Google Search Console router."""
+import logging
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, func
@@ -12,6 +13,8 @@ from app.models.project import Project
 from app.models.user import User
 from app.schemas.common import PaginatedResponse
 from app.schemas.gsc import GSCDataResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/gsc", tags=["gsc"])
 
