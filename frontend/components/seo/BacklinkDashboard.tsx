@@ -1,212 +1,277 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { api } from '@/lib/api';
-
-interface BacklinksData {
-  id: string;
-  project_id: string;
-  referring_domain: string;
-  authority_score: number;
-  timestamp: string;
-}
-
-interface PaginatedResponse<T> {
-  data: T[];
-  total: number;
-  skip: number;
-  limit: number;
-  has_more: boolean;
-}
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import { 
+  useBacklinks, 
+  useBacklinkStats, 
+  useBacklinkIntersect 
+} from '@/hooks/useSEO';
+import { 
+  Link2, 
+  Unlink, 
+  Anchor, 
+  ArrowUpRight, 
+  ShieldCheck,
+  Search,
+  ExternalLink,
+  Target
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface BacklinkDashboardProps {
   projectId: string;
-  pageSize?: number;
 }
 
-export function BacklinkDashboard({
-  projectId,
-  pageSize = 15,
-}: BacklinkDashboardProps) {
+export function BacklinkDashboard({ projectId }: BacklinkDashboardProps) {
   const { theme } = useTheme();
   const [currentPage, setCurrentPage] = useState(0);
-  const [minAuthority, setMinAuthority] = useState<number | null>(null);
-
+  const [activeTab, setActiveTab] = useState("overview");
+  const pageSize = 15;
   const skip = currentPage * pageSize;
 
-  // Fetch backlinks
-  const { data: response, isLoading, error } = useQuery({
-    queryKey: ['backlinks', projectId, skip, minAuthority],
-    queryFn: async () => {
-      try {
-        return await api.seoSuite.getBacklinks(projectId, skip, pageSize);
-      } catch (err) {
-        throw err;
-      }
-    },
-    staleTime: 60 * 60 * 1000, // 1 hour
-  });
+  // Fetch real data
+  const { data: backlinksResponse, isLoading: backlinksLoading } = useBacklinks(projectId, skip, pageSize);
+  const { data: stats, isLoading: statsLoading } = useBacklinkStats(projectId);
+  const { data: intersect, isLoading: intersectLoading } = useBacklinkIntersect(projectId);
 
   const isDark = theme === 'dark';
-  const bgColor = isDark ? 'bg-slate-900' : 'bg-white';
-  const textColor = isDark ? 'text-slate-100' : 'text-slate-900';
+  const backlinks = backlinksResponse?.data || [];
+  const totalPages = backlinksResponse ? Math.ceil(backlinksResponse.total / pageSize) : 0;
 
   const getAuthorityBadgeColor = (score: number) => {
-    if (score >= 80) return 'success';
-    if (score >= 60) return 'primary';
-    if (score >= 40) return 'warning';
-    return 'danger';
+    if (score >= 80) return 'text-green-500 bg-green-500/10 border-green-500/20';
+    if (score >= 60) return 'text-blue-500 bg-blue-500/10 border-blue-500/20';
+    if (score >= 40) return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
+    return 'text-red-500 bg-red-500/10 border-red-500/20';
   };
-
-  const backlinks = response?.data || [];
-  const totalPages = response
-    ? Math.ceil(response.total / pageSize)
-    : 0;
-
-  const stats = {
-    total: response?.total || 0,
-    avgAuthority:
-      backlinks.length > 0
-        ? (
-            backlinks.reduce((sum, b) => sum + b.authority_score, 0) /
-            backlinks.length
-          ).toFixed(2)
-        : '0',
-    topAuthority: backlinks.length > 0 ? backlinks[0].authority_score : 0,
-  };
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center py-8 text-red-500">
-        <div className="text-center">
-          <p>Failed to load backlinks</p>
-          <p className="text-sm text-gray-500 mt-1">Please ensure GSC is connected and backlinks have been synced</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className={`space-y-4 ${bgColor} rounded-lg p-4`}>
-      {/* Header */}
-      <div className="space-y-2">
-        <h3 className={`font-semibold ${textColor}`}>Backlinks Overview</h3>
-        <p className="text-sm text-gray-500">
-          Track referring domains and authority metrics
-        </p>
-      </div>
-
-      {/* Stats Row */}
-      {response && (
-        <div className="grid grid-cols-3 gap-4 py-2">
-          <div className={`p-3 rounded border ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-            <p className="text-xs text-gray-500 mb-1">Total Backlinks</p>
-            <p className={`text-2xl font-bold ${textColor}`}>{stats.total}</p>
-          </div>
-          <div className={`p-3 rounded border ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-            <p className="text-xs text-gray-500 mb-1">Avg Authority</p>
-            <p className={`text-2xl font-bold ${textColor}`}>{stats.avgAuthority}</p>
-          </div>
-          <div className={`p-3 rounded border ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-            <p className="text-xs text-gray-500 mb-1">Top Authority</p>
-            <p className={`text-2xl font-bold ${textColor}`}>{stats.topAuthority}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Filter */}
-      <div className="space-y-2">
-        <label className={`text-sm font-medium ${textColor}`}>
-          Minimum Authority Score
-        </label>
-        <div className="flex gap-2">
-          <Input
-            type="number"
-            min="0"
-            max="100"
-            value={minAuthority ?? ''}
-            onChange={(e) =>
-              setMinAuthority(e.target.value === '' ? null : parseInt(e.target.value))
-            }
-            placeholder="Filter by min authority (0-100)"
-          />
-          <Button
-            onClick={() => setMinAuthority(null)}
-            variant="outline"
-            size="sm"
-          >
-            Clear
-          </Button>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-xl font-bold text-text-primary">Advanced Backlink Intelligence</h3>
+          <p className="text-sm text-text-muted">Analyze your link profile and find gaps compared to competitors</p>
         </div>
       </div>
 
-      {/* List */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="text-gray-500">Loading backlinks...</div>
-        </div>
-      ) : backlinks.length === 0 ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="text-gray-500">
-            {minAuthority !== null
-              ? `No backlinks with authority >= ${minAuthority}`
-              : 'No backlinks available'}
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="space-y-2">
-            {backlinks.map((backlink) => (
-              <div
-                key={backlink.id}
-                className={`flex justify-between items-center p-3 rounded-lg border ${isDark ? 'border-slate-700' : 'border-slate-200'}`}
-              >
-                <div>
-                  <p className={`font-medium ${textColor} truncate`}>
-                    {backlink.referring_domain}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {new Date(backlink.timestamp).toLocaleDateString()}
-                  </p>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="anchors">Anchor Text</TabsTrigger>
+          <TabsTrigger value="intersect">Link Intersect</TabsTrigger>
+        </TabsList>
+
+        {/* --- Overview Tab --- */}
+        <TabsContent value="overview" className="space-y-6 pt-4">
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className="p-3 bg-blue-500/10 rounded-lg text-blue-500">
+                  <Link2 size={20} />
                 </div>
-                <Badge variant={getAuthorityBadgeColor(backlink.authority_score)}>
-                  {backlink.authority_score.toFixed(1)}
-                </Badge>
-              </div>
-            ))}
+                <div>
+                  <p className="text-xs text-text-muted">Total Links</p>
+                  <p className="text-xl font-bold">{stats?.total_backlinks || 0}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className="p-3 bg-green-500/10 rounded-lg text-green-500">
+                  <ArrowUpRight size={20} />
+                </div>
+                <div>
+                  <p className="text-xs text-text-muted">New (30d)</p>
+                  <p className="text-xl font-bold text-green-500">+{stats?.new_domains_30d || 0}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className="p-3 bg-red-500/10 rounded-lg text-red-500">
+                  <Unlink size={20} />
+                </div>
+                <div>
+                  <p className="text-xs text-text-muted">Lost (30d)</p>
+                  <p className="text-xl font-bold text-red-500">-{stats?.lost_domains_30d || 0}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className="p-3 bg-purple-500/10 rounded-lg text-purple-500">
+                  <ShieldCheck size={20} />
+                </div>
+                <div>
+                  <p className="text-xs text-text-muted">Avg Authority</p>
+                  <p className="text-xl font-bold">{(stats?.avg_authority || 0).toFixed(1)}</p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Pagination */}
-          <div className="flex items-center justify-between mt-4">
-            <div className={`text-sm ${textColor}`}>
-              Page {currentPage + 1} of {totalPages}
-            </div>
-            <div className="flex gap-2">
-              <Button
-                onClick={() => setCurrentPage(currentPage - 1)}
-                disabled={currentPage === 0}
-                variant="outline"
-                size="sm"
-              >
-                Previous
-              </Button>
-              <Button
-                onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={currentPage >= totalPages - 1}
-                variant="outline"
-                size="sm"
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        </>
-      )}
+          <Card>
+            <CardHeader className="pb-3 border-b border-border">
+              <CardTitle className="text-lg">Recent Backlinks</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-surface2 border-b border-border">
+                    <tr className="text-left text-xs font-semibold text-text-muted uppercase tracking-wider">
+                      <th className="px-4 py-3">Referring Domain</th>
+                      <th className="px-4 py-3">Authority</th>
+                      <th className="px-4 py-3">First Seen</th>
+                      <th className="px-4 py-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {backlinksLoading ? (
+                      [1,2,3].map(i => (
+                        <tr key={i}><td colSpan={4} className="px-4 py-4"><Skeleton className="h-4 w-full" /></td></tr>
+                      ))
+                    ) : backlinks.map((link) => (
+                      <tr key={link.id} className="border-b border-border hover:bg-surface2/50 transition-colors">
+                        <td className="px-4 py-4">
+                          <div className="font-medium text-text-primary flex items-center gap-2">
+                            {link.referring_domain}
+                            <ExternalLink size={12} className="text-text-tertiary" />
+                          </div>
+                          <p className="text-xs text-text-muted truncate max-w-[200px]">{link.target_url || "Homepage"}</p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <Badge variant="outline" className={cn("font-bold", getAuthorityBadgeColor(link.authority_score))}>
+                            {link.authority_score.toFixed(0)}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-4 text-text-muted">
+                          {new Date(link.timestamp).toLocaleDateString()}
+                        </td>
+                        <td className="px-4 py-4">
+                          <Badge variant="secondary" className="capitalize">
+                            {link.status || "active"}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Pagination */}
+              <div className="flex items-center justify-between p-4 border-t border-border">
+                <p className="text-xs text-text-muted">Showing page {currentPage + 1} of {totalPages || 1}</p>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" size="sm" 
+                    disabled={currentPage === 0}
+                    onClick={() => setCurrentPage(prev => prev - 1)}
+                  >Previous</Button>
+                  <Button 
+                    variant="outline" size="sm"
+                    disabled={currentPage >= totalPages - 1}
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                  >Next</Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* --- Anchors Tab --- */}
+        <TabsContent value="anchors" className="pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Anchor className="h-5 w-5 text-primary" />
+                Anchor Text Distribution
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {(stats?.top_anchor_texts || []).map((anchor: any, idx: number) => (
+                   <div key={idx} className="space-y-2">
+                     <div className="flex justify-between text-sm">
+                       <span className="font-medium">{anchor.text}</span>
+                       <span className="text-text-muted">{anchor.count} links</span>
+                     </div>
+                     <div className="h-2 bg-surface2 rounded-full overflow-hidden">
+                       <div 
+                        className="h-full bg-primary" 
+                        style={{ width: `${Math.min(100, (anchor.count / stats.total_backlinks) * 100)}%` }} 
+                       />
+                     </div>
+                   </div>
+                ))}
+                {!stats?.top_anchor_texts?.length && (
+                  <div className="text-center py-10 text-text-muted italic">
+                    No anchor text data available yet.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* --- Intersect Tab --- */}
+        <TabsContent value="intersect" className="pt-4">
+          <Card>
+            <CardHeader className="pb-3 border-b border-border">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Target className="h-5 w-5 text-primary" />
+                Backlink Intersect (Gap Analysis)
+              </CardTitle>
+              <p className="text-sm text-text-muted">Domains that link to your competitors but not to you.</p>
+            </CardHeader>
+            <CardContent className="p-0">
+               <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-surface2 border-b border-border">
+                    <tr className="text-left text-xs font-semibold text-text-muted uppercase tracking-wider">
+                      <th className="px-4 py-3">Potential Source</th>
+                      <th className="px-4 py-3">Authority</th>
+                      <th className="px-4 py-3">Links To</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {intersectLoading ? (
+                       <tr><td colSpan={3} className="px-4 py-8 text-center"><Skeleton className="h-10 w-full" /></td></tr>
+                    ) : (intersect || []).map((item, idx) => (
+                      <tr key={idx} className="border-b border-border hover:bg-surface2/50">
+                        <td className="px-4 py-4 font-medium text-text-primary">
+                          {item.referring_domain}
+                        </td>
+                        <td className="px-4 py-4">
+                          <Badge variant="outline" className={getAuthorityBadgeColor(item.authority_score)}>
+                            {item.authority_score.toFixed(0)}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-4 h-4 bg-primary/20 rounded-full flex items-center justify-center text-[10px] text-primary">C</div>
+                            <span className="text-text-muted">{item.links_to_competitor}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {!intersectLoading && (!intersect || intersect.length === 0) && (
+                      <tr><td colSpan={3} className="px-4 py-10 text-center text-text-muted italic">No link gaps identified.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

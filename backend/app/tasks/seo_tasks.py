@@ -157,11 +157,24 @@ async def _generate_keywords_impl(
         await session.execute(
             delete(Cluster).where(Cluster.project_id == project_id)
         )
-        for cluster_id, cluster_kws in clusters_raw.items():
+        
+        # We need to map keyword text to their objects to set cluster_id
+        # Reloading all keywords for this project to be sure
+        kw_result = await session.execute(
+            select(Keyword).where(Keyword.project_id == project_id)
+        )
+        db_keywords = {kw.keyword: kw for kw in kw_result.scalars().all()}
+
+        for cluster_idx, cluster_kws in clusters_raw.items():
             if not cluster_kws:
                 continue
+            
             # Use the most common word in the cluster as the topic name
-            topic_name = cluster_kws[0].get("keyword", f"cluster_{cluster_id}").split()[0].title()
+            # Or use AI to generate a better topic name if available
+            # For now, taking the first keyword's first word or the whole keyword if short
+            representative_kw = cluster_kws[0].get("keyword", "")
+            topic_name = representative_kw.split()[0].title() if " " in representative_kw else representative_kw.title()
+            
             new_cluster = Cluster(
                 id=uuid.uuid4(),
                 project_id=UUID(project_id),
@@ -169,6 +182,13 @@ async def _generate_keywords_impl(
                 keywords=[kw.get("keyword") for kw in cluster_kws],
             )
             session.add(new_cluster)
+            await session.flush() # Get the new_cluster.id
+
+            # Update Keyword records with the new cluster_id
+            for kw_data in cluster_kws:
+                kw_text = kw_data.get("keyword")
+                if kw_text in db_keywords:
+                    db_keywords[kw_text].cluster_id = new_cluster.id
 
         await session.commit()
         
@@ -452,6 +472,25 @@ async def _run_seo_audit_impl(project_id: str, url: str | None, audit_type: str 
         logger.info("Uploaded audit to Spaces for project %s url_hash %s", project_id, url_hash)
     except Exception as exc:
         logger.warning("Spaces upload failed (non-fatal): %s", exc)
+
+    # Persist to SiteAuditHistory table
+    from app.models.seo import SiteAuditHistory
+    async with AsyncSessionLocal() as db:
+        history = SiteAuditHistory(
+            id=uuid.uuid4(),
+            project_id=UUID(project_id),
+            url=target_url,
+            score=audit["overall_score"],
+            total_errors=len([i for i in on_page.get("issues", []) if i.get("severity") == "error"]) + 
+                         len([i for i in technical.get("issues", []) if i.get("severity") == "error"]),
+            total_warnings=len([i for i in on_page.get("issues", []) if i.get("severity") == "warning"]) +
+                           len([i for i in technical.get("issues", []) if i.get("severity") == "warning"]),
+            pages_crawled=1, # Initial basic crawler
+            crawl_depth=1,
+            timestamp=datetime.now(timezone.utc)
+        )
+        db.add(history)
+        await db.commit()
 
     await progress.complete()
     return {

@@ -125,46 +125,60 @@ async def complete_gsc_auth(
     from google_auth_oauthlib.flow import Flow
     from datetime import datetime, timezone, timedelta
     
-    flow = Flow.from_client_config(
-        {
-            "web": {
-                "client_id": settings.GOOGLE_CLIENT_ID,
-                "client_secret": settings.GOOGLE_CLIENT_SECRET,
-                "redirect_uris": [settings.GOOGLE_REDIRECT_URI],
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-            }
-        },
-        scopes=_SCOPES,
-    )
-    flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
+    # We try both the current redirect URI and the legacy one to be robust
+    redirect_uris = [
+        settings.GOOGLE_REDIRECT_URI,
+        f"{settings.BASE_URL.rstrip('/')}/api/gsc/callback"
+    ]
     
-    try:
-        flow.fetch_token(code=payload.code)
-        token = flow.credentials
-    except Exception as e:
-        logger.error(f"Failed to fetch Google token: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to exchange authorization code for tokens."
+    last_error = None
+    for r_uri in redirect_uris:
+        flow = Flow.from_client_config(
+            {
+                "web": {
+                    "client_id": settings.GOOGLE_CLIENT_ID,
+                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                    "redirect_uris": redirect_uris,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                }
+            },
+            scopes=_SCOPES,
         )
+        flow.redirect_uri = r_uri
+        
+        try:
+            flow.fetch_token(code=payload.code)
+            token = flow.credentials
+            
+            # If we reached here, exchange was successful
+            current_user.gsc_access_token = token.token
+            if token.refresh_token:
+                current_user.gsc_refresh_token = token.refresh_token
+            
+            if token.expiry:
+                if hasattr(token.expiry, "replace"):
+                    current_user.gsc_token_expiry = token.expiry.replace(tzinfo=timezone.utc)
+                else:
+                    current_user.gsc_token_expiry = datetime.now(timezone.utc) + timedelta(seconds=3600)
+            
+            db.add(current_user)
+            await db.commit()
+            
+            logger.info(f"GSC Auth successful using redirect_uri: {r_uri}")
+            return {"status": "authorized", "message": "Google Search Console connected successfully"}
+            
+        except Exception as e:
+            logger.warning(f"Failed to fetch Google token with {r_uri}: {e}")
+            last_error = e
+            # Continue to next URI if any
     
-    # Persist token to user record
-    current_user.gsc_access_token = token.token
-    if token.refresh_token:
-        current_user.gsc_refresh_token = token.refresh_token
-    
-    if token.expiry:
-        # credentials.expiry is often a datetime object
-        if hasattr(token.expiry, "replace"):
-            current_user.gsc_token_expiry = token.expiry.replace(tzinfo=timezone.utc)
-        else:
-            current_user.gsc_token_expiry = datetime.now(timezone.utc) + timedelta(seconds=3600)
-    
-    db.add(current_user)
-    await db.commit()
-    
-    return {"status": "authorized", "message": "Google Search Console connected successfully"}
+    # If all fail
+    logger.error(f"GSC Auth failed for all redirect URIs. Last error: {last_error}")
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"Failed to exchange authorization code for tokens. Error: {str(last_error)}"
+    )
 
 
 @router.get("/properties")

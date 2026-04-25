@@ -4,6 +4,7 @@ AdTicks — SEO Suite schemas (RankHistory, SerpFeatures, CompetitorKeywords, Ba
 
 from datetime import datetime
 from uuid import UUID
+from typing import Any
 
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -89,6 +90,9 @@ class CompetitorKeywordsResponse(CompetitorKeywordsBase):
 class BacklinksBase(BaseModel):
     """Base backlinks data."""
     referring_domain: str = Field(description="Referring domain")
+    target_url: str | None = Field(None, description="Target URL on project domain")
+    anchor_text: str | None = Field(None, description="Anchor text of the link")
+    status: str = Field("active", description="Link status (new, active, lost)")
     authority_score: float = Field(0.0, description="Authority score")
 
 
@@ -101,6 +105,36 @@ class BacklinksResponse(BacklinksBase):
     """Backlinks response."""
     id: UUID = Field(description="Backlink ID")
     project_id: UUID = Field(description="Associated project ID")
+    first_seen: datetime = Field(description="When the link was first seen")
+    last_seen: datetime = Field(description="When the link was last seen")
     timestamp: datetime = Field(description="Timestamp of the backlink")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BacklinkStatsResponse(BaseModel):
+    """Summary statistics for backlinks."""
+    total_backlinks: int
+    total_referring_domains: int
+    new_domains_30d: int
+    lost_domains_30d: int
+    avg_authority: float
+    authority_distribution: dict[str, int] = Field(
+        description="Count of domains per authority bracket (0-20, 21-40, etc.)"
+    )
+    top_anchor_texts: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class SiteAuditHistoryResponse(BaseModel):
+    """Historical audit response."""
+    id: UUID
+    project_id: UUID
+    url: str
+    score: int
+    total_errors: int
+    total_warnings: int
+    pages_crawled: int
+    crawl_depth: int
+    timestamp: datetime
 
     model_config = ConfigDict(from_attributes=True)

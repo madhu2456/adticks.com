@@ -1,7 +1,8 @@
 """AdTicks SEO router."""
 from uuid import UUID
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -201,6 +202,17 @@ async def get_rankings(
         .limit(limit)
     )
     
+    # Get latest URLs per keyword for cannibalization check (last 24h)
+    yesterday = datetime.now(tz=timezone.utc) - timedelta(days=1)
+    cannibal_res = await db.execute(
+        select(Ranking.keyword_id, func.count(func.distinct(Ranking.url)))
+        .join(Keyword, Ranking.keyword_id == Keyword.id)
+        .where(Keyword.project_id == project_id, Ranking.timestamp >= yesterday)
+        .group_by(Ranking.keyword_id)
+        .having(func.count(func.distinct(Ranking.url)) > 1)
+    )
+    cannibal_ids = {r[0] for r in cannibal_res.all()}
+
     # Build response with keyword data
     rankings_with_keywords = []
     for ranking, keyword in result.all():
@@ -214,6 +226,7 @@ async def get_rankings(
             intent=keyword.intent,
             difficulty=keyword.difficulty,
             volume=keyword.volume,
+            is_cannibalized=ranking.keyword_id in cannibal_ids
         )
         rankings_with_keywords.append(response)
     
@@ -223,6 +236,69 @@ async def get_rankings(
         skip=skip,
         limit=limit,
     )
+
+
+@router.get("/sov/{project_id}")
+@cached(ttl=3600)
+async def get_sov_stats(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Calculate Share of Voice (SOV) for a project based on keyword rankings and volumes.
+    """
+    await _assert_project_owner(project_id, current_user, db)
+    
+    # Get latest rank for every keyword
+    from sqlalchemy import over
+    
+    # Subquery to get latest ranking per keyword
+    latest_rank_sub = (
+        select(
+            Ranking.keyword_id,
+            Ranking.position,
+            Ranking.timestamp,
+            func.row_number().over(
+                partition_by=Ranking.keyword_id,
+                order_by=Ranking.timestamp.desc()
+            ).label("rn")
+        )
+        .join(Keyword, Ranking.keyword_id == Keyword.id)
+        .where(Keyword.project_id == project_id)
+        .subquery()
+    )
+    
+    query = (
+        select(Keyword.keyword, Keyword.volume, latest_rank_sub.c.position)
+        .join(latest_rank_sub, Keyword.id == latest_rank_sub.c.keyword_id)
+        .where(latest_rank_sub.c.rn == 1)
+    )
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    def get_ctr(pos):
+        if not pos: return 0
+        if pos == 1: return 0.31
+        if pos == 2: return 0.14
+        if pos == 3: return 0.09
+        if pos <= 5: return 0.06
+        if pos <= 10: return 0.03
+        return 0.01
+
+    total_possible_reach = sum((r.volume or 0) for r in rows)
+    estimated_reach = sum((r.volume or 0) * get_ctr(r.position) for r in rows)
+    
+    sov = (estimated_reach / total_possible_reach * 100) if total_possible_reach > 0 else 0
+    
+    return {
+        "project_id": str(project_id),
+        "share_of_voice": round(sov, 2),
+        "estimated_monthly_traffic": int(estimated_reach),
+        "total_market_volume": total_possible_reach,
+        "keywords_tracked": len(rows)
+    }
 
 
 @router.get("/gaps/{project_id}")

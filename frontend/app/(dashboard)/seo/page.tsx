@@ -8,6 +8,7 @@ import { RankTracker } from "@/components/seo/RankTracker";
 import { OnPageScore } from "@/components/seo/OnPageScore";
 import { ContentGaps } from "@/components/seo/ContentGaps";
 import { TechnicalSEO } from "@/components/seo/TechnicalSEO";
+import { KeywordManager } from "@/components/seo/KeywordManager";
 import { BacklinkDashboard } from "@/components/seo/BacklinkDashboard";
 import { CompetitorAnalysis } from "@/components/seo/CompetitorAnalysis";
 import { ScanModal } from "@/components/layout/ScanModal";
@@ -79,6 +80,10 @@ export default function SEOPage() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="overflow-x-auto">
           <TabsTrigger value="keywords">Keywords</TabsTrigger>
+          <TabsTrigger value="clusters" className="gap-1.5">
+            Clusters
+            <Badge className="h-4 px-1 text-[8px] bg-primary text-white border-0">New</Badge>
+          </TabsTrigger>
           <TabsTrigger value="rankings">Rankings</TabsTrigger>
           <TabsTrigger value="onpage">On-Page</TabsTrigger>
           <TabsTrigger value="backlinks">Backlinks</TabsTrigger>
@@ -122,6 +127,10 @@ export default function SEOPage() {
           ) : (
             <KeywordTable keywords={filteredKeywords} onSearch={setSearch} />
           )}
+        </TabsContent>
+
+        <TabsContent value="clusters">
+          <KeywordManager projectId={activeProject.id} />
         </TabsContent>
 
         <TabsContent value="rankings">
@@ -194,7 +203,7 @@ export default function SEOPage() {
           {technicalLoading ? (
             <Skeleton className="h-64 w-full" />
           ) : (
-            <TechnicalSEO checks={technicalChecks || []} />
+            <TechnicalSEO projectId={activeProject.id} checks={technicalChecks || []} />
           )}
         </TabsContent>
       </Tabs>

@@ -117,7 +117,20 @@ class Backlinks(Base):
         index=True,
     )
     referring_domain: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    target_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    anchor_text: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="active")  # new, active, lost
     authority_score: Mapped[float] = mapped_column(Float, default=0.0)
+    first_seen: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(tz=timezone.utc),
+        nullable=False,
+    )
+    last_seen: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(tz=timezone.utc),
+        nullable=False,
+    )
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(tz=timezone.utc),
@@ -127,3 +140,34 @@ class Backlinks(Base):
 
     # Relationships
     project = relationship("Project", back_populates="backlinks")
+
+
+class SiteAuditHistory(Base):
+    """Historical site audit results for domains."""
+
+    __tablename__ = "site_audit_history"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    score: Mapped[int] = mapped_column(Integer, default=0)
+    total_errors: Mapped[int] = mapped_column(Integer, default=0)
+    total_warnings: Mapped[int] = mapped_column(Integer, default=0)
+    pages_crawled: Mapped[int] = mapped_column(Integer, default=0)
+    crawl_depth: Mapped[int] = mapped_column(Integer, default=1)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(tz=timezone.utc),
+        nullable=False,
+        index=True,
+    )
+
+    # Relationships
+    project = relationship("Project", back_populates="audit_history")

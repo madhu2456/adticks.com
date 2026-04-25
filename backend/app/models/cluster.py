@@ -36,3 +36,4 @@ class Cluster(Base):
 
     # Relationships
     project = relationship("Project", back_populates="clusters")
+    keyword_items = relationship("Keyword", back_populates="cluster")

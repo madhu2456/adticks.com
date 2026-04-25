@@ -187,6 +187,24 @@ export const api = {
       axiosInstance.post<{ task_id: string }>(`/seo/keywords/sync-gsc?project_id=${projectId}`).then(unwrap),
     getTechnicalChecks: (projectId: string) =>
       axiosInstance.get(`/seo/technical/${projectId}`).then(unwrap),
+    getAuditHistory: (projectId: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/audit/history`).then(unwrap),
+    getSOV: (projectId: string) =>
+      axiosInstance.get<any>(`/seo/sov/${projectId}`).then(unwrap),
+  },
+
+  // Clusters
+  clusters: {
+    list: (projectId: string, skip = 0, limit = 50) =>
+      axiosInstance.get<PaginatedResponse<any>>(`/projects/${projectId}/clusters?skip=${skip}&limit=${limit}`).then(unwrap),
+    get: (projectId: string, clusterId: string) =>
+      axiosInstance.get<any>(`/projects/${projectId}/clusters/${clusterId}`).then(unwrap),
+    create: (projectId: string, data: { topic_name: string; keywords: string[] }) =>
+      axiosInstance.post<any>(`/projects/${projectId}/clusters`, data).then(unwrap),
+    update: (projectId: string, clusterId: string, data: { topic_name?: string; keywords?: string[] }) =>
+      axiosInstance.put<any>(`/projects/${projectId}/clusters/${clusterId}`, data).then(unwrap),
+    delete: (projectId: string, clusterId: string) =>
+      axiosInstance.delete(`/projects/${projectId}/clusters/${clusterId}`).then(unwrap),
   },
 
   // AI Visibility
@@ -319,6 +337,10 @@ export const api = {
   seoSuite: {
     getBacklinks: (projectId: string, skip = 0, limit = 50) =>
       axiosInstance.get<PaginatedResponse<any>>(`/seo/projects/${projectId}/backlinks?skip=${skip}&limit=${limit}`).then(unwrap),
+    getBacklinkStats: (projectId: string) =>
+      axiosInstance.get<any>(`/seo/projects/${projectId}/backlinks/stats`).then(unwrap),
+    getBacklinkIntersect: (projectId: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/backlinks/intersect`).then(unwrap),
     getCompetitorKeywords: (projectId: string, skip = 0, limit = 50) =>
       axiosInstance.get<PaginatedResponse<any>>(`/seo/projects/${projectId}/competitors/keywords?skip=${skip}&limit=${limit}`).then(unwrap),
     getSerpFeatures: (keywordId: string) =>

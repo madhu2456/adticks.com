@@ -5,7 +5,7 @@ AdTicks — Keyword and Ranking models.
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -26,10 +26,17 @@ class Keyword(Base):
         nullable=False,
         index=True,
     )
+    cluster_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("clusters.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     keyword: Mapped[str] = mapped_column(String(512), nullable=False)
     intent: Mapped[str | None] = mapped_column(String(64), nullable=True)
     difficulty: Mapped[float | None] = mapped_column(Float, nullable=True)
     volume: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    search_volume_history: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(tz=timezone.utc),
@@ -38,6 +45,7 @@ class Keyword(Base):
 
     # Relationships
     project = relationship("Project", back_populates="keywords")
+    cluster = relationship("Cluster", back_populates="keyword_items")
     rankings = relationship(
         "Ranking", back_populates="keyword", cascade="all, delete-orphan"
     )

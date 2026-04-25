@@ -65,6 +65,12 @@ class Project(Base):
     gsc_data = relationship(
         "GSCData", back_populates="project", cascade="all, delete-orphan"
     )
+    clusters = relationship(
+        "Cluster", back_populates="project", cascade="all, delete-orphan"
+    )
+    audit_history = relationship(
+        "SiteAuditHistory", back_populates="project", cascade="all, delete-orphan"
+    )
     ads_data = relationship(
         "AdsData", back_populates="project", cascade="all, delete-orphan"
     )

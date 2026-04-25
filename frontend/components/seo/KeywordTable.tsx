@@ -1,148 +1,132 @@
 "use client";
 import React, { useState } from "react";
-import { Search, ArrowUp, ArrowDown, Minus, ChevronUp, ChevronDown } from "lucide-react";
+import { Search, ArrowUp, ArrowDown, Minus, ChevronUp, ChevronDown, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Keyword, KeywordIntent } from "@/lib/types";
-import { formatNumber, getDifficultyColor, cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface KeywordTableProps {
-  keywords?: Keyword[];
-  loading?: boolean;
-  onSearch?: (query: string) => void;
+  keywords: any[];
+  onSearch: (v: string) => void;
 }
 
-type SortKey = "keyword" | "difficulty" | "volume" | "position";
-
-const intentVariantMap: Record<KeywordIntent, "informational" | "transactional" | "commercial" | "navigational"> = {
-  informational: "informational",
-  transactional: "transactional",
-  commercial: "commercial",
-  navigational: "navigational",
-};
-
-export function KeywordTable({ keywords = [], loading, onSearch }: KeywordTableProps) {
+export function KeywordTable({ keywords, onSearch }: KeywordTableProps) {
   const [search, setSearch] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("volume");
-  const [sortAsc, setSortAsc] = useState(false);
 
-  const handleSearch = (v: string) => {
-    setSearch(v);
-    onSearch?.(v);
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    onSearch(val);
   };
 
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) setSortAsc(!sortAsc);
-    else { setSortKey(key); setSortAsc(false); }
-  };
-
-  const filtered = keywords
-    .filter((k) => (k.keyword || "").toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => {
-      const va = sortKey === "keyword" ? a.keyword : (a[sortKey] ?? 999);
-      const vb = sortKey === "keyword" ? b.keyword : (b[sortKey] ?? 999);
-      if (typeof va === "string" && typeof vb === "string") {
-        return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
-      }
-      return sortAsc ? (va as number) - (vb as number) : (vb as number) - (va as number);
-    });
-
-  const SortIcon = ({ col }: { col: SortKey }) => {
-    if (sortKey !== col) return <ChevronUp className="h-3 w-3 opacity-30" />;
-    return sortAsc ? <ChevronUp className="h-3 w-3 text-primary" /> : <ChevronDown className="h-3 w-3 text-primary" />;
-  };
-
-  if (loading) {
-    return (
-      <div>
-        <Skeleton className="h-9 w-64 mb-4" />
-        <div className="space-y-2">
-          {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
-        </div>
-      </div>
-    );
-  }
+  const filtered = keywords.filter((k) =>
+    k.keyword.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
-    <div>
-      <div className="mb-4 relative">
+    <div className="space-y-4">
+      <div className="relative">
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
         <Input
           placeholder="Search keywords..."
+          className="pl-9"
           value={search}
-          onChange={(e) => handleSearch(e.target.value)}
-          className="pl-9 w-72"
+          onChange={(e) => handleSearchChange(e.target.value)}
         />
       </div>
-      <div className="rounded-xl border border-border overflow-hidden">
+
+      <div className="overflow-x-auto rounded-xl border border-border">
         <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-surface2/50">
-              {[
-                { key: "keyword" as SortKey, label: "Keyword" },
-                { key: null, label: "Intent" },
-                { key: "difficulty" as SortKey, label: "Difficulty" },
-                { key: "volume" as SortKey, label: "Volume" },
-                { key: "position" as SortKey, label: "Position" },
-                { key: null, label: "Change" },
-              ].map(({ key, label }) => (
-                <th
-                  key={label}
-                  className={cn("px-4 py-3 text-left text-xs font-semibold text-text-muted uppercase tracking-wide", key && "cursor-pointer hover:text-text-primary")}
-                  onClick={() => key && handleSort(key)}
-                >
-                  <div className="flex items-center gap-1">
-                    {label}
-                    {key && <SortIcon col={key} />}
-                  </div>
-                </th>
-              ))}
+          <thead className="bg-surface2 border-b border-border">
+            <tr className="text-left text-xs font-semibold text-text-muted uppercase tracking-wider">
+              <th className="px-4 py-3">Keyword</th>
+              <th className="px-4 py-3">Position</th>
+              <th className="px-4 py-3">Vol.</th>
+              <th className="px-4 py-3">Diff.</th>
+              <th className="px-4 py-3">Intent</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((kw, i) => (
-              <tr
-                key={kw.id}
-                className={cn("border-b border-border last:border-0 hover:bg-surface2/30 transition-colors", i % 2 === 0 ? "" : "bg-surface2/10")}
-              >
-                <td className="px-4 py-3 font-medium text-text-primary max-w-xs">
-                  <span className="truncate block">{kw.keyword}</span>
-                </td>
-                <td className="px-4 py-3">
-                  <Badge variant={intentVariantMap[kw.intent]} className="capitalize">
-                    {kw.intent}
-                  </Badge>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-16 h-1.5 bg-surface2 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{ width: `${kw.difficulty}%`, backgroundColor: getDifficultyColor(kw.difficulty) }}
-                      />
+            {filtered.map((kw) => (
+              <tr key={kw.id} className="border-b border-border hover:bg-surface2/50 transition-colors">
+                <td className="px-4 py-4">
+                   <div className="flex flex-col">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-text-primary">{kw.keyword}</span>
+                      {kw.is_cannibalized && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <AlertTriangle className="h-4 w-4 text-orange-500" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs text-xs">
+                                <strong>Keyword Cannibalization Detected:</strong> Multiple pages on your site are competing for this keyword, which can split authority and lower rankings.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                     </div>
-                    <span className="text-xs text-text-muted">{kw.difficulty}</span>
+                    <span className="text-[10px] text-text-muted truncate max-w-[200px]">
+                      {kw.url || "No URL detected"}
+                    </span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-text-muted">{formatNumber(kw.volume, true)}</td>
-                <td className="px-4 py-3 font-semibold text-text-primary">
-                  {kw.position ?? "—"}
+                <td className="px-4 py-4">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-text-primary">
+                      {kw.position ? `#${kw.position}` : "—"}
+                    </span>
+                    {kw.position_change && kw.position_change !== 0 ? (
+                      <span
+                        className={cn(
+                          "flex items-center text-[10px] font-bold",
+                          kw.position_change < 0 ? "text-success" : "text-danger"
+                        )}
+                      >
+                        {kw.position_change < 0 ? (
+                          <ChevronUp size={12} />
+                        ) : (
+                          <ChevronDown size={12} />
+                        )}
+                        {Math.abs(kw.position_change)}
+                      </span>
+                    ) : null}
+                  </div>
                 </td>
-                <td className="px-4 py-3">
-                  {kw.position_change === 0 ? (
-                    <span className="flex items-center gap-1 text-text-muted text-xs"><Minus className="h-3 w-3" />0</span>
-                  ) : kw.position_change > 0 ? (
-                    <span className="flex items-center gap-1 text-success text-xs"><ArrowUp className="h-3 w-3" />{kw.position_change}</span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-danger text-xs"><ArrowDown className="h-3 w-3" />{Math.abs(kw.position_change)}</span>
-                  )}
+                <td className="px-4 py-4 text-text-muted">
+                  {kw.volume ? kw.volume.toLocaleString() : "0"}
+                </td>
+                <td className="px-4 py-4">
+                  <span
+                    className={cn(
+                      "px-2 py-0.5 rounded text-[10px] font-bold",
+                      kw.difficulty > 70
+                        ? "bg-red-500/10 text-red-500"
+                        : kw.difficulty > 30
+                        ? "bg-orange-500/10 text-orange-500"
+                        : "bg-green-500/10 text-green-500"
+                    )}
+                  >
+                    {kw.difficulty || 0}
+                  </span>
+                </td>
+                <td className="px-4 py-4">
+                  <Badge variant="secondary" className="text-[10px] capitalize font-medium">
+                    {kw.intent || "—"}
+                  </Badge>
                 </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-text-muted text-sm">
+                <td colSpan={5} className="px-4 py-10 text-center text-text-muted">
                   No keywords found matching &quot;{search}&quot;
                 </td>
               </tr>

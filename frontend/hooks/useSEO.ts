@@ -59,3 +59,55 @@ export function useRankHistory(projectId: string, keywordId?: string, days = 30)
     enabled: !!projectId,
   });
 }
+
+export function useClusters(projectId: string) {
+  return useQuery({
+    queryKey: ["clusters", projectId],
+    queryFn: () => api.clusters.list(projectId),
+    enabled: !!projectId,
+  });
+}
+
+export function useCreateCluster() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId, data }: { projectId: string; data: any }) =>
+      api.clusters.create(projectId, data),
+    onSuccess: (_, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: ["clusters", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["keywords", projectId] });
+    },
+  });
+}
+
+export function useBacklinkStats(projectId: string) {
+  return useQuery({
+    queryKey: ["backlinkStats", projectId],
+    queryFn: () => api.seoSuite.getBacklinkStats(projectId),
+    enabled: !!projectId,
+  });
+}
+
+export function useBacklinkIntersect(projectId: string) {
+  return useQuery({
+    queryKey: ["backlinkIntersect", projectId],
+    queryFn: () => api.seoSuite.getBacklinkIntersect(projectId),
+    enabled: !!projectId,
+  });
+}
+
+export function useAuditHistory(projectId: string) {
+  return useQuery({
+    queryKey: ["auditHistory", projectId],
+    queryFn: () => api.seoSuite.getAuditHistory(projectId),
+    enabled: !!projectId,
+  });
+}
+
+export function useSOV(projectId: string) {
+  return useQuery({
+    queryKey: ["sov", projectId],
+    queryFn: () => api.seo.getSOV(projectId),
+    enabled: !!projectId,
+  });
+}

@@ -31,4 +31,5 @@ class RankingResponse(BaseModel):
     difficulty: float | None = None
     volume: int | None = None
     position_change: int | None = None
+    is_cannibalized: bool = False
     model_config = {"from_attributes": True}

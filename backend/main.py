@@ -20,7 +20,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from app.api import auth, projects, seo, ai, gsc, ads, insights, scores, aeo, seo_suite, geo, progress, cache
+from app.api import auth, projects, seo, ai, gsc, ads, insights, scores, aeo, seo_suite, geo, progress, cache, clusters
 from app.core.config import settings
 from app.core.database import Base, engine
 from app.core.exceptions import AdTicksException
@@ -287,6 +287,7 @@ app.include_router(ads.router, prefix=API_PREFIX)
 app.include_router(insights.router, prefix=API_PREFIX)
 app.include_router(scores.router, prefix=API_PREFIX)
 app.include_router(geo.router, prefix=API_PREFIX)
+app.include_router(clusters.router, prefix=API_PREFIX)
 app.include_router(progress.router, prefix=API_PREFIX)
 app.include_router(cache.router, prefix=API_PREFIX)
 

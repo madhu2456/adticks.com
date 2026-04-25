@@ -3,8 +3,9 @@ import React, { useState } from "react";
 import { LineChart } from "@/components/charts/LineChart";
 import { Select, SelectItem } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useKeywords, useRankHistory } from "@/hooks/useSEO";
+import { useKeywords, useRankHistory, useSOV } from "@/hooks/useSEO";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TrendingUp } from "lucide-react";
 
 interface RankTrackerProps {
   projectId: string;
@@ -18,6 +19,7 @@ export function RankTracker({ projectId }: RankTrackerProps) {
   const activeKeywordId = selectedId || keywords[0]?.id || "";
 
   const { data: historyResponse, isLoading } = useRankHistory(projectId, activeKeywordId);
+  const { data: sovData } = useSOV(projectId);
   
   const rawHistoryData = historyResponse?.data || [];
   
@@ -29,7 +31,7 @@ export function RankTracker({ projectId }: RankTrackerProps) {
     }))
     .reverse();
 
-  if (!keywords.length) {
+  if (!keywords.length && !isLoading) {
     return (
       <Card>
         <CardHeader>
@@ -43,9 +45,22 @@ export function RankTracker({ projectId }: RankTrackerProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle>Rank Tracker</CardTitle>
-          <p className="text-xs text-text-muted mt-0.5">Position over last 30 days</p>
+        <div className="flex items-center gap-6">
+          <div>
+            <CardTitle>Rank Tracker</CardTitle>
+            <p className="text-xs text-text-muted mt-0.5">Position over last 30 days</p>
+          </div>
+          {sovData && (
+            <div className="flex items-center gap-2 border-l border-border pl-6">
+               <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                 <TrendingUp size={16} />
+               </div>
+               <div>
+                 <p className="text-[10px] text-text-muted uppercase font-bold tracking-wider">Share of Voice</p>
+                 <p className="text-lg font-bold text-primary">{sovData.share_of_voice}%</p>
+               </div>
+            </div>
+          )}
         </div>
         <Select value={activeKeywordId} onValueChange={setSelectedId} className="w-64">
           {keywords.map((k) => (
