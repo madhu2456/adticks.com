@@ -9,8 +9,10 @@ import {
   AlertCircle,
   ChevronRight,
   Clock,
+  Trash2,
 } from 'lucide-react'
 import { useBackgroundScans } from '@/hooks/useBackgroundScans'
+import { useAlertModal } from '@/hooks/useAlertModal'
 
 const featureLabels: Record<string, string> = {
   seo: 'SEO Scan',
@@ -19,10 +21,15 @@ const featureLabels: Record<string, string> = {
   gsc: 'GSC Sync',
   ads: 'Ads Sync',
   full: 'Full Scan',
+  keywords_gsc: 'GSC Keyword Sync',
+  on_page: 'On-Page Audit',
+  technical: 'Technical Audit',
+  gaps: 'Content Gap Discovery',
 }
 
 export function BackgroundTasksDrawer() {
-  const { scans, removeScan, clearOldScans } = useBackgroundScans()
+  const { scans, removeScan, clearOldScans, clearScans } = useBackgroundScans()
+  const { showAlert, AlertModal } = useAlertModal()
   const [isOpen, setIsOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
 
@@ -49,6 +56,24 @@ export function BackgroundTasksDrawer() {
     if (minutes < 60) return `${minutes}m ago`
     if (hours < 24) return `${hours}h ago`
     return new Date(timestamp).toLocaleDateString()
+  }
+
+  const handleClearAll = () => {
+    if (scans.length === 0) return
+
+    const runningCount = scans.filter((s) => s.status === 'scanning').length
+    
+    showAlert({
+      title: 'Clear All Tasks?',
+      message: runningCount > 0 
+        ? `You have ${runningCount} tasks currently running. Clearing all will remove them from the tracking list. Continue?`
+        : 'This will remove all completed and failed tasks from the list.',
+      type: 'warning',
+      confirmText: 'Clear All',
+      onConfirm: () => {
+        clearScans()
+      },
+    })
   }
 
   return (
@@ -97,7 +122,18 @@ export function BackgroundTasksDrawer() {
             >
               {/* Header */}
               <div className="sticky top-0 px-6 py-4 border-b border-[#334155] bg-[#1e293b]/95 backdrop-blur-sm flex items-center justify-between">
-                <h2 className="text-lg font-bold text-[#f1f5f9]">Background Tasks</h2>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-bold text-[#f1f5f9]">Background Tasks</h2>
+                  {scans.length > 0 && (
+                    <button
+                      onClick={handleClearAll}
+                      className="text-xs text-[#94a3b8] hover:text-danger flex items-center gap-1 transition-colors px-2 py-1 rounded-md hover:bg-danger/10 border border-transparent hover:border-danger/20"
+                    >
+                      <Trash2 size={12} />
+                      Clear All
+                    </button>
+                  )}
+                </div>
                 <button
                   onClick={() => setIsOpen(false)}
                   className="text-[#94a3b8] hover:text-[#f1f5f9] transition-colors"
@@ -227,6 +263,7 @@ export function BackgroundTasksDrawer() {
           </>
         )}
       </AnimatePresence>
+      {AlertModal}
     </>
   )
 }

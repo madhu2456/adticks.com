@@ -71,6 +71,19 @@ async def create_project(
             db.add(comp)
         await db.flush()
     
+    # Trigger initial keyword research if seeds are provided
+    if payload.seed_keywords:
+        try:
+            from app.tasks.seo_tasks import generate_keywords_task
+            generate_keywords_task.delay(
+                project_id=str(project.id),
+                domain=project.domain,
+                industry=project.industry or "",
+                seed_keywords=payload.seed_keywords,
+            )
+        except Exception:
+            pass
+
     # Reload with competitors for the response
     return await _get_project_or_404(project.id, current_user, db)
 

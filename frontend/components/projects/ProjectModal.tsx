@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Loader2, Globe, Building2, Briefcase } from "lucide-react";
+import { X, Loader2, Globe, Building2, Briefcase, Key } from "lucide-react";
 import { useCreateProject } from "@/hooks/useProject";
 
 interface ProjectModalProps {
@@ -16,7 +16,12 @@ const INDUSTRIES = [
 ];
 
 export function ProjectModal({ isOpen, onClose, onSuccess }: ProjectModalProps) {
-  const [form, setForm] = useState({ brand_name: "", domain: "", industry: INDUSTRIES[0] });
+  const [form, setForm] = useState({ 
+    brand_name: "", 
+    domain: "", 
+    industry: INDUSTRIES[0],
+    seed_keywords: ""
+  });
   const [error, setError] = useState<string | null>(null);
   const createProject = useCreateProject();
 
@@ -29,9 +34,18 @@ export function ProjectModal({ isOpen, onClose, onSuccess }: ProjectModalProps) 
       return;
     }
 
+    const payload = {
+      brand_name: form.brand_name,
+      domain: form.domain,
+      industry: form.industry,
+      seed_keywords: form.seed_keywords 
+        ? form.seed_keywords.split(',').map(k => k.trim()).filter(Boolean)
+        : []
+    };
+
     try {
-      const project = await createProject.mutateAsync(form);
-      setForm({ brand_name: "", domain: "", industry: INDUSTRIES[0] });
+      const project = await createProject.mutateAsync(payload as any);
+      setForm({ brand_name: "", domain: "", industry: INDUSTRIES[0], seed_keywords: "" });
       onSuccess?.(project.id);
       onClose();
     } catch (err: any) {
@@ -128,6 +142,23 @@ export function ProjectModal({ isOpen, onClose, onSuccess }: ProjectModalProps) 
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[#94a3b8] uppercase tracking-wider">Seed Keywords (Optional)</label>
+                <div className="relative">
+                  <div className="absolute left-3 top-3 text-[#475569]">
+                    <Key className="h-4 w-4" />
+                  </div>
+                  <textarea
+                    placeholder="e.g. coffee beans, organic tea (comma separated)"
+                    value={form.seed_keywords}
+                    onChange={(e) => setForm({ ...form, seed_keywords: e.target.value })}
+                    rows={2}
+                    className="w-full bg-[#0f172a] border border-[#334155] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[#f1f5f9] focus:outline-none focus:ring-2 focus:ring-[#6366f1]/40 transition-all resize-none"
+                  />
+                </div>
+                <p className="text-[10px] text-[#64748b]">Helps AI find the most relevant rankings and opportunities.</p>
               </div>
 
               <div className="pt-2">

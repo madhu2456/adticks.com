@@ -1,5 +1,6 @@
 """AdTicks Google Search Console router."""
 import logging
+import os
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
@@ -20,7 +21,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/gsc", tags=["gsc"])
 
-_SCOPES = ["https://www.googleapis.com/auth/webmasters.readonly"]
+_SCOPES = [
+    "https://www.googleapis.com/auth/webmasters.readonly",
+    "https://www.googleapis.com/auth/webmasters" # Required for adding/verifying sites
+]
 
 
 async def _assert_owner(project_id: UUID, user: User, db: AsyncSession) -> Project:
@@ -60,12 +64,20 @@ async def gsc_auth(current_user: User = Depends(get_current_user)):
         )
 
     from google_auth_oauthlib.flow import Flow
+    
+    # We include all possible URIs in the flow config to be safe
+    redirect_uris = [
+        settings.GOOGLE_REDIRECT_URI,
+        f"{settings.BASE_URL.rstrip('/')}/api/gsc/callback",
+        f"{settings.BASE_URL.rstrip('/')}/gsc-callback"
+    ]
+    
     flow = Flow.from_client_config(
         {
             "web": {
                 "client_id": settings.GOOGLE_CLIENT_ID,
                 "client_secret": settings.GOOGLE_CLIENT_SECRET,
-                "redirect_uris": [settings.GOOGLE_REDIRECT_URI],
+                "redirect_uris": list(set(redirect_uris)), # Unique URIs
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://oauth2.googleapis.com/token",
             }
@@ -74,6 +86,8 @@ async def gsc_auth(current_user: User = Depends(get_current_user)):
     )
     flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
     auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline")
+    
+    logger.info(f"Generated GSC auth URL with redirect_uri: {flow.redirect_uri}")
     return {"auth_url": auth_url}
 
 
@@ -126,19 +140,29 @@ async def complete_gsc_auth(
     from datetime import datetime, timezone, timedelta
     
     # We try both the current redirect URI and the legacy one to be robust
+    # Note: Google determines which one is "correct" based on what was passed to /auth
     redirect_uris = [
         settings.GOOGLE_REDIRECT_URI,
-        f"{settings.BASE_URL.rstrip('/')}/api/gsc/callback"
+        f"{settings.BASE_URL.rstrip('/')}/api/gsc/callback",
+        f"{settings.BASE_URL.rstrip('/')}/gsc-callback"
     ]
     
+    # Filter unique URIs to avoid redundant calls
+    unique_uris = []
+    for uri in redirect_uris:
+        if uri not in unique_uris:
+            unique_uris.append(uri)
+    
     last_error = None
-    for r_uri in redirect_uris:
+    for r_uri in unique_uris:
+        logger.info(f"Attempting GSC token exchange with redirect_uri: {r_uri}")
+        
         flow = Flow.from_client_config(
             {
                 "web": {
                     "client_id": settings.GOOGLE_CLIENT_ID,
                     "client_secret": settings.GOOGLE_CLIENT_SECRET,
-                    "redirect_uris": redirect_uris,
+                    "redirect_uris": unique_uris,
                     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                     "token_uri": "https://oauth2.googleapis.com/token",
                 }
@@ -169,9 +193,11 @@ async def complete_gsc_auth(
             return {"status": "authorized", "message": "Google Search Console connected successfully"}
             
         except Exception as e:
-            logger.warning(f"Failed to fetch Google token with {r_uri}: {e}")
+            logger.warning(f"Failed to fetch Google token with {r_uri}: {str(e)}")
             last_error = e
-            # Continue to next URI if any
+            # If error is invalid_grant, code is dead, no point in retrying other URIs
+            if "invalid_grant" in str(e).lower():
+                break
     
     # If all fail
     logger.error(f"GSC Auth failed for all redirect URIs. Last error: {last_error}")

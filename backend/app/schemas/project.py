@@ -8,6 +8,7 @@ class ProjectCreate(BaseModel):
     domain: str
     industry: str | None = None
     competitors: list[str] | None = None
+    seed_keywords: list[str] | None = None
 
 class ProjectUpdate(BaseModel):
     brand_name: str | None = None
