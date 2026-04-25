@@ -46,7 +46,7 @@ export function RankTracker({ projectId }: RankTrackerProps) {
         </div>
         <Select value={selectedId} onValueChange={setSelectedId} className="w-64">
           {keywords.map((k) => (
-            <SelectItem key={k.id} value={k.id}>{k.keyword}</SelectItem>
+            <SelectItem key={k.id} value={k.id}>{k.keyword || "Unknown"}</SelectItem>
           ))}
         </Select>
       </CardHeader>
