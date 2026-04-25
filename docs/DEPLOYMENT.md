@@ -442,7 +442,7 @@ docker compose -f docker-compose.prod.yml exec postgres \
 ### Health check
 
 ```bash
-curl http://localhost:8002/health
+curl https://adticks.com/health
 # Expected: {"status":"ok","environment":"production"}
 ```
 

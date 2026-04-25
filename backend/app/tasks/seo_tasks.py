@@ -9,7 +9,8 @@ from datetime import datetime, timezone
 from sqlalchemy import select, delete
 
 from app.core.celery_app import celery_app
-from app.core.database import AsyncSessionLocal
+from app.core.celery_utils import run_async
+from app.core.database import AsyncSessionLocal, engine
 from app.core.storage import StorageService
 from app.core.progress import ScanProgress, ScanStage
 from app.models.cluster import Cluster
@@ -55,19 +56,19 @@ def generate_keywords_task(
     domain: str,
     industry: str,
     seed_keywords: list | None = None,
+    parent_task_id: str | None = None,
 ) -> dict:
-    """Generate keywords + clusters for a project, persist to DB and Spaces.
-    
-    Task timeout: 30 minutes (soft 25 minutes)
-    """
+    """Generate keywords + clusters for a project, persist to DB and Spaces."""
+    async def _run():
+        try:
+            return await _generate_keywords_impl(
+                project_id, domain, industry, seed_keywords or [], 
+                parent_task_id or self.request.id
+            )
+        finally:
+            await engine.dispose()
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(
-            _generate_keywords_impl(project_id, domain, industry, seed_keywords or [], self.request.id)
-        )
-        loop.close()
-        return result
+        return run_async(_run())
     except Exception as exc:
         logger.exception("generate_keywords_task failed for project %s: %s", project_id, exc)
         raise self.retry(exc=exc)
@@ -82,7 +83,9 @@ async def _generate_keywords_impl(
 ) -> dict:
     # Initialize progress tracking
     progress = ScanProgress(project_id, task_id)
-    await progress.initialize()
+    # Don't initialize again if it's a parent task
+    if task_id == project_id: # or some other logic
+        await progress.initialize()
     
     logger.info(
         "Generating keywords for project=%s domain=%s industry=%s seeds=%s",
@@ -207,17 +210,15 @@ async def _generate_keywords_impl(
 # ---------------------------------------------------------------------------
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60, time_limit=2700, soft_time_limit=2400)
-def run_rank_tracking_task(self, project_id: str) -> dict:
-    """Check SERP rankings for all project keywords and persist results.
-    
-    Task timeout: 45 minutes (soft 40 minutes)
-    """
+def run_rank_tracking_task(self, project_id: str, parent_task_id: str | None = None) -> dict:
+    """Check SERP rankings for all project keywords and persist results."""
+    async def _run():
+        try:
+            return await _run_rank_tracking_impl(project_id, parent_task_id or self.request.id)
+        finally:
+            await engine.dispose()
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_run_rank_tracking_impl(project_id, self.request.id))
-        loop.close()
-        return result
+        return run_async(_run())
     except Exception as exc:
         logger.exception("run_rank_tracking_task failed for project %s: %s", project_id, exc)
         raise self.retry(exc=exc)
@@ -226,7 +227,7 @@ def run_rank_tracking_task(self, project_id: str) -> dict:
 async def _run_rank_tracking_impl(project_id: str, task_id: str) -> dict:
     # Initialize progress tracking
     progress = ScanProgress(project_id, task_id)
-    await progress.initialize()
+    # logger.debug(f"Rank tracking using task_id {task_id}")
     
     logger.info("Running rank tracking for project=%s", project_id)
     await progress.update(ScanStage.RANK_TRACKING, 5, "⏳ Loading project and keywords...")
@@ -324,42 +325,45 @@ async def _run_rank_tracking_impl(project_id: str, task_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60, time_limit=1800, soft_time_limit=1500)
-def run_seo_audit_task(self, project_id: str, url: str | None = None) -> dict:
+def run_seo_audit_task(self, project_id: str, url: str | None = None, parent_task_id: str | None = None) -> dict:
     """Run full SEO audit (on-page + technical)."""
+    async def _run():
+        try:
+            return await _run_seo_audit_impl(project_id, url, audit_type="full", task_id=parent_task_id or self.request.id)
+        finally:
+            await engine.dispose()
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_run_seo_audit_impl(project_id, url, audit_type="full", task_id=self.request.id))
-        loop.close()
-        return result
+        return run_async(_run())
     except Exception as exc:
         logger.exception("run_seo_audit_task failed for project %s: %s", project_id, exc)
         raise self.retry(exc=exc)
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
-def run_seo_onpage_task(self, project_id: str, url: str) -> dict:
+def run_seo_onpage_task(self, project_id: str, url: str, parent_task_id: str | None = None) -> dict:
     """Run on-page SEO audit only."""
+    async def _run():
+        try:
+            return await _run_seo_audit_impl(project_id, url, audit_type="on_page", task_id=parent_task_id or self.request.id)
+        finally:
+            await engine.dispose()
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_run_seo_audit_impl(project_id, url, audit_type="on_page", task_id=self.request.id))
-        loop.close()
-        return result
+        return run_async(_run())
     except Exception as exc:
         logger.exception("run_seo_onpage_task failed for project %s: %s", project_id, exc)
         raise self.retry(exc=exc)
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
-def run_seo_technical_task(self, project_id: str) -> dict:
+def run_seo_technical_task(self, project_id: str, parent_task_id: str | None = None) -> dict:
     """Run technical SEO audit only."""
+    async def _run():
+        try:
+            return await _run_seo_audit_impl(project_id, None, audit_type="technical", task_id=parent_task_id or self.request.id)
+        finally:
+            await engine.dispose()
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_run_seo_audit_impl(project_id, None, audit_type="technical", task_id=self.request.id))
-        loop.close()
-        return result
+        return run_async(_run())
     except Exception as exc:
         logger.exception("run_seo_technical_task failed for project %s: %s", project_id, exc)
         raise self.retry(exc=exc)
@@ -368,7 +372,7 @@ def run_seo_technical_task(self, project_id: str) -> dict:
 async def _run_seo_audit_impl(project_id: str, url: str | None, audit_type: str = "full", task_id: str = "") -> dict:
     # Initialize progress tracking
     progress = ScanProgress(project_id, task_id)
-    await progress.initialize()
+    # await progress.initialize() # Don't initialize if part of chain
     
     audit_stage = ScanStage.ON_PAGE_ANALYSIS if audit_type in ["on_page", "full"] else ScanStage.TECHNICAL_AUDIT
     await progress.update(audit_stage, 5, f"⏳ Initializing {audit_type} audit...")
@@ -464,14 +468,10 @@ async def _run_seo_audit_impl(project_id: str, url: str | None, audit_type: str 
 # ---------------------------------------------------------------------------
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
-def find_content_gaps_task(self, project_id: str) -> dict:
+def find_content_gaps_task(self, project_id: str, parent_task_id: str | None = None) -> dict:
     """Identify content gaps vs competitors and persist results to Spaces."""
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_find_content_gaps_impl(project_id, self.request.id))
-        loop.close()
-        return result
+        return run_async(_find_content_gaps_impl(project_id, parent_task_id or self.request.id))
     except Exception as exc:
         logger.exception("find_content_gaps_task failed for project %s: %s", project_id, exc)
         raise self.retry(exc=exc)
@@ -480,7 +480,7 @@ def find_content_gaps_task(self, project_id: str) -> dict:
 async def _find_content_gaps_impl(project_id: str, task_id: str = "") -> dict:
     # Initialize progress tracking
     progress = ScanProgress(project_id, task_id)
-    await progress.initialize()
+    # await progress.initialize()
     
     logger.info("Finding content gaps for project=%s", project_id)
     await progress.update(ScanStage.GAP_ANALYSIS, 10, "Loading keywords and competitors...")
@@ -549,14 +549,15 @@ async def _find_content_gaps_impl(project_id: str, task_id: str = "") -> dict:
 # ---------------------------------------------------------------------------
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
-def import_gsc_keywords_task(self, project_id: str) -> dict:
+def import_gsc_keywords_task(self, project_id: str, parent_task_id: str | None = None) -> dict:
     """Import search queries from GSC data as keywords for tracking."""
+    async def _run():
+        try:
+            return await _import_gsc_keywords_impl(project_id, parent_task_id or self.request.id)
+        finally:
+            await engine.dispose()
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_import_gsc_keywords_impl(project_id, self.request.id))
-        loop.close()
-        return result
+        return run_async(_run())
     except Exception as exc:
         logger.exception("import_gsc_keywords_task failed for project %s: %s", project_id, exc)
         raise self.retry(exc=exc)
@@ -565,7 +566,7 @@ def import_gsc_keywords_task(self, project_id: str) -> dict:
 async def _import_gsc_keywords_impl(project_id: str, task_id: str = "") -> dict:
     # Initialize progress tracking
     progress = ScanProgress(project_id, task_id)
-    await progress.initialize()
+    # await progress.initialize()
     
     logger.info("Importing GSC queries as keywords for project=%s", project_id)
     await progress.update(ScanStage.KEYWORD_GENERATION, 10, "📂 Loading GSC data...")
@@ -635,14 +636,15 @@ async def _import_gsc_keywords_impl(project_id: str, task_id: str = "") -> dict:
 # ---------------------------------------------------------------------------
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
-def sync_gsc_data_task(self, project_id: str) -> dict:
+def sync_gsc_data_task(self, project_id: str, parent_task_id: str | None = None) -> dict:
     """Pull GSC data, upsert into DB, and archive raw data to Spaces."""
+    async def _run():
+        try:
+            return await _sync_gsc_data_impl(project_id, parent_task_id or self.request.id)
+        finally:
+            await engine.dispose()
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_sync_gsc_data_impl(project_id, self.request.id))
-        loop.close()
-        return result
+        return run_async(_run())
     except Exception as exc:
         logger.exception("sync_gsc_data_task failed for project %s: %s", project_id, exc)
         raise self.retry(exc=exc)
@@ -651,7 +653,7 @@ def sync_gsc_data_task(self, project_id: str) -> dict:
 async def _sync_gsc_data_impl(project_id: str, task_id: str = "") -> dict:
     # Initialize progress tracking
     progress = ScanProgress(project_id, task_id)
-    await progress.initialize()
+    # await progress.initialize()
     
     logger.info("Syncing GSC data for project=%s", project_id)
     await progress.update("gsc_sync", 10, "Loading project data...")
@@ -719,26 +721,27 @@ async def _sync_gsc_data_impl(project_id: str, task_id: str = "") -> dict:
 # ---------------------------------------------------------------------------
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
-def sync_ads_data_task(self, project_id: str) -> dict:
+def sync_ads_data_task(self, project_id: str, parent_task_id: str | None = None) -> dict:
     """Pull Ads performance data, upsert into DB, and archive to Spaces."""
+    async def _run():
+        try:
+            return await _sync_ads_data_impl(project_id, parent_task_id or self.request.id)
+        finally:
+            await engine.dispose()
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_sync_ads_data_impl(project_id))
-        loop.close()
-        return result
+        return run_async(_run())
     except Exception as exc:
         logger.exception("sync_ads_data_task failed for project %s: %s", project_id, exc)
         raise self.retry(exc=exc)
 
 
-async def _sync_ads_data_impl(project_id: str) -> dict:
+async def _sync_ads_data_impl(project_id: str, task_id: str = "") -> dict:
+    # Initialize progress tracking
+    progress = ScanProgress(project_id, task_id)
+    # await progress.initialize()
+    
     logger.info("Syncing Ads data for project=%s", project_id)
-
-    async with AsyncSessionLocal() as session:
-        project = await _load_project(session, project_id)
-        if not project:
-            return {"project_id": project_id, "rows_synced": 0, "status": "project_not_found"}
+    await progress.update("ads_sync", 10, "Loading project data...")
 
     sync_result = await ads_sync(
         project_id=project_id,

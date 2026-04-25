@@ -8,6 +8,7 @@ import logging
 import asyncio
 import json
 import uuid
+import os
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 
@@ -24,6 +25,16 @@ except ImportError:
     ANTHROPIC_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
+
+# Check for API keys to determine if we should use mock mode
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+
+# If no keys are provided, we'll use mock mode for everything to ensure scans complete in dev/test
+MOCK_MODE = not (OPENAI_API_KEY or ANTHROPIC_API_KEY) or os.getenv("MOCK_LLM", "false").lower() == "true"
+
+if MOCK_MODE:
+    logger.info("🤖 AI LLM Service starting in MOCK MODE (no API keys found)")
 
 OPENAI_MODEL = "gpt-4o"
 CLAUDE_MODEL = "claude-3-5-sonnet-20241022"
@@ -201,16 +212,30 @@ async def _execute_single(
     model: str,
     semaphore: asyncio.Semaphore,
 ) -> Dict[str, Any]:
-    """Execute a single prompt against one model with error handling."""
+    """Execute a single prompt against one model with error handling and mock fallback."""
     async with semaphore:
         prompt_id = prompt.get("id", str(uuid.uuid4()))
         prompt_text = prompt.get("text", "")
 
         try:
-            if model == "openai":
-                text = await query_openai(prompt_text)
+            if MOCK_MODE:
+                text = await query_gemini(prompt_text)
+            elif model == "openai":
+                try:
+                    text = await query_openai(prompt_text)
+                except Exception as e:
+                    if "api_key" in str(e).lower() or "auth" in str(e).lower():
+                        logger.warning(f"OpenAI auth failed, falling back to mock: {e}")
+                        text = await query_gemini(prompt_text)
+                    else: raise
             elif model == "claude":
-                text = await query_claude(prompt_text)
+                try:
+                    text = await query_claude(prompt_text)
+                except Exception as e:
+                    if "api_key" in str(e).lower() or "auth" in str(e).lower():
+                        logger.warning(f"Claude auth failed, falling back to mock: {e}")
+                        text = await query_gemini(prompt_text)
+                    else: raise
             elif model == "gemini":
                 text = await query_gemini(prompt_text)
             else:

@@ -224,7 +224,9 @@ def test_main_router_registration():
     print("\n✓ Testing Router Registration in main.py...")
     
     try:
-        with open('main.py', 'r') as f:
+        backend_dir = Path(__file__).parent
+        main_py = backend_dir / 'main.py'
+        with open(main_py, 'r') as f:
             content = f.read()
         
         # Check imports

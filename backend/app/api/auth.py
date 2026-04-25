@@ -47,25 +47,12 @@ async def get_token(token: str = Depends(_oauth2_scheme)) -> str:
 
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
 async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)):
     """
     Register a new user account.
     
-    Creates a new user account with email and password. The email must be unique.
-    
-    **Request body:**
-    - **email**: User's email address (must be unique)
-    - **password**: User's password (will be hashed before storage)
-    - **full_name**: User's full name
-    
-    **Returns:**
-    - User object with id, email, full_name, and timestamps
-    
-    **Responses:**
-    - 201 Created: User successfully registered
-    - 409 Conflict: Email already registered
-    - 422 Unprocessable Entity: Invalid input
+    Creates a new user account and returns JWT tokens for immediate authentication.
     """
     async with transaction_scope(db) as tx:
         # Check if email already exists
@@ -85,8 +72,16 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)):
         tx.add(user)
         await tx.flush()
         
+        access_token = create_access_token(subject=user.id)
+        refresh_token = create_refresh_token(subject=user.id)
+        
         logger.info("user_registered", extra={"user_id": str(user.id), "email": user.email})
-        return user
+        
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+        }
 
 
 @router.post("/login", response_model=Token)

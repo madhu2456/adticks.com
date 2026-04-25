@@ -202,6 +202,7 @@ async def adticks_exception_handler(request: Request, exc: AdTicksException):
         content={
             "error": exc.code,
             "message": exc.message,
+            "detail": exc.message,  # Added for frontend compatibility
             "details": exc.details,
         },
     )

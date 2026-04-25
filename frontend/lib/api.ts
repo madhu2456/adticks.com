@@ -13,24 +13,28 @@ import {
 // Use relative URL when frontend and backend are on same domain (production)
 // Use explicit URL for local development
 const getBaseUrl = () => {
-  if (typeof window === "undefined") return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8002/api";
-  
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (apiUrl) return apiUrl;
-  
-  // In browser: if we're on HTTPS and the API URL hasn't been set, use relative path
-  // Otherwise use HTTP localhost for development
-  if (typeof window !== "undefined" && window.location.protocol === "https:") {
-    return "/api";
+  let apiUrl = "";
+  if (typeof window === "undefined") {
+    apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8002";
+  } else {
+    apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+    
+    // In browser: if we're on HTTPS and the API URL hasn't been set, use relative path
+    if (!apiUrl && window.location.protocol === "https:") {
+      return "";
+    }
+    
+    if (!apiUrl) apiUrl = "http://localhost:8002";
   }
   
-  return "http://localhost:8002/api";
+  // Normalize: remove trailing slash and /api if present, we'll add /api cleanly
+  return apiUrl.replace(/\/+$/, "").replace(/\/api$/, "");
 };
 
 const BASE_URL = getBaseUrl();
 
 const axiosInstance: AxiosInstance = axios.create({
-  baseURL: BASE_URL,
+  baseURL: `${BASE_URL}/api`,
   headers: { "Content-Type": "application/json" },
   timeout: 30000,
 });
@@ -39,6 +43,7 @@ const axiosInstance: AxiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
   (config) => {
     const token = getAccessToken();
+    console.log(`[API] Request to ${config.url}, token present: ${!!token}`);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -51,8 +56,11 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
+    console.log(`[API] Response from ${error.config?.url}: ${error.response?.status}`);
     const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const isLoginRequest = originalRequest.url?.includes("/auth/login");
+    
+    if (error.response?.status === 401 && !originalRequest._retry && !isLoginRequest) {
       originalRequest._retry = true;
       const refreshToken = getRefreshToken();
       if (refreshToken) {

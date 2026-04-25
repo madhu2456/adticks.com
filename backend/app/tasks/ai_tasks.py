@@ -8,8 +8,10 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 
 from app.core.celery_app import celery_app
-from app.core.database import AsyncSessionLocal
+from app.core.celery_utils import run_async
+from app.core.database import AsyncSessionLocal, engine
 from app.core.storage import StorageService
+from app.core.progress import ScanProgress, ScanStage
 from app.models.project import Project
 from app.models.competitor import Competitor
 from app.models.prompt import Prompt, Response, Mention
@@ -51,16 +53,14 @@ def generate_prompts_task(
     domain: str,
     industry: str,
     competitors: list | None = None,
+    parent_task_id: str | None = None,
 ) -> dict:
     """Generate AI prompts for a project and persist to DB + Spaces."""
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(
-            _generate_prompts_impl(project_id, brand_name, domain, industry, competitors or [])
-        )
-        loop.close()
-        return result
+        return run_async(_generate_prompts_impl(
+            project_id, brand_name, domain, industry, 
+            competitors or [], parent_task_id or self.request.id
+        ))
     except Exception as exc:
         logger.exception("generate_prompts_task failed for project %s: %s", project_id, exc)
         raise self.retry(exc=exc)
@@ -72,7 +72,12 @@ async def _generate_prompts_impl(
     domain: str,
     industry: str,
     competitors: list,
+    task_id: str,
 ) -> dict:
+    progress = ScanProgress(project_id, task_id)
+    # await progress.initialize()
+    await progress.update(ScanStage.AI_VISIBILITY, 10, "⏳ Initializing AI prompt generation...")
+    
     logger.info(
         "Generating prompts for project=%s brand=%s industry=%s",
         project_id, brand_name, industry,
@@ -130,22 +135,19 @@ async def _generate_prompts_impl(
 # ---------------------------------------------------------------------------
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=120)
-def run_llm_scan_task(self, project_id: str, prompt_limit: int = 100) -> dict:
+def run_llm_scan_task(self, project_id: str, prompt_limit: int = 100, parent_task_id: str | None = None) -> dict:
     """Run AI visibility scan: execute prompts against LLMs, store results, score."""
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(
-            _run_llm_scan_impl(project_id, prompt_limit)
-        )
-        loop.close()
-        return result
+        return run_async(_run_llm_scan_impl(project_id, prompt_limit, parent_task_id or self.request.id))
     except Exception as exc:
         logger.exception("run_llm_scan_task failed for project %s: %s", project_id, exc)
         raise self.retry(exc=exc)
 
 
-async def _run_llm_scan_impl(project_id: str, prompt_limit: int) -> dict:
+async def _run_llm_scan_impl(project_id: str, prompt_limit: int, task_id: str) -> dict:
+    progress = ScanProgress(project_id, task_id)
+    await progress.update(ScanStage.AI_VISIBILITY, 30, f"🤖 Scanning LLMs (limit: {prompt_limit})...")
+    
     logger.info("Running LLM scan for project=%s limit=%d", project_id, prompt_limit)
 
     async with AsyncSessionLocal() as session:
@@ -271,14 +273,13 @@ def extract_mentions_task(
     competitor_brands: list,
 ) -> dict:
     """Extract brand mentions from a single LLM response and persist Mention rows."""
+    async def _run():
+        try:
+            return await _extract_mentions_impl(response_id, response_text, target_brand, competitor_brands)
+        finally:
+            await engine.dispose()
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(
-            _extract_mentions_impl(response_id, response_text, target_brand, competitor_brands)
-        )
-        loop.close()
-        return result
+        return run_async(_run())
     except Exception as exc:
         logger.exception("extract_mentions_task failed for response %s: %s", response_id, exc)
         raise self.retry(exc=exc)
@@ -326,20 +327,19 @@ async def _extract_mentions_impl(
 # ---------------------------------------------------------------------------
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
-def compute_scores_task(self, project_id: str) -> dict:
+def compute_scores_task(self, project_id: str, parent_task_id: str | None = None) -> dict:
     """Recompute visibility scores from DB mentions and insert a new Score row."""
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_compute_scores_impl(project_id))
-        loop.close()
-        return result
+        return run_async(_compute_scores_impl(project_id, parent_task_id or self.request.id))
     except Exception as exc:
         logger.exception("compute_scores_task failed for project %s: %s", project_id, exc)
         raise self.retry(exc=exc)
 
 
-async def _compute_scores_impl(project_id: str) -> dict:
+async def _compute_scores_impl(project_id: str, task_id: str = "") -> dict:
+    progress = ScanProgress(project_id, task_id)
+    await progress.update(ScanStage.SCORE_COMPUTATION, 50, "📊 Computing visibility scores...")
+    
     logger.info("Computing scores for project=%s", project_id)
 
     async with AsyncSessionLocal() as session:
@@ -425,12 +425,13 @@ async def _compute_scores_impl(project_id: str) -> dict:
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
 def cluster_prompts_task(self, project_id: str) -> dict:
     """Group project prompts by category and store clustering summary to Spaces."""
+    async def _run():
+        try:
+            return await _cluster_prompts_impl(project_id)
+        finally:
+            await engine.dispose()
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_cluster_prompts_impl(project_id))
-        loop.close()
-        return result
+        return run_async(_run())
     except Exception as exc:
         logger.exception("cluster_prompts_task failed for project %s: %s", project_id, exc)
         raise self.retry(exc=exc)

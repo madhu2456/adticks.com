@@ -147,7 +147,9 @@ async def run_scan(
         from app.workers.tasks import run_full_scan_task
         task = run_full_scan_task.delay(project_id=str(project.id))
         return {"status": "queued", "task_id": task.id}
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error triggering full scan: {e}", exc_info=True)
         return {"status": "queued", "task_id": None}
 
 

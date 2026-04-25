@@ -68,7 +68,7 @@ Once `make dev` is running, open:
 | Service | URL |
 |---------|-----|
 | Frontend | http://localhost:3002 |
-| Backend API docs | http://localhost:8002/docs |
+| Backend API docs | https://adticks.com/docs |
 | Celery Flower | http://localhost:5555 |
 | pgAdmin (optional) | http://localhost:5050 |
 

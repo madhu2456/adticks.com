@@ -226,9 +226,10 @@ export function DashboardContent() {
               message: "Your scan has completed successfully! The data is now being displayed.",
               type: "success",
               confirmText: "OK",
+              onConfirm: () => {
+                window.location.reload();
+              }
             });
-            // Refresh page to show new data
-            window.location.reload();
           } else if (statusData.status === "FAILURE") {
             isComplete = true;
             showAlert({

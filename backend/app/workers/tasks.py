@@ -12,7 +12,8 @@ from celery import group
 from sqlalchemy import select, delete, func
 
 from app.core.celery_app import celery_app
-from app.core.database import AsyncSessionLocal
+from app.core.celery_utils import run_async
+from app.core.database import AsyncSessionLocal, engine
 from app.core.storage import StorageService
 from app.core.progress import ScanProgress, ScanStage
 from app.core.differential_updates import DifferentialUpdateDetector
@@ -77,79 +78,59 @@ from celery import chain, chord
 def run_full_scan_task(self, project_id: str, force_refresh: bool = False) -> dict:
     """
     Master task: orchestrate the full AdTicks pipeline for a project using non-blocking chains.
-    
-    Task timeout: 60 minutes (soft 55 minutes)
-    
-    Workflow:
-      1. Check if valid cached results exist (unless force_refresh=True)
-      2. If cache miss or invalid: Keyword Generation (Initial)
-      3. Group of Parallel tasks (SEO audit, rank tracking, gaps, prompts, GSC, Ads)
-      4. LLM Scan (depends on prompts)
-      5. Score Computation
-      6. Insight Generation
-      7. Cache results in Redis (24 hour TTL)
-    
-    Args:
-        project_id: Project UUID string
-        force_refresh: If True, bypass cache and re-run full scan
     """
-    # Initialize progress tracking
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
-    progress = ScanProgress(project_id, self.request.id)
-    loop.run_until_complete(progress.initialize())
-    loop.close()
-    
-    try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        project_info = loop.run_until_complete(_get_project_info(project_id))
-        loop.close()
-    except Exception as exc:
-        logger.exception("run_full_scan_task: could not load project %s: %s", project_id, exc)
-        raise self.retry(exc=exc)
-
-    if not project_info:
-        logger.warning("run_full_scan_task: project %s not found", project_id)
-        return {"project_id": project_id, "status": "project_not_found"}
-
-    # Check if we can use cached results
-    if not force_refresh:
+    async def _run_init():
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            # Initialize progress tracking
+            progress = ScanProgress(project_id, self.request.id)
+            await progress.initialize()
             
-            # Check if cache exists and is still valid
-            cache_exists = loop.run_until_complete(has_scan_cache(project_id))
-            cache_invalid = loop.run_until_complete(should_invalidate_cache(project_id))
+            project_info = await _get_project_info(project_id)
             
-            loop.close()
-            
-            if cache_exists and not cache_invalid:
-                logger.info(f"Using cached scan results for project {project_id}")
+            if not project_info:
+                logger.warning("run_full_scan_task: project %s not found", project_id)
+                return None, None
+
+            # Check if we can use cached results
+            if not force_refresh:
                 try:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
+                    # Check if cache exists and is still valid
+                    cache_exists = await has_scan_cache(project_id)
+                    cache_invalid = await should_invalidate_cache(project_id)
                     
-                    loop.run_until_complete(progress.update(ScanStage.COMPLETED, 100, "Using cached results"))
-                    cached_results = loop.run_until_complete(get_cached_scan_results(project_id))
-                    loop.close()
-                    
-                    if cached_results:
-                        return {
-                            "project_id": project_id,
-                            "status": "cached",
-                            "from_cache": True,
-                            "message": "Results from cache (24 hour TTL)",
-                        }
+                    if cache_exists and not cache_invalid:
+                        logger.info(f"Using cached scan results for project {project_id}")
+                        try:
+                            await progress.update(ScanStage.COMPLETED, 100, "Using cached results")
+                            cached_results = await get_cached_scan_results(project_id)
+                            
+                            if cached_results:
+                                return {
+                                    "project_id": project_id,
+                                    "status": "cached",
+                                    "from_cache": True,
+                                    "message": "Results from cache (24 hour TTL)",
+                                }, None
+                        except Exception as e:
+                            logger.warning(f"Error retrieving cached results: {e}")
+                    elif cache_invalid:
+                        logger.info(f"Scan cache invalidated for project {project_id} (project state changed)")
                 except Exception as e:
-                    logger.warning(f"Error retrieving cached results: {e}")
-            elif cache_invalid:
-                logger.info(f"Scan cache invalidated for project {project_id} (project state changed)")
-        except Exception as e:
-            logger.warning(f"Error checking scan cache: {e}")
-            # Continue with fresh scan
+                    logger.warning(f"Error checking scan cache: {e}")
+            
+            return None, project_info
+        finally:
+            await engine.dispose()
+
+    try:
+        cached_res, project_info = run_async(_run_init())
+        if cached_res:
+            return cached_res
+        if not project_info:
+            return {"project_id": project_id, "status": "project_not_found"}
+    except Exception as exc:
+        logger.exception("run_full_scan_task initialization failed for project %s: %s", project_id, exc)
+        raise self.retry(exc=exc)
 
     domain = project_info["domain"]
     brand_name = project_info["brand_name"]
@@ -165,43 +146,41 @@ def run_full_scan_task(self, project_id: str, force_refresh: bool = False) -> di
 
     # We build a chain: 
     # generate_keywords -> group(parallel_tasks) -> run_llm_scan_task -> compute_scores_task -> generate_insights_task -> cache_results
-    
+    master_task_id = self.request.id
+
+    from celery import group
     workflow = chain(
         generate_keywords_task.s(
             project_id=project_id,
             domain=domain,
             industry=industry,
             seed_keywords=seed_keywords,
+            parent_task_id=master_task_id,
         ),
         group(
-            run_rank_tracking_task.s(project_id=project_id),
-            run_seo_audit_task.s(project_id=project_id),
-            find_content_gaps_task.s(project_id=project_id),
+            run_rank_tracking_task.s(project_id=project_id, parent_task_id=master_task_id),
+            run_seo_audit_task.s(project_id=project_id, parent_task_id=master_task_id),
+            find_content_gaps_task.s(project_id=project_id, parent_task_id=master_task_id),
             generate_prompts_task.s(
                 project_id=project_id,
                 brand_name=brand_name,
                 domain=domain,
                 industry=industry,
                 competitors=competitor_domains,
+                parent_task_id=master_task_id,
             ),
-            sync_gsc_data_task.s(project_id=project_id),
-            sync_ads_data_task.s(project_id=project_id),
+            sync_gsc_data_task.s(project_id=project_id, parent_task_id=master_task_id),
+            sync_ads_data_task.s(project_id=project_id, parent_task_id=master_task_id),
         ),
-        run_llm_scan_task.s(project_id=project_id, prompt_limit=100),
-        compute_scores_task.s(project_id=project_id),
-        generate_insights_task.s(project_id=project_id),
-        cache_scan_results_task.s(project_id=project_id),
+        run_llm_scan_task.s(project_id=project_id, prompt_limit=100, parent_task_id=master_task_id),
+        compute_scores_task.s(project_id=project_id, parent_task_id=master_task_id),
+        generate_insights_task.s(project_id=project_id, parent_task_id=master_task_id),
+        cache_scan_results_task.s(project_id=project_id, parent_task_id=master_task_id),
     )
 
     # Launch the chain
-    workflow.apply_async()
-
-    return {
-        "project_id": project_id,
-        "status": "started",
-        "from_cache": False,
-        "started_at": datetime.now(timezone.utc).isoformat(),
-    }
+    # By returning self.replace, we make the master task's ID represent the entire chain
+    return self.replace(workflow)
 
 
 
@@ -224,25 +203,26 @@ async def _get_project_info(project_id: str) -> dict | None:
 # ---------------------------------------------------------------------------
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
-def generate_insights_task(self, project_id: str) -> dict:
+def generate_insights_task(self, project_id: str, parent_task_id: str | None = None) -> dict:
     """
     Generate cross-channel insights and recommendations from all collected data.
-
-    Loads rankings, mentions, scores, GSC data, and Ads data from DB,
-    runs InsightEngine, generates recommendations, persists to DB and Spaces.
     """
+    async def _run():
+        try:
+            return await _generate_insights_impl(project_id, parent_task_id or self.request.id)
+        finally:
+            await engine.dispose()
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_generate_insights_impl(project_id))
-        loop.close()
-        return result
+        return run_async(_run())
     except Exception as exc:
         logger.exception("generate_insights_task failed for project %s: %s", project_id, exc)
         raise self.retry(exc=exc)
 
 
-async def _generate_insights_impl(project_id: str) -> dict:
+async def _generate_insights_impl(project_id: str, task_id: str = "") -> dict:
+    progress = ScanProgress(project_id, task_id)
+    await progress.update(ScanStage.INSIGHT_GENERATION, 5, "⏳ Initializing insight engine...")
+    
     logger.info("Generating insights for project=%s", project_id)
 
     async with AsyncSessionLocal() as session:
@@ -412,30 +392,29 @@ async def _generate_insights_impl(project_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 @celery_app.task(bind=True, max_retries=1, default_retry_delay=30)
-def cache_scan_results_task(self, project_id: str, scan_results: dict | None = None) -> dict:
+def cache_scan_results_task(self, project_id: str, scan_results: dict | None = None, parent_task_id: str | None = None) -> dict:
     """
     Cache the final scan results to Redis (24 hour TTL).
-    
-    This task runs at the end of the workflow chain to persist
-    results for quick retrieval on subsequent scans (if nothing changed).
     """
+    async def _run():
+        try:
+            return await _cache_scan_results_impl(project_id, scan_results, parent_task_id or self.request.id)
+        finally:
+            await engine.dispose()
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_cache_scan_results_impl(project_id, scan_results))
-        loop.close()
-        return result
+        return run_async(_run())
     except Exception as exc:
         logger.exception("cache_scan_results_task failed for project %s: %s", project_id, exc)
         raise self.retry(exc=exc)
 
 
-async def _cache_scan_results_impl(project_id: str, scan_results: dict | None = None) -> dict:
+async def _cache_scan_results_impl(project_id: str, scan_results: dict | None = None, task_id: str = "") -> dict:
     """
     Cache scan results to Redis.
-    
-    Builds a minimal but useful result object containing latest data from DB.
     """
+    progress = ScanProgress(project_id, task_id)
+    await progress.update(ScanStage.COMPLETED, 95, "⚡ Finalizing and caching results...")
+    
     logger.info("Caching scan results for project %s", project_id)
     
     try:
@@ -475,6 +454,7 @@ async def _cache_scan_results_impl(project_id: str, scan_results: dict | None = 
         
         if success:
             logger.info("Successfully cached scan results for project %s (24h TTL)", project_id)
+            await progress.complete()
             return {
                 "project_id": project_id,
                 "status": "cached",
@@ -500,14 +480,14 @@ async def _cache_scan_results_impl(project_id: str, scan_results: dict | None = 
 def schedule_daily_scans_task(self) -> dict:
     """
     Celery Beat task: enqueue run_full_scan_task for every active project.
-    Runs daily at 2 AM UTC (configured in celery_app.py beat_schedule).
     """
+    async def _run():
+        try:
+            return await _schedule_daily_scans_impl()
+        finally:
+            await engine.dispose()
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_schedule_daily_scans_impl())
-        loop.close()
-        return result
+        return run_async(_run())
     except Exception as exc:
         logger.exception("schedule_daily_scans_task failed: %s", exc)
         raise self.retry(exc=exc)

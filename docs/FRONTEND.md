@@ -787,7 +787,7 @@ Test files live in `__tests__/` with `*.test.tsx` naming.
 
 ```bash
 # Required
-NEXT_PUBLIC_API_URL=http://localhost:8002/api   # Backend API URL
+NEXT_PUBLIC_API_URL=https://adticks.com/api   # Backend API URL
 NEXTAUTH_SECRET=your-secret-here               # NextAuth signing secret
 NEXTAUTH_URL=http://localhost:3002             # Canonical app URL
 
