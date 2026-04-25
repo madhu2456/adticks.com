@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { Zap, RefreshCw, Search, ShieldCheck, FileSearch, Globe } from "lucide-react";
 import { KeywordTable } from "@/components/seo/KeywordTable";
 import { RankTracker } from "@/components/seo/RankTracker";
@@ -88,7 +89,10 @@ export default function SEOPage() {
 
         <TabsContent value="keywords" className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-text-primary">Keyword Discovery</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-text-primary">Keyword Discovery</h2>
+              <Badge className="bg-indigo-500/20 text-indigo-700 border border-indigo-500/30">Uses AI</Badge>
+            </div>
             <div className="flex gap-2">
               <Button 
                 onClick={() => triggerScan('keywords_gsc')} 
@@ -125,7 +129,13 @@ export default function SEOPage() {
         </TabsContent>
 
         <TabsContent value="onpage">
-          <OnPageScore projectId={activeProject.id} />
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-text-primary">On-Page Audit</h2>
+              <Badge className="bg-indigo-500/20 text-indigo-700 border border-indigo-500/30">Uses AI</Badge>
+            </div>
+            <OnPageScore projectId={activeProject.id} />
+          </div>
         </TabsContent>
 
         <TabsContent value="backlinks">
@@ -139,7 +149,10 @@ export default function SEOPage() {
         <TabsContent value="gaps" className="space-y-4">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-lg font-semibold text-text-primary">Content Gaps</h2>
+              <div className="flex items-center gap-2 mb-1">
+                <h2 className="text-lg font-semibold text-text-primary">Content Gaps</h2>
+                <Badge className="bg-indigo-500/20 text-indigo-700 border border-indigo-500/30">Uses AI</Badge>
+              </div>
               <p className="text-sm text-text-muted">Topics your competitors rank for but you don&apos;t</p>
             </div>
             <Button 
@@ -162,7 +175,10 @@ export default function SEOPage() {
         <TabsContent value="technical" className="space-y-4">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-lg font-semibold text-text-primary">Technical Audit</h2>
+              <div className="flex items-center gap-2 mb-1">
+                <h2 className="text-lg font-semibold text-text-primary">Technical Audit</h2>
+                <Badge className="bg-indigo-500/20 text-indigo-700 border border-indigo-500/30">Uses AI</Badge>
+              </div>
               <p className="text-sm text-text-muted">Core technical health checks for your domain</p>
             </div>
             <Button 
