@@ -15,6 +15,10 @@ from app.schemas.keyword import KeywordCreate, RankingResponse
 router = APIRouter(prefix="/seo", tags=["seo"])
 
 
+from app.core.scan_cache import save_scan_results
+from app.core.component_cache import ComponentCache
+
+
 async def _assert_project_owner(project_id: UUID, user: User, db: AsyncSession) -> Project:
     result = await db.execute(
         select(Project).where(Project.id == project_id, Project.user_id == user.id)
@@ -38,27 +42,6 @@ async def trigger_keyword_research(
     Creates a new keyword record and queues a background task to perform keyword research.
     The research generates related keywords, estimates search volume, calculates difficulty
     scores, and analyzes search intent. Results are stored and available via /seo/rankings.
-    
-    **Authentication:** Required (Bearer token)
-    
-    **Query parameters:**
-    - **project_id**: UUID of the project (required)
-    
-    **Request body:**
-    - **keyword**: Primary seed keyword to research
-    - **intent**: Search intent category (e.g., "commercial", "informational", "navigational")
-    - **difficulty**: SEO difficulty estimate (0-100)
-    - **volume**: Estimated monthly search volume
-    
-    **Returns:**
-    - **status**: Task status ("queued")
-    - **keyword_id**: UUID of the created keyword record
-    
-    **Responses:**
-    - 202 Accepted: Research queued successfully
-    - 401 Unauthorized: Missing or invalid authentication
-    - 404 Not Found: Project not found or not owned by user
-    - 422 Unprocessable Entity: Invalid request body
     """
     await _assert_project_owner(project_id, current_user, db)
     keyword = Keyword(
@@ -100,20 +83,6 @@ async def trigger_site_audit(
     Starts a background job that crawls the website and performs comprehensive technical
     SEO analysis. Checks for issues like broken links, missing meta tags, slow pages,
     mobile usability, structured data, and more. Results are available via /seo/technical.
-    
-    **Authentication:** Required (Bearer token)
-    
-    **Query parameters:**
-    - **project_id**: UUID of the project (required)
-    
-    **Returns:**
-    - **status**: Task status ("queued")
-    - **task_id**: Celery task ID for tracking async execution
-    
-    **Responses:**
-    - 202 Accepted: Audit queued successfully
-    - 401 Unauthorized: Missing or invalid authentication
-    - 404 Not Found: Project not found or not owned by user
     """
     project = await _assert_project_owner(project_id, current_user, db)
     try:
@@ -135,32 +104,6 @@ async def get_rankings(
 ):
     """
     Retrieve all SERP ranking snapshots for a project with pagination.
-    
-    Returns paginated list of keyword rankings tracked for the project. Each ranking
-    represents a point-in-time snapshot of where a keyword ranked on Google SERPs.
-    Results are sorted by most recent first. Results are cached for 5 minutes.
-    
-    **Authentication:** Required (Bearer token)
-    
-    **Path parameters:**
-    - **project_id**: UUID of the project (required)
-    
-    **Query parameters:**
-    - **skip**: Number of items to skip (default: 0)
-    - **limit**: Number of items to return per page (default: 50, max: 500)
-    
-    **Returns:**
-    - Paginated response with:
-      - **data**: Array of ranking objects with keyword, position, url, timestamp
-      - **total**: Total number of ranking records
-      - **skip**: Number of items skipped
-      - **limit**: Number of items returned
-      - **has_more**: Whether more items are available
-    
-    **Responses:**
-    - 200 OK: Rankings returned successfully (may be cached)
-    - 401 Unauthorized: Missing or invalid authentication
-    - 404 Not Found: Project not found or not owned by user
     """
     await _assert_project_owner(project_id, current_user, db)
     
@@ -201,45 +144,63 @@ async def get_keyword_gaps(
 ):
     """
     Retrieve keyword gap analysis for a project.
-    
-    Analyzes differences between keywords the project currently ranks for and keywords
-    that competitors rank for. Identifies high-opportunity gaps where competitors rank
-    but the project does not. This helps identify new keyword targeting opportunities.
-    
-    **Authentication:** Required (Bearer token)
-    
-    **Path parameters:**
-    - **project_id**: UUID of the project (required)
-    
-    **Query parameters:**
-    - **skip**: Number of items to skip (default: 0)
-    - **limit**: Number of items to return per page (default: 50, max: 500)
-    
-    **Returns:**
-    - Paginated response with:
-      - **data**: Array of gap objects with keyword, competitor_rank, difficulty, volume
-      - **total**: Total number of keyword gaps found
-      - **skip**: Number of items skipped
-      - **limit**: Number of items returned
-      - **has_more**: Whether more items are available
-      - **message**: Status message if no gaps available
-    
-    **Responses:**
-    - 200 OK: Gap analysis returned
-    - 401 Unauthorized: Missing or invalid authentication
-    - 404 Not Found: Project not found or not owned by user
-    
-    **Note:** Run /seo/keywords endpoint first to generate keyword data
     """
     await _assert_project_owner(project_id, current_user, db)
+    
+    cache = ComponentCache(str(project_id))
+    cached_data = await cache.get_cached_gaps()
+    
+    if not cached_data:
+        return {
+            "project_id": str(project_id),
+            "data": [],
+            "total": 0,
+            "skip": skip,
+            "limit": limit,
+            "has_more": False,
+            "message": "Run keyword research first"
+        }
+    
+    gaps = cached_data.get("gaps", [])
+    total = len(gaps)
+    paginated_data = gaps[skip : skip + limit]
+    
     return {
         "project_id": str(project_id),
-        "data": [],
-        "total": 0,
+        "data": paginated_data,
+        "total": total,
         "skip": skip,
         "limit": limit,
-        "has_more": False,
-        "message": "Run keyword research first"
+        "has_more": total > skip + limit
+    }
+
+
+@router.get("/onpage/{project_id}")
+async def get_onpage_audit(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Retrieve on-page SEO audit results for a project.
+    
+    Returns cached results from the most recent on-page SEO audit.
+    """
+    await _assert_project_owner(project_id, current_user, db)
+    
+    cache = ComponentCache(str(project_id))
+    cached_data = await cache.get_cached_audit()
+    
+    if not cached_data or "on_page" not in cached_data:
+        return {
+            "project_id": str(project_id),
+            "on_page": None,
+            "message": "Run /seo/audit first"
+        }
+    
+    return {
+        "project_id": str(project_id),
+        "on_page": cached_data["on_page"]
     }
 
 
@@ -254,42 +215,60 @@ async def get_technical_seo(
     """
     Retrieve technical SEO audit results for a project.
     
-    Returns cached results from the most recent technical SEO audit. Includes findings
-    for issues like broken links, missing meta tags, page speed, mobile usability,
-    structured data, robots.txt, sitemap, and other technical SEO factors.
-    
-    **Authentication:** Required (Bearer token)
-    
-    **Path parameters:**
-    - **project_id**: UUID of the project (required)
-    
-    **Query parameters:**
-    - **skip**: Number of items to skip (default: 0)
-    - **limit**: Number of items to return per page (default: 50, max: 500)
-    
-    **Returns:**
-    - Paginated response with:
-      - **data**: Array of audit findings with issue_type, severity, url, description
-      - **total**: Total number of findings
-      - **skip**: Number of items skipped
-      - **limit**: Number of items returned
-      - **has_more**: Whether more items are available
-      - **message**: Status message if no audit results available
-    
-    **Responses:**
-    - 200 OK: Audit results returned
-    - 401 Unauthorized: Missing or invalid authentication
-    - 404 Not Found: Project not found or not owned by user
-    
-    **Note:** Run /seo/audit endpoint first to generate audit data
+    Returns cached results from the most recent technical SEO audit.
     """
     await _assert_project_owner(project_id, current_user, db)
+    
+    cache = ComponentCache(str(project_id))
+    cached_data = await cache.get_cached_audit()
+    
+    if not cached_data or "technical" not in cached_data:
+        return {
+            "project_id": str(project_id),
+            "data": [],
+            "total": 0,
+            "skip": skip,
+            "limit": limit,
+            "has_more": False,
+            "message": "Run /seo/audit first"
+        }
+    
+    technical = cached_data["technical"]
+    issues = technical.get("issues", [])
+    
+    # Transform issues to technical check objects for frontend
+    formatted_checks = []
+    
+    if technical.get("robots_txt", {}).get("present"):
+        formatted_checks.append({
+            "check": "Robots.txt",
+            "status": "pass",
+            "description": "robots.txt is present and valid."
+        })
+    
+    if technical.get("https", {}).get("https_available"):
+        formatted_checks.append({
+            "check": "HTTPS",
+            "status": "pass",
+            "description": "Website is correctly served over HTTPS."
+        })
+
+    for issue in issues:
+        status = "fail" if "CRITICAL" in issue.upper() or "HTTPS not available" in issue else "warning"
+        formatted_checks.append({
+            "check": issue.split("—")[0].strip() if "—" in issue else "Technical Issue",
+            "status": status,
+            "description": issue
+        })
+    
+    total = len(formatted_checks)
+    paginated_data = formatted_checks[skip : skip + limit]
+    
     return {
         "project_id": str(project_id),
-        "data": [],
-        "total": 0,
+        "data": paginated_data,
+        "total": total,
         "skip": skip,
         "limit": limit,
-        "has_more": False,
-        "message": "Run /seo/audit first"
+        "has_more": total > skip + limit
     }

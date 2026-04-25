@@ -22,11 +22,13 @@ export default function SEOPage() {
 
   // Fetch real data from backend
   const { data: keywordResponse, isLoading: keywordsLoading } = useKeywords(activeProject?.id || "", search);
-  const { data: gaps, isLoading: gapsLoading } = useContentGaps(activeProject?.id || "");
-  const { data: technicalChecks, isLoading: technicalLoading } = useTechnicalChecks(activeProject?.id || "");
+  const { data: gapsResponse, isLoading: gapsLoading } = useContentGaps(activeProject?.id || "");
+  const { data: technicalResponse, isLoading: technicalLoading } = useTechnicalChecks(activeProject?.id || "");
 
-  // Extract keywords from paginated response
+  // Extract data from paginated responses
   const keywords = (keywordResponse?.data || []) as any[];
+  const gaps = (gapsResponse?.data || []) as any[];
+  const technicalChecks = (technicalResponse?.data || []) as any[];
 
   const filteredKeywords = keywords.filter((k) =>
     search ? k.keyword?.toLowerCase().includes(search.toLowerCase()) : true

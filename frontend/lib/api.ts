@@ -155,6 +155,8 @@ export const api = {
         .then(unwrap),
     getGaps: (projectId: string) =>
       axiosInstance.get(`/seo/gaps/${projectId}`).then(unwrap),
+    getOnPageAudit: (projectId: string) =>
+      axiosInstance.get(`/seo/onpage/${projectId}`).then(unwrap),
     runAudit: (projectId: string, url: string) =>
       axiosInstance.post<{ task_id: string }>(`/seo/audit?project_id=${projectId}`, { url }).then(unwrap),
     getTechnicalChecks: (projectId: string) =>

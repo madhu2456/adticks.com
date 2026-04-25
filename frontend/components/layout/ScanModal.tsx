@@ -58,10 +58,27 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
         setError(null)
         setPollProgress(0)
 
-        // Start the full scan
-        const response = await api.ai.runScan(projectId)
+        // Start the appropriate scan based on featureType
+        let response;
+        switch (featureType) {
+          case 'seo':
+            response = await api.seo.runAudit(projectId, '');
+            break;
+          case 'gsc':
+            response = await api.gsc.sync(projectId);
+            break;
+          case 'ads':
+            response = await api.ads.sync(projectId);
+            break;
+          case 'ai':
+          case 'full':
+          default:
+            response = await api.ai.runScan(projectId);
+            break;
+        }
+        
         const newTaskId = response.task_id
-        const cached = response.from_cache || false
+        const cached = (response as any).from_cache || false
 
         if (newTaskId) {
           const scanId = `${projectId}-${featureType}-${Date.now()}`

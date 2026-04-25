@@ -18,12 +18,24 @@ export function useContentGaps(projectId: string) {
   });
 }
 
-export function useOnPageAudit(projectId: string, url?: string) {
+/**
+ * Hook to fetch the most recent on-page audit results from cache.
+ */
+export function useOnPageAudit(projectId: string) {
   return useQuery({
-    queryKey: ["audit", projectId, url],
-    queryFn: () => (url ? api.seo.runAudit(projectId, url) : Promise.reject(new Error("URL required"))),
-    enabled: !!url,
-    staleTime: 60 * 1000,
+    queryKey: ["onpage-audit", projectId],
+    queryFn: () => api.seo.getOnPageAudit(projectId),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * Hook to trigger a new audit.
+ */
+export function useTriggerOnPageAudit() {
+  return useMutation({
+    mutationFn: ({ projectId, url }: { projectId: string, url: string }) => 
+      api.seo.runAudit(projectId, url),
   });
 }
 
