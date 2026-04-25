@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, Check, AlertCircle, Zap, ArrowRight } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useScanProgress } from '@/hooks/useScanProgress'
+import { useBackgroundScans, type BackgroundScan } from '@/hooks/useBackgroundScans'
+import { useToast } from '@/components/ui/use-toast'
 
 interface ScanModalProps {
   isOpen: boolean
@@ -21,6 +23,9 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
   const [error, setError] = useState<string | null>(null)
   const [fromCache, setFromCache] = useState(false)
   const [pollProgress, setPollProgress] = useState(0)
+  const { addScan, updateScan } = useBackgroundScans()
+  const { toast } = useToast()
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
   
   // Get auth token (adjust based on your auth system)
   const authToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null
@@ -59,20 +64,37 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
         const cached = response.from_cache || false
 
         if (newTaskId) {
+          const scanId = `${projectId}-${featureType}-${Date.now()}`
+          const newScan: BackgroundScan = {
+            id: scanId,
+            projectId,
+            featureType,
+            status: 'scanning',
+            startedAt: Date.now(),
+            progress: 0,
+            stage: 'Initializing...',
+            message: '',
+          }
+
           setTaskId(newTaskId)
           setFromCache(cached)
+          addScan(newScan)
           
           // If results are from cache, show them immediately
           if (cached) {
             setStatus('cached')
             setPollProgress(100)
+            updateScan(scanId, {
+              status: 'completed',
+              progress: 100,
+            })
             // Auto-close after 3 seconds
             setTimeout(() => {
               setStatus('background')
             }, 3000)
           } else {
             setStatus('scanning')
-            pollTaskStatus(newTaskId)
+            pollTaskStatus(newTaskId, scanId)
           }
         } else {
           throw new Error('No task ID received from server')
@@ -85,9 +107,15 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
     }
 
     startScan()
-  }, [isOpen, projectId])
 
-  const pollTaskStatus = async (taskId: string) => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+      }
+    }
+  }, [isOpen, projectId, featureType, addScan, updateScan, toast])
+
+  const pollTaskStatus = async (taskId: string, scanId: string) => {
     // Allow 60 minutes of polling, but user can close modal before then
     const maxAttempts = 3600 // 60 minutes (3600 seconds / 1 second interval)
     let attempts = 0
@@ -97,6 +125,15 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
         clearInterval(interval)
         setStatus('error')
         setError('Scan took too long. This may indicate a backend issue. Please check backend logs or try again later.')
+        updateScan(scanId, {
+          status: 'error',
+          error: 'Scan took too long',
+        })
+        toast({
+          title: 'Scan Timeout',
+          description: 'The scan took too long to complete.',
+          variant: 'destructive',
+        })
         return
       }
 
@@ -107,10 +144,28 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
         if (taskStatus === 'completed' || taskStatus === 'success') {
           setPollProgress(100)
           setStatus('completed')
+          updateScan(scanId, {
+            status: 'completed',
+            progress: 100,
+          })
+          toast({
+            title: 'Scan Complete',
+            description: `Your ${featureType} scan has completed successfully.`,
+            variant: 'default',
+          })
           clearInterval(interval)
         } else if (taskStatus === 'failed' || taskStatus === 'error' || taskStatus === 'failure') {
           setStatus('error')
           setError(response.error || 'Scan failed. Please try again.')
+          updateScan(scanId, {
+            status: 'error',
+            error: response.error,
+          })
+          toast({
+            title: 'Scan Failed',
+            description: response.error || 'An error occurred during the scan.',
+            variant: 'destructive',
+          })
           clearInterval(interval)
         } else {
           // Creeping progress:
@@ -123,6 +178,9 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
             if (prev < 99) return prev + (Math.random() * 0.5 + 0.1)
             return 99
           })
+          updateScan(scanId, {
+            progress: Math.floor(pollProgress),
+          })
         }
 
         attempts++
@@ -132,6 +190,7 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full' }: 
       }
     }, 1000)
 
+    pollIntervalRef.current = interval
     return () => clearInterval(interval)
   }
 

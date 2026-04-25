@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
+import { BackgroundTasksDrawer } from "./BackgroundTasksDrawer";
 import { cn } from "@/lib/utils";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -11,6 +12,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
       <Header sidebarCollapsed={collapsed} />
+      <BackgroundTasksDrawer />
 
       <main
         className={cn(
