@@ -223,3 +223,25 @@ async def test_location(db_session: AsyncSession, test_project: Project):
     await db_session.commit()
     await db_session.refresh(location)
     return location
+
+
+# ---------------------------------------------------------------------------
+# Redis cleanup fixture - runs before each test to clear test Redis keys
+# ---------------------------------------------------------------------------
+@pytest_asyncio.fixture(autouse=True)
+async def clear_redis_cache():
+    """Clear Redis cache before each test to ensure isolation."""
+    from app.core.caching import get_redis_client
+    
+    redis = await get_redis_client()
+    if redis:
+        try:
+            # Clear all AdTicks-related keys
+            for pattern in ["component:*", "scan:*", "cache:*"]:
+                keys = await redis.keys(pattern)
+                if keys:
+                    await redis.delete(*keys)
+        except Exception:
+            # Redis might not be available in test environment
+            pass
+    yield

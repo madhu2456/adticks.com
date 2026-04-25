@@ -204,12 +204,17 @@ async def get_rankings(
     # Build response with keyword data
     rankings_with_keywords = []
     for ranking, keyword in result.all():
-        response = RankingResponse.model_validate(ranking)
-        # Populate keyword fields
-        response.keyword = keyword.keyword
-        response.intent = keyword.intent
-        response.difficulty = keyword.difficulty
-        response.volume = keyword.volume
+        response = RankingResponse(
+            id=ranking.id,
+            keyword_id=ranking.keyword_id,
+            position=ranking.position,
+            url=ranking.url,
+            timestamp=ranking.timestamp,
+            keyword=keyword.keyword,
+            intent=keyword.intent,
+            difficulty=keyword.difficulty,
+            volume=keyword.volume,
+        )
         rankings_with_keywords.append(response)
     
     return PaginatedResponse.create(

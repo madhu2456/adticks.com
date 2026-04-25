@@ -237,36 +237,61 @@ class SnippetTrackingService:
         Get snippet summary for all keywords in a project.
         """
         from app.models.keyword import Keyword
+        from sqlalchemy import func
 
         try:
             # Get all keywords for project
-            result = await db.execute(
-                select(Keyword).where(Keyword.project_id == project_id)
+            kw_result = await db.execute(
+                select(Keyword.id).where(Keyword.project_id == project_id)
             )
-            keywords = result.scalars().all()
+            keyword_ids = [r[0] for r in kw_result.all()]
+            
+            if not keyword_ids:
+                return {
+                    "total_keywords": 0,
+                    "with_snippet": 0,
+                    "without_snippet": 0,
+                    "lost_snippet": 0,
+                    "snippet_percentage": 0
+                }
 
-            has_snippet = 0
-            no_snippet = 0
-            lost_snippet = 0
+            # Get the most recent snippet record for each keyword
+            # Using a subquery to find the latest date_captured per keyword
+            latest_snippets_sub = (
+                select(
+                    SnippetTracking.keyword_id,
+                    func.max(SnippetTracking.date_captured).label("max_date")
+                )
+                .where(SnippetTracking.keyword_id.in_(keyword_ids))
+                .group_by(SnippetTracking.keyword_id)
+                .subquery()
+            )
 
-            for kw in keywords:
-                snippet = await self.get_current_snippet(db, kw.id)
-                if snippet:
-                    if snippet.has_snippet:
-                        has_snippet += 1
-                    elif snippet.lost_date:
-                        lost_snippet += 1
-                    else:
-                        no_snippet += 1
-                else:
-                    no_snippet += 1
+            latest_snippets_query = (
+                select(SnippetTracking)
+                .join(
+                    latest_snippets_sub,
+                    (SnippetTracking.keyword_id == latest_snippets_sub.c.keyword_id) &
+                    (SnippetTracking.date_captured == latest_snippets_sub.c.max_date)
+                )
+            )
+            
+            snippet_result = await db.execute(latest_snippets_query)
+            latest_snippets = snippet_result.scalars().all()
+            
+            has_snippet = sum(1 for s in latest_snippets if s.has_snippet)
+            lost_snippet = sum(1 for s in latest_snippets if not s.has_snippet and s.lost_date)
+            
+            total_keywords = len(keyword_ids)
+            # Keywords that either have no snippet record or have a record saying they don't have one
+            no_snippet = total_keywords - has_snippet
 
             return {
-                "total_keywords": len(keywords),
+                "total_keywords": total_keywords,
                 "with_snippet": has_snippet,
                 "without_snippet": no_snippet,
                 "lost_snippet": lost_snippet,
-                "snippet_percentage": (has_snippet / len(keywords) * 100) if keywords else 0
+                "snippet_percentage": (has_snippet / total_keywords * 100) if total_keywords > 0 else 0
             }
 
         except Exception as e:

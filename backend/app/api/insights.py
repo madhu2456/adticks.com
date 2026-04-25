@@ -128,11 +128,21 @@ async def get_insights_summary(
     )
     latest_score = score_result.scalar_one_or_none()
 
-    rec_result = await db.execute(
-        select(Recommendation)
+    # Get unread count
+    count_result = await db.execute(
+        select(func.count(Recommendation.id))
         .where(Recommendation.project_id == project_id, Recommendation.is_read.is_(False))
     )
-    unread = rec_result.scalars().all()
+    unread_count = count_result.scalar() or 0
+
+    # Get top 5 priorities
+    top_rec_result = await db.execute(
+        select(Recommendation)
+        .where(Recommendation.project_id == project_id, Recommendation.is_read.is_(False))
+        .order_by(Recommendation.priority.asc(), Recommendation.created_at.desc())
+        .limit(5)
+    )
+    top_unread = top_rec_result.scalars().all()
 
     return {
         "project_id": str(project_id),
@@ -142,10 +152,10 @@ async def get_insights_summary(
             "sov_score": latest_score.sov_score if latest_score else None,
             "timestamp": latest_score.timestamp.isoformat() if latest_score else None,
         },
-        "unread_recommendations": len(unread),
+        "unread_recommendations": unread_count,
         "top_priorities": [
             {"text": r.text, "priority": r.priority, "category": r.category}
-            for r in sorted(unread, key=lambda x: x.priority)[:5]
+            for r in top_unread
         ],
     }
 

@@ -133,7 +133,9 @@ def cached(ttl: int = 300, key_prefix: str = "") -> Callable:
             # Store in cache (don't fail if caching fails)
             try:
                 # Try to JSON serialize the result
-                if isinstance(result, (dict, list)):
+                if result is None:
+                    cached_data = json.dumps(None)
+                elif isinstance(result, (dict, list, str, int, float, bool)):
                     cached_data = json.dumps(result, default=str)
                 elif hasattr(result, "model_dump"):  # Pydantic models
                     cached_data = json.dumps(result.model_dump(), default=str)
@@ -142,7 +144,7 @@ def cached(ttl: int = 300, key_prefix: str = "") -> Callable:
                 elif hasattr(result, "__dict__"):
                     cached_data = json.dumps(result.__dict__, default=str)
                 else:
-                    # For non-JSON-serializable objects, convert to string
+                    # For other objects, convert to string and JSONify
                     cached_data = json.dumps(str(result))
                 
                 await redis_client.setex(full_key, ttl, cached_data)

@@ -72,6 +72,14 @@ async def lifespan(app: FastAPI):
     
     # Graceful shutdown
     logger.info("application_shutdown")
+    
+    # Close AEO services
+    try:
+        from app.api.aeo import visibility_service
+        await visibility_service.close()
+    except Exception as e:
+        logger.warning(f"failed_to_close_visibility_service: {e}")
+        
     await close_redis_client()
     await engine.dispose()
 

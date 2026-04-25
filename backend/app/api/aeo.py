@@ -200,7 +200,7 @@ async def get_chatgpt_visibility(
 
     result = await db.execute(query)
     records = result.scalars().all()
-    return [AEOVisibilityResponse.from_orm(r) for r in records]
+    return [AEOVisibilityResponse.model_validate(r) for r in records]
 
 
 @router.get(
@@ -230,7 +230,7 @@ async def get_perplexity_visibility(
 
     result = await db.execute(query)
     records = result.scalars().all()
-    return [AEOVisibilityResponse.from_orm(r) for r in records]
+    return [AEOVisibilityResponse.model_validate(r) for r in records]
 
 
 @router.get(
@@ -260,7 +260,7 @@ async def get_claude_visibility(
 
     result = await db.execute(query)
     records = result.scalars().all()
-    return [AEOVisibilityResponse.from_orm(r) for r in records]
+    return [AEOVisibilityResponse.model_validate(r) for r in records]
 
 
 @router.get(
@@ -291,7 +291,7 @@ async def get_visibility_trends(
 
     result = await db.execute(query)
     records = result.scalars().all()
-    return [AEOTrendsResponse.from_orm(r) for r in records]
+    return [AEOTrendsResponse.model_validate(r) for r in records]
 
 
 # ============================================================================
@@ -312,7 +312,7 @@ async def get_snippet_history(
     """Get featured snippet tracking history for a keyword."""
     await _get_keyword(keyword_id, db)
     snippets = await snippet_service.get_snippet_history(db, keyword_id, limit)
-    return [SnippetTrackingResponse.from_orm(s) for s in snippets]
+    return [SnippetTrackingResponse.model_validate(s) for s in snippets]
 
 
 @router.get(
@@ -328,7 +328,7 @@ async def get_paa_queries(
     """Get People Also Ask queries for a keyword."""
     await _get_keyword(keyword_id, db)
     paa_queries = await snippet_service.get_paa_queries(db, keyword_id)
-    return [PAA_Response.from_orm(p) for p in paa_queries]
+    return [PAA_Response.model_validate(p) for p in paa_queries]
 
 
 @router.post(
@@ -387,7 +387,7 @@ async def generate_recommendations(
     )
     await db.commit()
 
-    return [ContentRecommendationResponse.from_orm(r) for r in recommendations]
+    return [ContentRecommendationResponse.model_validate(r) for r in recommendations]
 
 
 @router.get(
@@ -420,7 +420,7 @@ async def get_recommendations(
 
     result = await db.execute(query)
     records = result.scalars().all()
-    return [ContentRecommendationResponse.from_orm(r) for r in records]
+    return [ContentRecommendationResponse.model_validate(r) for r in records]
 
 
 @router.put(
@@ -439,7 +439,7 @@ async def mark_recommendation_action(
         db, rec_id, update.user_action
     )
     await db.commit()
-    return ContentRecommendationResponse.from_orm(rec)
+    return ContentRecommendationResponse.model_validate(rec)
 
 
 # ============================================================================
@@ -468,7 +468,7 @@ async def generate_faq_from_paa(
     )
     await db.commit()
 
-    return GeneratedFAQResponse.from_orm(faq)
+    return GeneratedFAQResponse.model_validate(faq)
 
 
 @router.get(
@@ -494,7 +494,7 @@ async def get_faqs(
         approved_only=approved_only
     )
 
-    return [GeneratedFAQResponse.from_orm(f) for f in faqs[:limit]]
+    return [GeneratedFAQResponse.model_validate(f) for f in faqs[:limit]]
 
 
 @router.put(
@@ -510,7 +510,7 @@ async def approve_faq(
     """Approve a generated FAQ entry."""
     faq = await recommendation_service.approve_faq(db, faq_id)
     await db.commit()
-    return GeneratedFAQResponse.from_orm(faq)
+    return GeneratedFAQResponse.model_validate(faq)
 
 
 # ============================================================================

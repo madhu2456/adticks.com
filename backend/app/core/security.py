@@ -51,17 +51,17 @@ def verify_password(plain: str, hashed: str) -> bool:
 # ---------------------------------------------------------------------------
 # JWT Token Blacklist (Redis-backed)
 # ---------------------------------------------------------------------------
-async def get_redis():
-    """Get Redis client for token blacklisting."""
-    import redis.asyncio as redis
-    
-    return await redis.from_url(settings.REDIS_URL, decode_responses=True)
+from app.core.caching import get_redis_client
 
 
 async def revoke_token(token: str) -> None:
     """Add token to blacklist with expiry based on token's exp claim."""
     try:
-        redis_client = await get_redis()
+        redis_client = await get_redis_client()
+        if not redis_client:
+            logger.warning("token_revoke_skip_redis_unavailable")
+            return
+            
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         exp = payload.get("exp")
         
@@ -71,7 +71,6 @@ async def revoke_token(token: str) -> None:
             ttl = max(0, int(exp - now))
             if ttl > 0:
                 await redis_client.setex(f"blacklist:{token}", ttl, "revoked")
-        await redis_client.aclose()
     except Exception as e:
         logger.error("token_revoke_failed", extra={"error": str(e)})
 
@@ -79,9 +78,11 @@ async def revoke_token(token: str) -> None:
 async def is_token_blacklisted(token: str) -> bool:
     """Check if token is blacklisted."""
     try:
-        redis_client = await get_redis()
+        redis_client = await get_redis_client()
+        if not redis_client:
+            return False
+            
         is_blacklisted = await redis_client.exists(f"blacklist:{token}")
-        await redis_client.aclose()
         return bool(is_blacklisted)
     except Exception as e:
         logger.error("blacklist_check_failed", extra={"error": str(e)})
