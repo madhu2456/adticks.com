@@ -184,7 +184,8 @@ async def _run_llm_scan_impl(project_id: str, prompt_limit: int, task_id: str) -
             try:
                 prompt_uuid = uuid.UUID(prompt_id_str)
             except (ValueError, AttributeError):
-                prompt_uuid = uuid.uuid4()
+                logger.warning("Invalid prompt_id_str: %s, skipping responses for this prompt", prompt_id_str)
+                continue
 
             for resp_data in pr.get("responses", []):
                 resp_id = uuid.uuid4()
