@@ -7,6 +7,7 @@ export function useKeywords(projectId: string, search?: string) {
     queryKey: ["keywords", projectId, search],
     queryFn: () => api.seo.getKeywords(projectId, 1, search),
     staleTime: 2 * 60 * 1000,
+    enabled: !!projectId,
   });
 }
 
@@ -15,6 +16,7 @@ export function useContentGaps(projectId: string) {
     queryKey: ["content-gaps", projectId],
     queryFn: () => api.seo.getGaps(projectId),
     staleTime: 5 * 60 * 1000,
+    enabled: !!projectId,
   });
 }
 
@@ -26,6 +28,7 @@ export function useOnPageAudit(projectId: string) {
     queryKey: ["onpage-audit", projectId],
     queryFn: () => api.seo.getOnPageAudit(projectId),
     staleTime: 5 * 60 * 1000,
+    enabled: !!projectId,
   });
 }
 
@@ -44,5 +47,6 @@ export function useTechnicalChecks(projectId: string) {
     queryKey: ["technical", projectId],
     queryFn: () => api.seo.getTechnicalChecks(projectId),
     staleTime: 10 * 60 * 1000,
+    enabled: !!projectId,
   });
 }
