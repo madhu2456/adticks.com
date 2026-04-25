@@ -15,7 +15,7 @@ import {
 const getBaseUrl = () => {
   let apiUrl = "";
   if (typeof window === "undefined") {
-    apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8002";
+    apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://adticks.com";
   } else {
     apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
     
@@ -24,7 +24,7 @@ const getBaseUrl = () => {
       return "";
     }
     
-    if (!apiUrl) apiUrl = "http://localhost:8002";
+    if (!apiUrl) apiUrl = "https://adticks.com";
   }
   
   // Normalize: remove trailing slash and /api if present, we'll add /api cleanly
@@ -56,7 +56,17 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
-    console.log(`[API] Response from ${error.config?.url}: ${error.response?.status}`);
+    // Explicitly log every API error to the console with details
+    const status = error.response?.status;
+    const url = error.config?.url;
+    const method = error.config?.method?.toUpperCase();
+    const errorData = error.response?.data;
+    
+    console.error(`[API Error] ${method} ${url} | Status: ${status}`, {
+      data: errorData,
+      message: error.message
+    });
+
     const originalRequest = error.config;
     const isLoginRequest = originalRequest.url?.includes("/auth/login");
     
@@ -311,6 +321,16 @@ export const api = {
       axiosInstance.get<PaginatedResponse<any>>(`/seo/projects/${projectId}/competitors/keywords?skip=${skip}&limit=${limit}`).then(unwrap),
     getSerpFeatures: (keywordId: string) =>
       axiosInstance.get<any>(`/seo/keywords/${keywordId}/serp-features`).then(unwrap),
+  },
+
+  // Cache
+  cache: {
+    getStats: (projectId: string) =>
+      axiosInstance.get<any>(`/cache/stats/${projectId}`).then(unwrap),
+    invalidate: (projectId: string) =>
+      axiosInstance.post<any>(`/cache/invalidate/${projectId}`).then(unwrap),
+    purgeAll: () =>
+      axiosInstance.post<any>("/cache/purge-all").then(unwrap),
   },
 };
 

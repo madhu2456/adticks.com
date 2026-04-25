@@ -196,6 +196,44 @@ function ProfileTab() {
       <div className="pt-2">
         <SaveButton onClick={handleSave} saved={saved} />
       </div>
+
+      {/* Danger Zone */}
+      <div className="pt-6 border-t border-[#334155]">
+        <h3 className="text-sm font-semibold text-[#ef4444] mb-1">Danger Zone</h3>
+        <p className="text-xs text-[#94a3b8] mb-4">Actions here are permanent and affect the entire system cache.</p>
+        
+        <button
+          onClick={async () => {
+            showAlert({
+              title: "Purge Everything?",
+              message: "This will clear all cached data and background task states across the entire system. This action cannot be undone.",
+              type: "warning",
+              confirmText: "Purge All",
+              cancelText: "Cancel",
+              onConfirm: async () => {
+                try {
+                  await api.cache.purgeAll();
+                  showAlert({
+                    title: "Success",
+                    message: "System-wide cache has been purged successfully.",
+                    type: "success",
+                  });
+                } catch (err: any) {
+                  showAlert({
+                    title: "Purge Failed",
+                    message: err.response?.data?.detail || "You may not have permission to perform this action.",
+                    type: "error",
+                  });
+                }
+              }
+            });
+          }}
+          className="flex items-center gap-2 bg-[#ef4444]/10 hover:bg-[#ef4444]/20 text-[#ef4444] border border-[#ef4444]/20 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all active:scale-95"
+        >
+          <XCircle className="h-4 w-4" />
+          Purge Everything
+        </button>
+      </div>
       {AlertModal}
     </div>
   );

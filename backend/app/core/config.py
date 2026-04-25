@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     # CORS Configuration
     # ------------------------------------------------------------------
     ALLOWED_ORIGINS: list[str] = Field(
-        default_factory=lambda: ["http://localhost:3002"],
+        default_factory=lambda: ["https://adticks.com", "http://localhost:3002"],
         description="CORS allowed origins"
     )
 
@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     STORAGE_ROOT: str = "data"
     BASE_URL: str = Field(
-        default="http://localhost:8002",
+        default="https://adticks.com",
         description="Base URL for generating file URLs"
     )
 
@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = Field(
-        default="http://localhost:8002/api/gsc/callback",
+        default="https://adticks.com/api/gsc/callback",
         description="Google OAuth callback URL"
     )
 

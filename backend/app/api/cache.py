@@ -17,10 +17,39 @@ from app.core.database import get_db, AsyncSessionLocal
 from app.core.scan_cache import get_cache_status, invalidate_scan_cache
 from app.core.component_cache import ComponentCache
 from app.models.project import Project
-from sqlalchemy import select
+from app.models.user import User
+from app.core.security import get_current_user
+from sqlalchemy import select, status
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/cache", tags=["cache"])
+
+@router.post("/purge-all", name="Purge system-wide cache")
+async def purge_all_cache(current_user=Depends(get_current_user)):
+    """
+    DANGER ZONE: Purge EVERYTHING from Redis.
+    Clears all cached results, task progress data, and session data across all projects.
+    
+    Requires superuser privileges.
+    """
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only superusers can perform a system-wide purge."
+        )
+    
+    try:
+        from app.core.progress import ScanProgress
+        redis_client = await ScanProgress._get_redis()
+        if redis_client:
+            await redis_client.flushall()
+            logger.warning(f"SYSTEM PURGE: User {current_user.email} purged all Redis data.")
+            return {"status": "success", "message": "System-wide cache purged successfully."}
+        else:
+            raise Exception("Could not connect to Redis")
+    except Exception as e:
+        logger.error(f"Error during system purge: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/stats/{project_id}", name="Get cache stats")

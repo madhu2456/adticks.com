@@ -93,6 +93,9 @@ if settings.ENVIRONMENT == "development":
 else:
     # Production: include the public domain and localhost for docker compose
     origins = settings.ALLOWED_ORIGINS
+    # Ensure production domain is always included
+    if "https://adticks.com" not in origins:
+        origins.append("https://adticks.com")
     # Always allow the app's own domain for avatar/storage requests
     if settings.BASE_URL not in origins:
         origins.append(settings.BASE_URL)
@@ -204,6 +207,21 @@ async def adticks_exception_handler(request: Request, exc: AdTicksException):
             "message": exc.message,
             "detail": exc.message,  # Added for frontend compatibility
             "details": exc.details,
+        },
+    )
+
+
+from fastapi.exceptions import HTTPException as FastAPIHTTPException
+
+@app.exception_handler(FastAPIHTTPException)
+async def http_exception_handler(request: Request, exc: FastAPIHTTPException):
+    """Handle standard FastAPI HTTP exceptions."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": "HTTP_ERROR",
+            "message": exc.detail,
+            "detail": exc.detail,
         },
     )
 

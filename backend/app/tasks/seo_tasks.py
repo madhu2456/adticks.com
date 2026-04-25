@@ -746,10 +746,19 @@ async def _sync_ads_data_impl(project_id: str, task_id: str = "") -> dict:
     logger.info("Syncing Ads data for project=%s", project_id)
     await progress.update("ads_sync", 10, "Loading project data...")
 
+    async with AsyncSessionLocal() as session:
+        project = await _load_project(session, project_id)
+        if not project:
+            await progress.complete()
+            return {"project_id": project_id, "rows_synced": 0, "status": "project_not_found"}
+
+        brand_name = project.brand_name
+        industry = project.industry or "Technology"
+
     sync_result = await ads_sync(
         project_id=project_id,
-        brand_name=project.brand_name,
-        industry=project.industry or "Technology",
+        brand_name=brand_name,
+        industry=industry,
     )
 
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -767,8 +776,8 @@ async def _sync_ads_data_impl(project_id: str, task_id: str = "") -> dict:
     from app.services.ads.ads_service import get_performance
     perf = await get_performance(
         project_id=project_id,
-        brand_name=project.brand_name,
-        industry=project.industry or "Technology",
+        brand_name=brand_name,
+        industry=industry,
         days=30,
     )
 

@@ -134,9 +134,10 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full', ur
           throw new Error('No task ID received from server')
         }
       } catch (err: any) {
-        console.error('Scan failed:', err)
+        console.error('[ScanModal] Scan trigger failed:', err)
         setStatus('error')
-        setError(err.response?.data?.message || 'Failed to start scan. Please try again.')
+        const errorMsg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to start scan. Please try again.';
+        setError(errorMsg)
       }
     }
 
