@@ -5,8 +5,12 @@ set -e
 
 echo "Starting AdTicks Backend entrypoint script..."
 
-# Run migrations
-echo "Running database migrations..."
+# 1. Run Force Schema Fix (handles cases where Alembic is out of sync)
+echo "Running force schema fix (direct SQL)..."
+python3 scripts/force_schema_fix.py
+
+# 2. Run migrations
+echo "Running database migrations via Alembic..."
 alembic upgrade head
 echo "Migrations completed successfully."
 
