@@ -527,10 +527,10 @@ async def _cache_scan_results_impl(project_id: str, scan_results: dict | None = 
                 )
                 latest_score = score_result.scalar_one_or_none()
                 
-                # Get latest keywords with timeout (only fetch first 1000 to avoid memory issues)
+                # Get latest keywords with timeout (only fetch first 100 to avoid memory issues)
                 kw_result = await asyncio.wait_for(
                     session.execute(
-                        select(Keyword.keyword).where(Keyword.project_id == project_id).limit(1000)
+                        select(Keyword.keyword).where(Keyword.project_id == project_id).limit(100)
                     ),
                     timeout=15
                 )
