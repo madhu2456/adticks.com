@@ -232,9 +232,9 @@ export const api = {
   // GSC
   gsc: {
     getAuthUrl: (projectId: string) =>
-      axiosInstance.get<{ auth_url: string }>(`/gsc/auth`).then(unwrap),
-    completeAuth: (code: string) =>
-      axiosInstance.post<{ status: string }>(`/gsc/complete`, { code }).then(unwrap),
+      axiosInstance.get<{ auth_url: string; state: string; pkce_state: string }>(`/gsc/auth`).then(unwrap),
+    completeAuth: (code: string, pkce_state?: string) =>
+      axiosInstance.post<{ status: string }>(`/gsc/complete`, { code, pkce_state }).then(unwrap),
     listProperties: () =>
       axiosInstance.get<any[]>(`/gsc/properties`).then(unwrap),
     connectProperty: (projectId: string, propertyUrl: string) =>
@@ -335,8 +335,8 @@ export const api = {
 
   // Advanced SEO Suite
   seoSuite: {
-    getBacklinks: (projectId: string, skip = 0, limit = 50) =>
-      axiosInstance.get<PaginatedResponse<any>>(`/seo/projects/${projectId}/backlinks?skip=${skip}&limit=${limit}`).then(unwrap),
+    getBacklinks: (projectId: string, skip = 0, limit = 50, minAuthority?: number) =>
+      axiosInstance.get<PaginatedResponse<any>>(`/seo/projects/${projectId}/backlinks?skip=${skip}&limit=${limit}${minAuthority ? `&min_authority=${minAuthority}` : ''}`).then(unwrap),
     getBacklinkStats: (projectId: string) =>
       axiosInstance.get<any>(`/seo/projects/${projectId}/backlinks/stats`).then(unwrap),
     getBacklinkIntersect: (projectId: string) =>
@@ -351,10 +351,12 @@ export const api = {
 
   // Cache
   cache: {
-    getStats: (projectId: string) =>
+    stats: (projectId: string) =>
       axiosInstance.get<any>(`/cache/stats/${projectId}`).then(unwrap),
     invalidate: (projectId: string) =>
       axiosInstance.post<any>(`/cache/invalidate/${projectId}`).then(unwrap),
+    invalidateComponent: (projectId: string, component: string) =>
+      axiosInstance.post<any>(`/cache/invalidate-component/${projectId}/${component}`).then(unwrap),
     purgeAll: () =>
       axiosInstance.post<any>("/cache/purge-all").then(unwrap),
   },

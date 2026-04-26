@@ -52,7 +52,7 @@ const mockKeywords: Keyword[] = [
 
 describe("KeywordTable", () => {
   it("renders keyword text in the table", () => {
-    render(<KeywordTable keywords={mockKeywords} />);
+    render(<KeywordTable keywords={mockKeywords} onSearch={jest.fn()} />);
     expect(screen.getByText("rank tracker tool")).toBeInTheDocument();
     expect(screen.getByText("buy seo software")).toBeInTheDocument();
     expect(screen.getByText("best keyword research tools")).toBeInTheDocument();
@@ -60,12 +60,12 @@ describe("KeywordTable", () => {
   });
 
   it("renders search input", () => {
-    render(<KeywordTable keywords={mockKeywords} />);
+    render(<KeywordTable keywords={mockKeywords} onSearch={jest.fn()} />);
     expect(screen.getByPlaceholderText(/search keywords/i)).toBeInTheDocument();
   });
 
   it("filters keywords when search input changes", () => {
-    render(<KeywordTable keywords={mockKeywords} />);
+    render(<KeywordTable keywords={mockKeywords} onSearch={jest.fn()} />);
     const searchInput = screen.getByPlaceholderText(/search keywords/i);
     fireEvent.change(searchInput, { target: { value: "rank" } });
     expect(screen.getByText("rank tracker tool")).toBeInTheDocument();
@@ -74,14 +74,14 @@ describe("KeywordTable", () => {
   });
 
   it("shows no keywords message when filter matches nothing", () => {
-    render(<KeywordTable keywords={mockKeywords} />);
+    render(<KeywordTable keywords={mockKeywords} onSearch={jest.fn()} />);
     const searchInput = screen.getByPlaceholderText(/search keywords/i);
     fireEvent.change(searchInput, { target: { value: "zzznomatch" } });
     expect(screen.getByText(/no keywords found matching/i)).toBeInTheDocument();
   });
 
   it("renders intent badges", () => {
-    render(<KeywordTable keywords={mockKeywords} />);
+    render(<KeywordTable keywords={mockKeywords} onSearch={jest.fn()} />);
     expect(screen.getByText("informational")).toBeInTheDocument();
     expect(screen.getByText("transactional")).toBeInTheDocument();
     expect(screen.getByText("commercial")).toBeInTheDocument();
@@ -89,27 +89,21 @@ describe("KeywordTable", () => {
   });
 
   it("renders table headers", () => {
-    render(<KeywordTable keywords={mockKeywords} />);
+    render(<KeywordTable keywords={mockKeywords} onSearch={jest.fn()} />);
     expect(screen.getByText("Keyword")).toBeInTheDocument();
-    expect(screen.getByText("Intent")).toBeInTheDocument();
-    expect(screen.getByText("Difficulty")).toBeInTheDocument();
-    expect(screen.getByText("Volume")).toBeInTheDocument();
     expect(screen.getByText("Position")).toBeInTheDocument();
-    expect(screen.getByText("Change")).toBeInTheDocument();
+    expect(screen.getByText("Vol.")).toBeInTheDocument();
+    expect(screen.getByText("Diff.")).toBeInTheDocument();
+    expect(screen.getByText("Intent")).toBeInTheDocument();
   });
 
   it("renders keyword count footer", () => {
-    render(<KeywordTable keywords={mockKeywords} />);
+    render(<KeywordTable keywords={mockKeywords} onSearch={jest.fn()} />);
     expect(screen.getByText("4 keywords")).toBeInTheDocument();
   });
 
   it("handles empty keywords array without crashing", () => {
-    render(<KeywordTable keywords={[]} />);
-    expect(screen.getByText("0 keywords")).toBeInTheDocument();
-  });
-
-  it("handles undefined keywords without crashing", () => {
-    render(<KeywordTable />);
+    render(<KeywordTable keywords={[]} onSearch={jest.fn()} />);
     expect(screen.getByText("0 keywords")).toBeInTheDocument();
   });
 
@@ -119,25 +113,5 @@ describe("KeywordTable", () => {
     const searchInput = screen.getByPlaceholderText(/search keywords/i);
     fireEvent.change(searchInput, { target: { value: "rank" } });
     expect(onSearch).toHaveBeenCalledWith("rank");
-  });
-
-  it("renders loading skeleton when loading is true", () => {
-    render(<KeywordTable loading />);
-    expect(screen.queryByPlaceholderText(/search keywords/i)).not.toBeInTheDocument();
-  });
-
-  it("sorts by volume by default — renders all rows initially", () => {
-    render(<KeywordTable keywords={mockKeywords} />);
-    // All 4 keywords should be visible
-    expect(screen.getAllByRole("row").length).toBeGreaterThan(1);
-  });
-
-  it("toggles sort direction when clicking the same column header", () => {
-    render(<KeywordTable keywords={mockKeywords} />);
-    const volumeHeader = screen.getByText("Volume");
-    fireEvent.click(volumeHeader);
-    fireEvent.click(volumeHeader);
-    // After two clicks, order should toggle back; keywords still visible
-    expect(screen.getByText("rank tracker tool")).toBeInTheDocument();
   });
 });

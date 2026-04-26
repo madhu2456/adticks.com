@@ -3,6 +3,7 @@ import React from "react";
 import { CheckCircle, XCircle, AlertCircle, TrendingUp, History } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { TechnicalCheck } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { LineChart } from "@/components/charts/LineChart";

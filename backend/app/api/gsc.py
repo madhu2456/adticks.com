@@ -50,6 +50,7 @@ async def gsc_auth(current_user: User = Depends(get_current_user)):
     
     **Returns:**
     - **auth_url**: Google OAuth2 authorization URL for the user to visit
+    - **state**: State parameter for session tracking
     
     **Responses:**
     - 200 OK: Authorization URL generated successfully
@@ -64,6 +65,8 @@ async def gsc_auth(current_user: User = Depends(get_current_user)):
         )
 
     from google_auth_oauthlib.flow import Flow
+    import json
+    import base64
     
     # We include all possible URIs in the flow config to be safe
     redirect_uris = [
@@ -85,11 +88,22 @@ async def gsc_auth(current_user: User = Depends(get_current_user)):
         scopes=_SCOPES,
     )
     flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
-    # Disable PKCE by not sending code_challenge in authorization_url
-    auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline")
+    # Google now requires PKCE - enable code_challenge (automatically done by flow)
+    auth_url, state = flow.authorization_url(prompt="consent", access_type="offline")
     
-    logger.info(f"Generated GSC auth URL with redirect_uri: {flow.redirect_uri}")
-    return {"auth_url": auth_url}
+    # Store code_verifier in state for later use
+    pkce_data = {
+        "code_verifier": flow.code_verifier,
+        "original_state": state,
+    }
+    pkce_state = base64.urlsafe_b64encode(json.dumps(pkce_data).encode()).decode()
+    
+    logger.info(f"Generated GSC auth URL with redirect_uri: {flow.redirect_uri}, PKCE enabled")
+    return {
+        "auth_url": auth_url,
+        "state": state,
+        "pkce_state": pkce_state  # Frontend needs to store this to pass back
+    }
 
 
 @router.get("/callback")
@@ -118,6 +132,7 @@ async def gsc_legacy_callback(
 
 class GSCAuthComplete(BaseModel):
     code: str
+    pkce_state: str | None = None  # PKCE state with code_verifier
 
 @router.post("/complete")
 async def complete_gsc_auth(
@@ -130,6 +145,10 @@ async def complete_gsc_auth(
     
     The frontend should call this endpoint after receiving the 'code' from Google's
     redirect. This request must be authenticated with the user's AdTicks JWT.
+    
+    Required:
+    - code: The authorization code from Google
+    - pkce_state: The PKCE state returned from /auth endpoint (contains code_verifier)
     """
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
         raise HTTPException(
@@ -139,6 +158,17 @@ async def complete_gsc_auth(
 
     from google_auth_oauthlib.flow import Flow
     from datetime import datetime, timezone, timedelta
+    import json
+    import base64
+    
+    # Decode PKCE state to get code_verifier
+    code_verifier = None
+    if payload.pkce_state:
+        try:
+            pkce_data = json.loads(base64.urlsafe_b64decode(payload.pkce_state.encode()))
+            code_verifier = pkce_data.get("code_verifier")
+        except Exception as e:
+            logger.warning(f"Failed to decode PKCE state: {e}")
     
     # We try both the current redirect URI and the legacy one to be robust
     # Note: Google determines which one is "correct" based on what was passed to /auth
@@ -173,6 +203,11 @@ async def complete_gsc_auth(
         flow.redirect_uri = r_uri
         
         try:
+            # If we have a code_verifier from PKCE, set it on the flow
+            if code_verifier:
+                flow.code_verifier = code_verifier
+                logger.info(f"Using stored code_verifier for PKCE")
+            
             flow.fetch_token(code=payload.code)
             token = flow.credentials
             

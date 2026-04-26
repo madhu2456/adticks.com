@@ -4,7 +4,7 @@ import {
   User, FolderOpen, Link2, CreditCard, Key,
   CheckCircle, XCircle, Copy, RefreshCw, Eye, EyeOff,
   Plus, X, ChevronDown, BarChart2, Megaphone, TrendingUp,
-  Zap, Crown, Loader2,
+  Zap, Crown, Loader2, Database,
 } from "lucide-react";
 import { useActiveProject, useUpdateProject } from "@/hooks/useProject";
 import { useUsage } from "@/hooks/useUsage";
@@ -14,7 +14,7 @@ import { api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
-type Tab = "profile" | "project" | "integrations" | "plan" | "api";
+type Tab = "profile" | "project" | "integrations" | "plan" | "api" | "cache";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "profile", label: "Profile", icon: User },
@@ -22,6 +22,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "integrations", label: "Integrations", icon: Link2 },
   { id: "plan", label: "Plan", icon: CreditCard },
   { id: "api", label: "API", icon: Key },
+  { id: "cache", label: "Data Cache", icon: Database },
 ];
 
 function SaveButton({ onClick, saved }: { onClick: () => void; saved: boolean }) {
@@ -823,6 +824,149 @@ function APITab() {
   );
 }
 
+function CacheTab() {
+  const { activeProject } = useActiveProject();
+  const { showAlert, AlertModal } = useAlertModal();
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [clearing, setClearing] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (activeProject) {
+      loadStats();
+    }
+  }, [activeProject]);
+
+  async function loadStats() {
+    setLoading(true);
+    try {
+      const data = await api.cache.stats(activeProject!.id);
+      setStats(data);
+    } catch (err) {
+      console.error("Failed to load cache stats", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleInvalidateComponent(component: string) {
+    if (!activeProject) return;
+    setClearing(component);
+    try {
+      await api.cache.invalidateComponent(activeProject.id, component);
+      showAlert({
+        title: "Cache Cleared",
+        message: `${component} cache has been cleared successfully.`,
+        type: "success",
+      });
+      loadStats();
+    } catch (err) {
+      showAlert({
+        title: "Clear Failed",
+        message: `Failed to clear ${component} cache.`,
+        type: "error",
+      });
+    } finally {
+      setClearing(null);
+    }
+  }
+
+  async function handleInvalidateAll() {
+    if (!activeProject) return;
+    showAlert({
+      title: "Clear All Cache?",
+      message: "This will force the next scan to re-fetch all data. Are you sure?",
+      type: "warning",
+      confirmText: "Clear All",
+      cancelText: "Cancel",
+      onConfirm: async () => {
+        setClearing("all");
+        try {
+          await api.cache.invalidate(activeProject.id);
+          showAlert({
+            title: "Success",
+            message: "All project caches cleared.",
+            type: "success",
+          });
+          loadStats();
+        } catch (err) {
+          showAlert({
+            title: "Clear Failed",
+            message: "Failed to clear all cache.",
+            type: "error",
+          });
+        } finally {
+          setClearing(null);
+        }
+      }
+    });
+  }
+
+  if (!activeProject) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <Database className="h-12 w-12 text-[#475569] mb-4" />
+        <h2 className="text-lg font-semibold text-[#f1f5f9]">No Project Selected</h2>
+        <p className="text-sm text-[#94a3b8] max-w-xs mt-1">Select or create a project to manage its cache.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold text-[#f1f5f9] mb-1">Cache & Data Management</h2>
+        <p className="text-sm text-[#94a3b8]">Manage differential update cache to force fresh data collection.</p>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-[#94a3b8]">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading stats...
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {["keywords", "rankings", "audit", "gaps"].map((comp) => {
+            const stat = stats?.components?.[comp];
+            const exists = stat?.exists;
+            const size = stat?.size_bytes ? (stat.size_bytes / 1024).toFixed(1) + " KB" : "0 KB";
+            const isClearing = clearing === comp;
+            
+            return (
+              <div key={comp} className="flex items-center justify-between p-4 bg-[#0f172a]/50 border border-[#334155] rounded-xl">
+                <div>
+                  <h4 className="text-sm font-medium text-[#f1f5f9] capitalize">{comp}</h4>
+                  <p className="text-xs text-[#94a3b8]">
+                    {exists ? `Cached size: ${size}` : "Not cached currently"}
+                  </p>
+                </div>
+                <button
+                  disabled={!exists || isClearing || clearing === "all"}
+                  onClick={() => handleInvalidateComponent(comp)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#334155] text-[#f1f5f9] hover:bg-[#475569] disabled:opacity-50 transition-colors"
+                >
+                  {isClearing ? <Loader2 className="h-3 w-3 animate-spin" /> : "Clear"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="pt-6 border-t border-[#334155]">
+        <button
+          onClick={handleInvalidateAll}
+          disabled={clearing === "all"}
+          className="flex items-center gap-2 bg-[#ef4444]/10 hover:bg-[#ef4444]/20 text-[#ef4444] border border-[#ef4444]/20 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all disabled:opacity-50"
+        >
+          {clearing === "all" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          Clear All Project Cache
+        </button>
+      </div>
+      {AlertModal}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("profile");
 
@@ -832,6 +976,7 @@ export default function SettingsPage() {
     integrations: <IntegrationsTab />,
     plan: <PlanTab />,
     api: <APITab />,
+    cache: <CacheTab />,
   };
 
   return (

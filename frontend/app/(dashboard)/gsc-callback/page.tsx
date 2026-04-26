@@ -24,7 +24,12 @@ export default function GSCCallbackPage() {
     const completeAuth = async () => {
       try {
         completedRef.current = true;
-        await api.gsc.completeAuth(code);
+        // Retrieve pkce_state from sessionStorage
+        const pkce_state = sessionStorage.getItem("gsc_pkce_state");
+        if (pkce_state) {
+          sessionStorage.removeItem("gsc_pkce_state"); // Clear it after use
+        }
+        await api.gsc.completeAuth(code, pkce_state || undefined);
         router.push("/gsc?success=true");
       } catch (err: any) {
         console.error("GSC Auth completion failed:", err);

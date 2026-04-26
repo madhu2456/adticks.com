@@ -15,6 +15,8 @@ from app.core.celery_utils import run_async
 from app.core.database import AsyncSessionLocal, engine
 from app.core.storage import StorageService
 from app.core.progress import ScanProgress, ScanStage
+from app.core.component_cache import ComponentCache
+from app.core.differential_updates import DifferentialUpdateDetector
 from app.models.project import Project
 from app.models.competitor import Competitor
 from app.models.prompt import Prompt
@@ -149,41 +151,82 @@ def run_full_scan_task(self, project_id: str, force_refresh: bool = False) -> di
     # 4. Filter AI tasks if disabled
     ai_enabled = project_info.get("ai_scans_enabled", True)
     
-    # Define parallel group
-    parallel_tasks = [
-        run_rank_tracking_task.si(project_id=project_id, parent_task_id=master_task_id),
-        run_seo_audit_task.si(project_id=project_id, parent_task_id=master_task_id),
-        find_content_gaps_task.si(project_id=project_id, parent_task_id=master_task_id),
-        sync_gsc_data_task.si(project_id=project_id, parent_task_id=master_task_id),
-        sync_ads_data_task.si(project_id=project_id, parent_task_id=master_task_id),
-    ]
+    # 5. Differential Update Detection
+    async def _get_changes():
+        detector = DifferentialUpdateDetector(project_id)
+        return await detector.get_changes_summary(
+            domain=domain,
+            keywords=project_info["keywords"],
+            competitors=project_info["competitors"]
+        )
+    
+    changes = run_async(_get_changes())
+    logger.info(f"[{project_id}] Differential analysis: {changes}")
+
+    # Define parallel group based on changes
+    parallel_tasks = []
+    
+    # Rankings should probably run every time unless we want to be very aggressive, 
+    # but let's say we always run them for fresh data.
+    parallel_tasks.append(run_rank_tracking_task.si(project_id=project_id, parent_task_id=master_task_id))
+    
+    # Audit: skip if domain hasn't changed and not forced
+    if changes["domain_changed"] or force_refresh:
+        parallel_tasks.append(run_seo_audit_task.si(project_id=project_id, parent_task_id=master_task_id))
+    else:
+        logger.info(f"[{project_id}] Skipping SEO audit (domain unchanged)")
+
+    # Content Gaps: skip if domain and competitors haven't changed
+    if changes["domain_changed"] or changes["competitors_changed"] or force_refresh:
+        parallel_tasks.append(find_content_gaps_task.si(project_id=project_id, parent_task_id=master_task_id))
+    else:
+        logger.info(f"[{project_id}] Skipping content gap analysis (domain and competitors unchanged)")
+
+    # GSC and Ads: always sync for fresh daily data
+    parallel_tasks.append(sync_gsc_data_task.si(project_id=project_id, parent_task_id=master_task_id))
+    parallel_tasks.append(sync_ads_data_task.si(project_id=project_id, parent_task_id=master_task_id))
     
     if ai_enabled:
-        parallel_tasks.append(
-            generate_prompts_task.si(
+        # Prompt generation: only if keywords or competitors changed
+        if changes["keywords_changed"] or changes["competitors_changed"] or force_refresh:
+            parallel_tasks.append(
+                generate_prompts_task.si(
+                    project_id=project_id,
+                    brand_name=brand_name,
+                    domain=domain,
+                    industry=industry,
+                    competitors=competitor_domains,
+                    parent_task_id=master_task_id,
+                )
+            )
+        else:
+            logger.info(f"[{project_id}] Skipping prompt generation (keywords and competitors unchanged)")
+    else:
+        logger.info(f"[{project_id}] AI scans disabled for this project. Skipping prompt generation.")
+
+    # 6. Build the chain
+    chain_steps = []
+    
+    # Keyword discovery: only if domain or industry changed
+    if changes["domain_changed"] or force_refresh:
+        chain_steps.append(
+            generate_keywords_task.s(
                 project_id=project_id,
-                brand_name=brand_name,
                 domain=domain,
                 industry=industry,
-                competitors=competitor_domains,
+                seed_keywords=seed_keywords,
                 parent_task_id=master_task_id,
             )
         )
     else:
-        logger.info(f"[{project_id}] AI scans disabled for this project. Skipping prompt generation.")
-
-    chain_steps = [
-        generate_keywords_task.s(
-            project_id=project_id,
-            domain=domain,
-            industry=industry,
-            seed_keywords=seed_keywords,
-            parent_task_id=master_task_id,
-        ),
-        group(parallel_tasks),
-    ]
+        logger.info(f"[{project_id}] Skipping keyword discovery (domain unchanged)")
+    
+    if parallel_tasks:
+        chain_steps.append(group(parallel_tasks))
     
     if ai_enabled:
+        # LLM scan: run if prompts were regenerated or if specifically requested
+        # For simplicity, if AI is enabled and we are running a scan, we run the LLM scan
         chain_steps.append(run_llm_scan_task.si(project_id=project_id, prompt_limit=100, parent_task_id=master_task_id))
     
     chain_steps.extend([
@@ -223,11 +266,20 @@ async def _get_project_info(project_id: str) -> dict | None:
         if not project:
             return None
         competitors = await _load_competitors(session, project_id)
+        
+        # Also load keyword texts for differential update detection
+        kw_result = await session.execute(
+            select(Keyword.keyword).where(Keyword.project_id == project_id)
+        )
+        keywords = [r[0] for r in kw_result.all()]
+        
         return {
             "domain": project.domain,
             "brand_name": project.brand_name,
             "industry": project.industry,
             "competitors": [c.domain for c in competitors],
+            "keywords": keywords,
+            "ai_scans_enabled": project.ai_scans_enabled,
         }
 
 
@@ -453,6 +505,11 @@ async def _cache_scan_results_impl(project_id: str, scan_results: dict | None = 
     try:
         # Build a results dict with latest data
         async with AsyncSessionLocal() as session:
+            # Load project for domain info
+            project = await _load_project(session, project_id)
+            if not project:
+                return {"project_id": project_id, "status": "project_not_found"}
+            
             # Get latest score
             score_result = await session.execute(
                 select(Score)
@@ -462,12 +519,16 @@ async def _cache_scan_results_impl(project_id: str, scan_results: dict | None = 
             )
             latest_score = score_result.scalar_one_or_none()
             
-            # Get latest keywords count
+            # Get latest keywords
             kw_result = await session.execute(
-                select(func.count(Keyword.id))
-                .where(Keyword.project_id == project_id)
+                select(Keyword.keyword).where(Keyword.project_id == project_id)
             )
-            keyword_count = kw_result.scalar() or 0
+            keyword_list = [r[0] for r in kw_result.all()]
+            keyword_count = len(keyword_list)
+            
+            # Get competitors
+            competitors = await _load_competitors(session, project_id)
+            competitor_domains = [c.domain for c in competitors]
             
             # Build cache object
             cache_data = {
@@ -481,6 +542,18 @@ async def _cache_scan_results_impl(project_id: str, scan_results: dict | None = 
                 "keyword_count": keyword_count,
                 "status": "complete",
             }
+            
+            # Save state for differential updates
+            try:
+                detector = DifferentialUpdateDetector(project_id)
+                await detector.save_all_states(
+                    domain=project.domain,
+                    keywords=keyword_list,
+                    competitors=competitor_domains
+                )
+                logger.info(f"Saved differential update state for project {project_id}")
+            except Exception as e:
+                logger.warning(f"Failed to save differential update state: {e}")
         
         # Save to Redis cache
         success = await save_scan_results(project_id, cache_data)

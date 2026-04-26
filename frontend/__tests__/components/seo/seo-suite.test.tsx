@@ -7,7 +7,22 @@ import { RankHistoryChart } from '@/components/seo/RankHistoryChart';
 import { CompetitorAnalysis } from '@/components/seo/CompetitorAnalysis';
 import { BacklinkDashboard } from '@/components/seo/BacklinkDashboard';
 
-jest.mock('axios');
+jest.mock('axios', () => {
+  const mockAxios = {
+    get: jest.fn(),
+    post: jest.fn(),
+    put: jest.fn(),
+    delete: jest.fn(),
+    patch: jest.fn(),
+    interceptors: {
+      request: { use: jest.fn() },
+      response: { use: jest.fn() },
+    },
+    create: jest.fn(),
+  };
+  mockAxios.create.mockReturnValue(mockAxios);
+  return mockAxios;
+});
 jest.mock('next-themes', () => ({
   useTheme: jest.fn(() => ({ theme: 'light', setTheme: jest.fn() })),
 }));
@@ -83,7 +98,7 @@ describe('RankHistoryChart', () => {
 
     await waitFor(() => {
       expect(mockAxios.get).toHaveBeenCalledWith(
-        expect.stringContaining(`/api/seo/projects/${projectId}/keywords/history`)
+        expect.stringContaining(`/seo/projects/${projectId}/keywords/history`)
       );
     });
   });
@@ -378,23 +393,37 @@ describe('BacklinkDashboard', () => {
   });
 
   test('handles pagination', async () => {
-    mockAxios.get.mockResolvedValueOnce({
-      data: {
-        ...mockBacklinkData,
-        total: 30,
-        has_more: true,
-      },
+    mockAxios.get.mockImplementation((url: string) => {
+      if (url.includes('/backlinks/stats')) {
+        return Promise.resolve({ data: { total_backlinks: 30, avg_authority: 50 } });
+      }
+      if (url.includes('/backlinks/intersect')) {
+        return Promise.resolve({ data: [] });
+      }
+      if (url.includes('/backlinks')) {
+        return Promise.resolve({
+          data: {
+            ...mockBacklinkData,
+            total: 30,
+            has_more: true,
+          },
+        });
+      }
+      return Promise.resolve({ data: {} });
     });
 
     render(
       <QueryClientProvider client={queryClient}>
-        <BacklinkDashboard projectId={projectId} pageSize={15} />
+        <BacklinkDashboard projectId={projectId} />
       </QueryClientProvider>
     );
 
-    const nextButton = await waitFor(() => screen.getByText(/Next/i));
-    expect(nextButton).not.toBeDisabled();
+    await waitFor(() => {
+      const nextButton = screen.getByText(/Next/i);
+      expect(nextButton).not.toBeDisabled();
+    });
 
+    const nextButton = screen.getByText(/Next/i);
     await userEvent.click(nextButton);
 
     await waitFor(() => {

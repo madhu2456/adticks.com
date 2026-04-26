@@ -62,7 +62,9 @@ export default function GSCPage() {
   async function handleConnect() {
     if (!activeProject) return;
     try {
-      const { auth_url } = await api.gsc.getAuthUrl(activeProject.id);
+      const { auth_url, pkce_state } = await api.gsc.getAuthUrl(activeProject.id);
+      // Store pkce_state in sessionStorage so gsc-callback can retrieve it
+      sessionStorage.setItem("gsc_pkce_state", pkce_state);
       window.location.href = auth_url;
     } catch (err) {
       console.error("Failed to get GSC auth URL:", err);

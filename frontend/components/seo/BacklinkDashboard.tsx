@@ -21,7 +21,8 @@ import {
   ShieldCheck,
   Search,
   ExternalLink,
-  Target
+  Target,
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -33,17 +34,24 @@ export function BacklinkDashboard({ projectId }: BacklinkDashboardProps) {
   const { theme } = useTheme();
   const [currentPage, setCurrentPage] = useState(0);
   const [activeTab, setActiveTab] = useState("overview");
+  const [minAuthority, setMinAuthority] = useState<number | ''>('');
   const pageSize = 15;
   const skip = currentPage * pageSize;
 
   // Fetch real data
-  const { data: backlinksResponse, isLoading: backlinksLoading } = useBacklinks(projectId, skip, pageSize);
+  const { data: backlinksResponse, isLoading: backlinksLoading } = useBacklinks(
+    projectId, 
+    skip, 
+    pageSize, 
+    minAuthority === '' ? undefined : Number(minAuthority)
+  );
   const { data: stats, isLoading: statsLoading } = useBacklinkStats(projectId);
   const { data: intersect, isLoading: intersectLoading } = useBacklinkIntersect(projectId);
 
   const isDark = theme === 'dark';
   const backlinks = backlinksResponse?.data || [];
-  const totalPages = backlinksResponse ? Math.ceil(backlinksResponse.total / pageSize) : 0;
+  const totalCount = backlinksResponse?.total || 0;
+  const totalPages = Math.ceil(totalCount / pageSize);
 
   const getAuthorityBadgeColor = (score: number) => {
     if (score >= 80) return 'text-green-500 bg-green-500/10 border-green-500/20';
@@ -52,11 +60,24 @@ export function BacklinkDashboard({ projectId }: BacklinkDashboardProps) {
     return 'text-red-500 bg-red-500/10 border-red-500/20';
   };
 
+  const handleMinAuthorityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (val === '') {
+      setMinAuthority('');
+    } else {
+      const num = parseInt(val);
+      if (!isNaN(num)) {
+        setMinAuthority(num);
+      }
+    }
+    setCurrentPage(0); // Reset to first page on filter change
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-xl font-bold text-text-primary">Advanced Backlink Intelligence</h3>
+          <h3 className="text-xl font-bold text-text-primary">Backlinks Overview</h3>
           <p className="text-sm text-text-muted">Analyze your link profile and find gaps compared to competitors</p>
         </div>
       </div>
@@ -78,7 +99,7 @@ export function BacklinkDashboard({ projectId }: BacklinkDashboardProps) {
                   <Link2 size={20} />
                 </div>
                 <div>
-                  <p className="text-xs text-text-muted">Total Links</p>
+                  <p className="text-xs text-text-muted">Total Backlinks</p>
                   <p className="text-xl font-bold">{stats?.total_backlinks || 0}</p>
                 </div>
               </CardContent>
@@ -119,8 +140,31 @@ export function BacklinkDashboard({ projectId }: BacklinkDashboardProps) {
           </div>
 
           <Card>
-            <CardHeader className="pb-3 border-b border-border">
+            <CardHeader className="pb-3 border-b border-border flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-lg">Recent Backlinks</CardTitle>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
+                  <Input
+                    type="number"
+                    placeholder="Filter by min authority"
+                    className="h-8 w-[180px] pl-8 text-xs bg-surface-2"
+                    value={minAuthority}
+                    onChange={handleMinAuthorityChange}
+                  />
+                  {minAuthority !== '' && (
+                    <button 
+                      onClick={() => setMinAuthority('')}
+                      className="absolute right-2 top-2 text-text-muted hover:text-text-primary"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setMinAuthority('')}>
+                  Clear
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -138,30 +182,38 @@ export function BacklinkDashboard({ projectId }: BacklinkDashboardProps) {
                       [1,2,3].map(i => (
                         <tr key={i}><td colSpan={4} className="px-4 py-4"><Skeleton className="h-4 w-full" /></td></tr>
                       ))
-                    ) : backlinks.map((link) => (
-                      <tr key={link.id} className="border-b border-border hover:bg-surface2/50 transition-colors">
-                        <td className="px-4 py-4">
-                          <div className="font-medium text-text-primary flex items-center gap-2">
-                            {link.referring_domain}
-                            <ExternalLink size={12} className="text-text-tertiary" />
-                          </div>
-                          <p className="text-xs text-text-muted truncate max-w-[200px]">{link.target_url || "Homepage"}</p>
-                        </td>
-                        <td className="px-4 py-4">
-                          <Badge variant="outline" className={cn("font-bold", getAuthorityBadgeColor(link.authority_score))}>
-                            {link.authority_score.toFixed(0)}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-4 text-text-muted">
-                          {new Date(link.timestamp).toLocaleDateString()}
-                        </td>
-                        <td className="px-4 py-4">
-                          <Badge variant="secondary" className="capitalize">
-                            {link.status || "active"}
-                          </Badge>
+                    ) : backlinks.length > 0 ? (
+                      backlinks.map((link) => (
+                        <tr key={link.id} className="border-b border-border hover:bg-surface2/50 transition-colors">
+                          <td className="px-4 py-4">
+                            <div className="font-medium text-text-primary flex items-center gap-2">
+                              {link.referring_domain}
+                              <ExternalLink size={12} className="text-text-tertiary" />
+                            </div>
+                            <p className="text-xs text-text-muted truncate max-w-[200px]">{link.target_url || "Homepage"}</p>
+                          </td>
+                          <td className="px-4 py-4">
+                            <Badge variant="outline" className={cn("font-bold", getAuthorityBadgeColor(link.authority_score))}>
+                              {link.authority_score.toFixed(0)}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-4 text-text-muted">
+                            {new Date(link.timestamp).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-4">
+                            <Badge variant="secondary" className="capitalize">
+                              {link.status || "active"}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-10 text-center text-text-muted">
+                          No backlinks available
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>

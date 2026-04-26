@@ -80,6 +80,14 @@ export function useCreateCluster() {
   });
 }
 
+export function useBacklinks(projectId: string, skip = 0, limit = 50, minAuthority?: number) {
+  return useQuery({
+    queryKey: ["backlinks", projectId, skip, limit, minAuthority],
+    queryFn: () => api.seoSuite.getBacklinks(projectId, skip, limit, minAuthority),
+    enabled: !!projectId,
+  });
+}
+
 export function useBacklinkStats(projectId: string) {
   return useQuery({
     queryKey: ["backlinkStats", projectId],

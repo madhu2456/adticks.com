@@ -419,7 +419,7 @@ describe("Error Boundary Edge Cases", () => {
   });
 
   it("handles error report button click", async () => {
-    const alertSpy = jest.spyOn(window, "alert").mockImplementation();
+    const consoleSpy = jest.spyOn(console, "log").mockImplementation();
 
     render(
       <ErrorBoundary>
@@ -430,10 +430,13 @@ describe("Error Boundary Edge Cases", () => {
     fireEvent.click(screen.getByRole("button", { name: /report error/i }));
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalled();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Error report would be sent:",
+        expect.any(Object)
+      );
     });
 
-    alertSpy.mockRestore();
+    consoleSpy.mockRestore();
   });
 
   it("preserves component state in different error boundaries", () => {

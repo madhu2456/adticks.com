@@ -19,6 +19,7 @@ import { useInsights } from "@/hooks/useInsights";
 import { useAlertModal } from "@/hooks/useAlertModal";
 import { getUser } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { ScanProgressModal } from "@/components/projects/ScanProgressModal";
 import { 
   mockStats, mockScore, mockChannelPerformance, 
   mockActivity, mockInsights 
@@ -179,6 +180,9 @@ export function DashboardContent() {
   const greeting = getGreeting();
   const { showAlert, AlertModal } = useAlertModal();
 
+  const [isScanModalOpen, setIsScanModalOpen] = React.useState(false);
+  const [activeTaskId, setActiveTaskId] = React.useState<string | null>(null);
+
   const handleRefresh = async () => {
     if (!activeProject) {
       showAlert({
@@ -190,71 +194,10 @@ export function DashboardContent() {
       return;
     }
 
-    showAlert({
-      title: "Scan Starting",
-      message: "Starting comprehensive scan of SEO, AI visibility, GSC, and Ads data... This will take a few moments.",
-      type: "info",
-      confirmText: "Got it",
-    });
-
     try {
       const data = await api.ai.runScan(activeProject.id);
-      const taskId = data.task_id;
-
-      showAlert({
-        title: "Scan Queued",
-        message: "Your scan has been queued and will complete in a few moments. Check back shortly for updated data.",
-        type: "success",
-        confirmText: "OK",
-      });
-
-      // Poll for task completion
-      let isComplete = false;
-      let pollCount = 0;
-      const maxPolls = 120; // 2 minutes max with 1 second interval
-      
-      while (!isComplete && pollCount < maxPolls) {
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before polling
-        
-        try {
-          const statusData = await api.ai.getTaskStatus(taskId);
-          
-          if (statusData.status === "SUCCESS") {
-            isComplete = true;
-            showAlert({
-              title: "Scan Complete",
-              message: "Your scan has completed successfully! The data is now being displayed.",
-              type: "success",
-              confirmText: "OK",
-              onConfirm: () => {
-                window.location.reload();
-              }
-            });
-          } else if (statusData.status === "FAILURE") {
-            isComplete = true;
-            showAlert({
-              title: "Scan Failed",
-              message: `Scan failed: ${statusData.error || "Unknown error"}`,
-              type: "error",
-              confirmText: "Close",
-            });
-            break;
-          }
-        } catch (err) {
-          console.error("Poll error:", err);
-        }
-        
-        pollCount++;
-      }
-      
-      if (!isComplete && pollCount >= maxPolls) {
-        showAlert({
-          title: "Scan Timeout",
-          message: "The scan is taking longer than expected. Results may still be processing. Please check back in a moment.",
-          type: "warning",
-          confirmText: "OK",
-        });
-      }
+      setActiveTaskId(data.task_id);
+      setIsScanModalOpen(true);
     } catch (err) {
       console.error("Scan error:", err);
       showAlert({
@@ -513,6 +456,16 @@ export function DashboardContent() {
 
       </div>
       {AlertModal}
+      <ScanProgressModal
+        projectId={projectId}
+        taskId={activeTaskId}
+        isOpen={isScanModalOpen}
+        onClose={() => setIsScanModalOpen(false)}
+        onComplete={() => {
+          setIsScanModalOpen(false);
+          window.location.reload();
+        }}
+      />
     </div>
   );
 }

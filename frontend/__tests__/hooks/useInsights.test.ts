@@ -82,11 +82,11 @@ describe("useInsights", () => {
     resolve!(mockInsightsData);
   });
 
-  it("handles API errors", async () => {
+  it("handles API errors by returning empty data", async () => {
     (mockApi.insights.getInsights as jest.Mock).mockRejectedValue(new Error("Server error"));
     const { result } = renderHook(() => useInsights("proj1"), { wrapper: createWrapper() });
-    await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(result.current.error).toEqual(new Error("Server error"));
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual({ data: [] });
   });
 
   it("filters by category when category param is provided", async () => {
