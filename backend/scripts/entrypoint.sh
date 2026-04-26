@@ -17,8 +17,12 @@ echo "Running database migrations via Alembic..."
 alembic upgrade head
 echo "Migrations completed successfully."
 
-# Check if we should start uvicorn with reload (development) or not (production)
-if [ "$DEBUG" = "true" ]; then
+# If arguments are provided (e.g., from docker-compose command), execute them (for Celery worker)
+if [ $# -gt 0 ]; then
+    echo "Starting with provided command..."
+    exec "$@"
+# Otherwise, start Uvicorn (for backend server)
+elif [ "$DEBUG" = "true" ]; then
     echo "Starting Uvicorn with reload..."
     exec uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 else
