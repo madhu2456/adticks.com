@@ -830,6 +830,7 @@ function CacheTab() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState<string | null>(null);
+  const [clearingDb, setClearingDb] = useState(false);
 
   React.useEffect(() => {
     if (activeProject) {
@@ -870,6 +871,38 @@ function CacheTab() {
       setClearing(null);
     }
   }
+
+  async function handleClearDatabase() {
+    if (!activeProject) return;
+    showAlert({
+      title: "Clear All Database Records?",
+      message: "This will permanently delete ALL keywords, rankings, scores, prompts, and scan data for this project. This action CANNOT be undone. Are you absolutely sure?",
+      type: "warning",
+      confirmText: "Yes, Clear All Data",
+      cancelText: "Cancel",
+      onConfirm: async () => {
+        setClearingDb(true);
+        try {
+          const response = await api.cache.clearDatabase(activeProject.id);
+          showAlert({
+            title: "Database Cleared",
+            message: `Successfully cleared ${response.records_cleared} records from the database.`,
+            type: "success",
+          });
+          loadStats();
+        } catch (err) {
+          showAlert({
+            title: "Clear Failed",
+            message: "Failed to clear database records. Please try again.",
+            type: "error",
+          });
+        } finally {
+          setClearingDb(false);
+        }
+      }
+    });
+  }
+
 
   async function handleInvalidateAll() {
     if (!activeProject) return;
@@ -962,6 +995,23 @@ function CacheTab() {
           Clear All Project Cache
         </button>
       </div>
+
+      <div className="pt-6 border-t border-[#334155]">
+        <h3 className="text-sm font-semibold text-[#f1f5f9] mb-3 flex items-center gap-2">
+          <span className="w-2 h-2 bg-[#ef4444] rounded-full"></span>
+          Danger Zone
+        </h3>
+        <button
+          onClick={handleClearDatabase}
+          disabled={clearingDb || !activeProject}
+          className="flex items-center gap-2 bg-[#7c2d12]/20 hover:bg-[#7c2d12]/30 text-[#ea580c] border border-[#ea580c]/30 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all disabled:opacity-50"
+        >
+          {clearingDb ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
+          {clearingDb ? "Clearing..." : "Empty Database"}
+        </button>
+        <p className="text-xs text-[#94a3b8] mt-2">Permanently delete all keywords, rankings, scores, and scan data. This cannot be undone.</p>
+      </div>
+
       {AlertModal}
     </div>
   );

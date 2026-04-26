@@ -359,6 +359,8 @@ export const api = {
       axiosInstance.post<any>(`/cache/invalidate-component/${projectId}/${component}`).then(unwrap),
     purgeAll: () =>
       axiosInstance.post<any>("/cache/purge-all").then(unwrap),
+    clearDatabase: (projectId: string) =>
+      axiosInstance.post<any>(`/cache/clear-db?project_id=${projectId}`).then(unwrap),
   },
 };
 

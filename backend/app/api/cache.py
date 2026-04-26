@@ -66,6 +66,104 @@ async def purge_all_cache(current_user=Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/clear-db", name="Clear database records")
+async def clear_database_records(
+    project_id: str,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+):
+    """
+    DANGER ZONE: Clear all data records for a project from the database.
+    This removes keywords, rankings, scores, prompts, responses, and all scan-related data.
+    This action CANNOT be undone.
+    
+    Only project owner can perform this action.
+    """
+    # Verify project exists and user owns it
+    result = await session.execute(
+        select(Project).where(Project.id == project_id)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    if project.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only project owner can clear project data."
+        )
+    
+    try:
+        from sqlalchemy import delete
+        from app.models.keyword import Keyword
+        from app.models.ranking import Ranking, RankHistory
+        from app.models.score import Score
+        from app.models.prompt import Prompt
+        from app.models.response import Response
+        from app.models.audit import (
+            OnPageAudit, TechnicalCheck, ContentAnalysis,
+            ContentRecommendation, BrokenLink, URLRedirect,
+            DuplicateContent, ImageAudit, MetaTagAudit,
+            StructuredDataAudit, CrawlabilityAudit,
+            InternalLinkMap, PageSpeedMetrics
+        )
+        from app.models.gsc import GSCData
+        from app.models.ads import AdsData
+        from app.models.backlink import Backlink
+        from app.models.cluster import Cluster
+        from app.models.competitor import Competitor, CompetitorKeywords
+        
+        tables_to_clear = [
+            (Keyword, "keywords"),
+            (RankHistory, "rank_history"),
+            (Ranking, "rankings"),
+            (Score, "scores"),
+            (Response, "responses"),
+            (Prompt, "prompts"),
+            (OnPageAudit, "on_page_audit"),
+            (TechnicalCheck, "technical_checks"),
+            (ContentAnalysis, "content_analysis"),
+            (ContentRecommendation, "content_recommendations"),
+            (BrokenLink, "broken_links"),
+            (URLRedirect, "url_redirects"),
+            (DuplicateContent, "duplicate_content"),
+            (ImageAudit, "image_audits"),
+            (MetaTagAudit, "meta_tag_audits"),
+            (StructuredDataAudit, "structured_data_audits"),
+            (CrawlabilityAudit, "crawlability_audits"),
+            (InternalLinkMap, "internal_link_maps"),
+            (PageSpeedMetrics, "page_speed_metrics"),
+            (GSCData, "gsc_data"),
+            (AdsData, "ads_data"),
+            (Backlink, "backlinks"),
+            (CompetitorKeywords, "competitor_keywords"),
+            (Competitor, "competitors"),
+            (Cluster, "clusters"),
+        ]
+        
+        deleted_count = 0
+        for model, table_name in tables_to_clear:
+            stmt = delete(model).where(model.project_id == project_id)
+            result = await session.execute(stmt)
+            deleted_count += result.rowcount
+            logger.info(f"Cleared {result.rowcount} records from {table_name} for project {project_id}")
+        
+        await session.commit()
+        
+        logger.warning(f"DATABASE CLEARED: User {current_user.email} cleared all records for project {project_id} ({deleted_count} records deleted)")
+        
+        return {
+            "status": "success",
+            "message": f"Successfully cleared {deleted_count} records from project database.",
+            "records_cleared": deleted_count,
+        }
+    except Exception as e:
+        await session.rollback()
+        logger.error(f"Error clearing database records: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear database: {str(e)}")
+
+
+
 @router.get("/stats/{project_id}", name="Get cache stats")
 async def get_cache_stats(project_id: str, session: AsyncSession = Depends(get_db)):
     """
