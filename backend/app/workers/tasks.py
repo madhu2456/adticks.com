@@ -504,47 +504,69 @@ async def _cache_scan_results_impl(project_id: str, scan_results: dict | None = 
     logger.info("Caching scan results for project %s", project_id)
     
     try:
-        # Build a results dict with latest data
-        async with AsyncSessionLocal() as session:
-            # Load project for domain info
-            project = await _load_project(session, project_id)
-            if not project:
-                return {"project_id": project_id, "status": "project_not_found"}
-            
-            # Get latest score
-            score_result = await session.execute(
-                select(Score)
-                .where(Score.project_id == project_id)
-                .order_by(Score.timestamp.desc())
-                .limit(1)
-            )
-            latest_score = score_result.scalar_one_or_none()
-            
-            # Get latest keywords
-            kw_result = await session.execute(
-                select(Keyword.keyword).where(Keyword.project_id == project_id)
-            )
-            keyword_list = [r[0] for r in kw_result.all()]
-            keyword_count = len(keyword_list)
-            
-            # Get competitors
-            competitors = await _load_competitors(session, project_id)
-            competitor_domains = [c.domain for c in competitors]
-            
-            # Build cache object
-            cache_data = {
-                "project_id": project_id,
-                "scan_completed_at": datetime.now(timezone.utc).isoformat(),
-                "scores": {
-                    "visibility_score": latest_score.visibility_score if latest_score else 0.0,
-                    "impact_score": latest_score.impact_score if latest_score else 0.0,
-                    "sov_score": latest_score.sov_score if latest_score else 0.0,
-                } if latest_score else {},
-                "keyword_count": keyword_count,
-                "status": "complete",
-            }
-            
-            # Save state for differential updates
+        # Build a results dict with latest data with timeout to prevent hanging
+        try:
+            async with AsyncSessionLocal() as session:
+                # Load project for domain info
+                project = await asyncio.wait_for(
+                    _load_project(session, project_id),
+                    timeout=10
+                )
+                if not project:
+                    return {"project_id": project_id, "status": "project_not_found"}
+                
+                # Get latest score with timeout
+                score_result = await asyncio.wait_for(
+                    session.execute(
+                        select(Score)
+                        .where(Score.project_id == project_id)
+                        .order_by(Score.timestamp.desc())
+                        .limit(1)
+                    ),
+                    timeout=10
+                )
+                latest_score = score_result.scalar_one_or_none()
+                
+                # Get latest keywords with timeout (only fetch first 1000 to avoid memory issues)
+                kw_result = await asyncio.wait_for(
+                    session.execute(
+                        select(Keyword.keyword).where(Keyword.project_id == project_id).limit(1000)
+                    ),
+                    timeout=15
+                )
+                keyword_list = [r[0] for r in kw_result.all()]
+                keyword_count = len(keyword_list)
+                
+                # Get competitors with timeout
+                competitors = await asyncio.wait_for(
+                    _load_competitors(session, project_id),
+                    timeout=10
+                )
+                competitor_domains = [c.domain for c in competitors]
+        except asyncio.TimeoutError:
+            logger.warning(f"Timeout loading scan data for {project_id} (continuing with partial data)")
+            # Use empty/default values to continue
+            latest_score = None
+            keyword_list = []
+            keyword_count = 0
+            competitor_domains = []
+            project = None
+        
+        # Build cache object
+        cache_data = {
+            "project_id": project_id,
+            "scan_completed_at": datetime.now(timezone.utc).isoformat(),
+            "scores": {
+                "visibility_score": latest_score.visibility_score if latest_score else 0.0,
+                "impact_score": latest_score.impact_score if latest_score else 0.0,
+                "sov_score": latest_score.sov_score if latest_score else 0.0,
+            } if latest_score else {},
+            "keyword_count": keyword_count,
+            "status": "complete",
+        }
+        
+        # Save state for differential updates (only if project was loaded)
+        if project:
             try:
                 detector = DifferentialUpdateDetector(project_id)
                 await asyncio.wait_for(
