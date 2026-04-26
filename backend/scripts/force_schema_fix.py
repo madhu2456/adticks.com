@@ -24,20 +24,16 @@ async def force_fix():
         
         # --- 2. Keywords Table Columns ---
         logger.info("Ensuring keywords table columns exist...")
-        await conn.execute(text("""
-            ALTER TABLE public.keywords ADD COLUMN IF NOT EXISTS cluster_id UUID REFERENCES public.clusters(id) ON DELETE SET NULL;
-            ALTER TABLE public.keywords ADD COLUMN IF NOT EXISTS intent VARCHAR(64);
-            ALTER TABLE public.keywords ADD COLUMN IF NOT EXISTS difficulty FLOAT;
-            ALTER TABLE public.keywords ADD COLUMN IF NOT EXISTS volume INTEGER;
-            ALTER TABLE public.keywords ADD COLUMN IF NOT EXISTS search_volume_history JSONB;
-        """))
+        await conn.execute(text("ALTER TABLE public.keywords ADD COLUMN IF NOT EXISTS cluster_id UUID REFERENCES public.clusters(id) ON DELETE SET NULL;"))
+        await conn.execute(text("ALTER TABLE public.keywords ADD COLUMN IF NOT EXISTS intent VARCHAR(64);"))
+        await conn.execute(text("ALTER TABLE public.keywords ADD COLUMN IF NOT EXISTS difficulty FLOAT;"))
+        await conn.execute(text("ALTER TABLE public.keywords ADD COLUMN IF NOT EXISTS volume INTEGER;"))
+        await conn.execute(text("ALTER TABLE public.keywords ADD COLUMN IF NOT EXISTS search_volume_history JSONB;"))
 
         # --- 3. Rankings Table Columns ---
         logger.info("Ensuring rankings table columns exist...")
-        await conn.execute(text("""
-            ALTER TABLE public.rankings ADD COLUMN IF NOT EXISTS position INTEGER;
-            ALTER TABLE public.rankings ADD COLUMN IF NOT EXISTS url VARCHAR(2048);
-        """))
+        await conn.execute(text("ALTER TABLE public.rankings ADD COLUMN IF NOT EXISTS position INTEGER;"))
+        await conn.execute(text("ALTER TABLE public.rankings ADD COLUMN IF NOT EXISTS url VARCHAR(2048);"))
         
         # --- 4. Backlinks Table ---
         logger.info("Ensuring backlinks table and columns exist...")
@@ -54,27 +50,22 @@ async def force_fix():
                 last_seen TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
                 timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
             );
-            
-            ALTER TABLE public.backlinks ADD COLUMN IF NOT EXISTS target_url VARCHAR(2048);
-            ALTER TABLE public.backlinks ADD COLUMN IF NOT EXISTS anchor_text VARCHAR(1024);
-            ALTER TABLE public.backlinks ADD COLUMN IF NOT EXISTS authority_score FLOAT NOT NULL DEFAULT 0.0;
         """))
+        await conn.execute(text("ALTER TABLE public.backlinks ADD COLUMN IF NOT EXISTS target_url VARCHAR(2048);"))
+        await conn.execute(text("ALTER TABLE public.backlinks ADD COLUMN IF NOT EXISTS anchor_text VARCHAR(1024);"))
+        await conn.execute(text("ALTER TABLE public.backlinks ADD COLUMN IF NOT EXISTS authority_score FLOAT NOT NULL DEFAULT 0.0;"))
 
         # --- 5. Project Table Columns ---
         logger.info("Ensuring projects table columns exist...")
-        await conn.execute(text("""
-            ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS gsc_connected BOOLEAN NOT NULL DEFAULT FALSE;
-            ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS gsc_property_url VARCHAR(512);
-            ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS ai_scans_enabled BOOLEAN NOT NULL DEFAULT TRUE;
-        """))
+        await conn.execute(text("ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS gsc_connected BOOLEAN NOT NULL DEFAULT FALSE;"))
+        await conn.execute(text("ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS gsc_property_url VARCHAR(512);"))
+        await conn.execute(text("ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS ai_scans_enabled BOOLEAN NOT NULL DEFAULT TRUE;"))
 
         # --- 6. Users Table Columns ---
         logger.info("Ensuring users table columns exist...")
-        await conn.execute(text("""
-            ALTER TABLE public.users ADD COLUMN IF NOT EXISTS plan VARCHAR(32) NOT NULL DEFAULT 'free';
-            ALTER TABLE public.users ADD COLUMN IF NOT EXISTS company_name VARCHAR(255);
-            ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_superuser BOOLEAN NOT NULL DEFAULT FALSE;
-        """))
+        await conn.execute(text("ALTER TABLE public.users ADD COLUMN IF NOT EXISTS plan VARCHAR(32) NOT NULL DEFAULT 'free';"))
+        await conn.execute(text("ALTER TABLE public.users ADD COLUMN IF NOT EXISTS company_name VARCHAR(255);"))
+        await conn.execute(text("ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_superuser BOOLEAN NOT NULL DEFAULT FALSE;"))
 
     logger.info("Force schema fix v2 completed.")
 
