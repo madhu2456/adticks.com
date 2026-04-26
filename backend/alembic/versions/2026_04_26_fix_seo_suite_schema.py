@@ -21,7 +21,30 @@ def upgrade():
     inspector = sa.inspect(conn)
     tables = inspector.get_table_names()
 
-    # 1. backlinks
+    # 1. clusters
+    if 'clusters' not in tables:
+        op.create_table(
+            'clusters',
+            sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+            sa.Column('project_id', postgresql.UUID(as_uuid=True), nullable=False),
+            sa.Column('topic_name', sa.String(length=512), nullable=False),
+            sa.Column('keywords', postgresql.JSONB(astext_type=sa.Text()), nullable=False, server_default='[]'),
+            sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+            sa.PrimaryKeyConstraint('id'),
+            sa.ForeignKeyConstraint(['project_id'], ['projects.id'], ondelete='CASCADE'),
+        )
+        op.create_index(op.f('ix_clusters_id'), 'clusters', ['id'], unique=False)
+        op.create_index(op.f('ix_clusters_project_id'), 'clusters', ['project_id'], unique=False)
+
+    # 2. Add cluster_id to keywords if not exists
+    if 'keywords' in tables:
+        columns = [c['name'] for c in inspector.get_columns('keywords')]
+        if 'cluster_id' not in columns:
+            op.add_column('keywords', sa.Column('cluster_id', postgresql.UUID(as_uuid=True), nullable=True))
+            op.create_foreign_key('fk_keywords_cluster_id', 'keywords', 'clusters', ['cluster_id'], ['id'], ondelete='SET NULL')
+            op.create_index(op.f('ix_keywords_cluster_id'), 'keywords', ['cluster_id'], unique=False)
+
+    # 3. backlinks
     if 'backlinks' not in tables:
         op.create_table(
             'backlinks',
@@ -60,7 +83,7 @@ def upgrade():
             op.add_column('backlinks', sa.Column('timestamp', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()))
             op.create_index(op.f('ix_backlinks_timestamp'), 'backlinks', ['timestamp'], unique=False)
 
-    # 2. rank_history
+    # 4. rank_history
     if 'rank_history' not in tables:
         op.create_table(
             'rank_history',
@@ -79,7 +102,7 @@ def upgrade():
         op.create_index(op.f('ix_rank_history_keyword_id'), 'rank_history', ['keyword_id'], unique=False)
         op.create_index(op.f('ix_rank_history_timestamp'), 'rank_history', ['timestamp'], unique=False)
 
-    # 3. serp_features
+    # 5. serp_features
     if 'serp_features' not in tables:
         op.create_table(
             'serp_features',
@@ -98,7 +121,7 @@ def upgrade():
         op.create_index(op.f('ix_serp_features_keyword_id'), 'serp_features', ['keyword_id'], unique=False)
         op.create_index(op.f('ix_serp_features_timestamp'), 'serp_features', ['timestamp'], unique=False)
 
-    # 4. competitor_keywords
+    # 6. competitor_keywords
     if 'competitor_keywords' not in tables:
         op.create_table(
             'competitor_keywords',
@@ -116,7 +139,7 @@ def upgrade():
         op.create_index(op.f('ix_competitor_keywords_project_id'), 'competitor_keywords', ['project_id'], unique=False)
         op.create_index(op.f('ix_competitor_keywords_timestamp'), 'competitor_keywords', ['timestamp'], unique=False)
 
-    # 5. site_audit_history
+    # 7. site_audit_history
     if 'site_audit_history' not in tables:
         op.create_table(
             'site_audit_history',
@@ -143,3 +166,8 @@ def downgrade():
     op.drop_table('serp_features')
     op.drop_table('rank_history')
     op.drop_table('backlinks')
+    # Remove cluster_id from keywords
+    op.drop_constraint('fk_keywords_cluster_id', 'keywords', type_='foreignkey')
+    op.drop_index('ix_keywords_cluster_id', 'keywords')
+    op.drop_column('keywords', 'cluster_id')
+    op.drop_table('clusters')
