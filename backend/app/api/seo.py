@@ -184,58 +184,63 @@ async def get_rankings(
     """
     await _assert_project_owner(project_id, current_user, db)
     
-    # Get total count
-    count_result = await db.execute(
-        select(func.count(Ranking.id))
-        .join(Keyword, Ranking.keyword_id == Keyword.id)
-        .where(Keyword.project_id == project_id)
-    )
-    total = count_result.scalar() or 0
-    
-    # Get paginated results with keyword info
-    result = await db.execute(
-        select(Ranking, Keyword)
-        .join(Keyword, Ranking.keyword_id == Keyword.id)
-        .where(Keyword.project_id == project_id)
-        .order_by(Ranking.timestamp.desc())
-        .offset(skip)
-        .limit(limit)
-    )
-    
-    # Get latest URLs per keyword for cannibalization check (last 24h)
-    yesterday = datetime.now(tz=timezone.utc) - timedelta(days=1)
-    cannibal_res = await db.execute(
-        select(Ranking.keyword_id, func.count(func.distinct(Ranking.url)))
-        .join(Keyword, Ranking.keyword_id == Keyword.id)
-        .where(Keyword.project_id == project_id, Ranking.timestamp >= yesterday)
-        .group_by(Ranking.keyword_id)
-        .having(func.count(func.distinct(Ranking.url)) > 1)
-    )
-    cannibal_ids = {r[0] for r in cannibal_res.all()}
-
-    # Build response with keyword data
-    rankings_with_keywords = []
-    for ranking, keyword in result.all():
-        response = RankingResponse(
-            id=ranking.id,
-            keyword_id=ranking.keyword_id,
-            position=ranking.position,
-            url=ranking.url,
-            timestamp=ranking.timestamp,
-            keyword=keyword.keyword,
-            intent=keyword.intent,
-            difficulty=keyword.difficulty,
-            volume=keyword.volume,
-            is_cannibalized=ranking.keyword_id in cannibal_ids
+    try:
+        # Get total count
+        count_result = await db.execute(
+            select(func.count(Ranking.id))
+            .join(Keyword, Ranking.keyword_id == Keyword.id)
+            .where(Keyword.project_id == project_id)
         )
-        rankings_with_keywords.append(response)
-    
-    return PaginatedResponse.create(
-        data=rankings_with_keywords,
-        total=total,
-        skip=skip,
-        limit=limit,
-    )
+        total = count_result.scalar() or 0
+        
+        # Get paginated results with keyword info
+        result = await db.execute(
+            select(Ranking, Keyword)
+            .join(Keyword, Ranking.keyword_id == Keyword.id)
+            .where(Keyword.project_id == project_id)
+            .order_by(Ranking.timestamp.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        
+        # Get latest URLs per keyword for cannibalization check (last 24h)
+        yesterday = datetime.now(tz=timezone.utc) - timedelta(days=1)
+        cannibal_res = await db.execute(
+            select(Ranking.keyword_id, func.count(func.distinct(Ranking.url)))
+            .join(Keyword, Ranking.keyword_id == Keyword.id)
+            .where(Keyword.project_id == project_id, Ranking.timestamp >= yesterday)
+            .group_by(Ranking.keyword_id)
+            .having(func.count(func.distinct(Ranking.url)) > 1)
+        )
+        cannibal_ids = {r[0] for r in cannibal_res.all()}
+
+        # Build response with keyword data
+        rankings_with_keywords = []
+        for ranking, keyword in result.all():
+            response = RankingResponse(
+                id=ranking.id,
+                keyword_id=ranking.keyword_id,
+                position=ranking.position,
+                url=ranking.url,
+                timestamp=ranking.timestamp,
+                keyword=keyword.keyword,
+                intent=keyword.intent,
+                difficulty=keyword.difficulty,
+                volume=keyword.volume,
+                is_cannibalized=ranking.keyword_id in cannibal_ids
+            )
+            rankings_with_keywords.append(response)
+        
+        return PaginatedResponse.create(
+            data=rankings_with_keywords,
+            total=total,
+            skip=skip,
+            limit=limit,
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception(f"Error in get_rankings for project {project_id}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/sov/{project_id}")

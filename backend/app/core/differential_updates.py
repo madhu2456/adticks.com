@@ -80,7 +80,7 @@ class DifferentialUpdateDetector:
         
         try:
             key = f"diff:domain_state:{self.project_id}"
-            await redis.setex(key, 86400 * 30, domain, )  # 30 days
+            await redis.setex(key, 86400 * 30, domain)  # 30 days
             logger.debug(f"Saved domain state for project {self.project_id}: {domain}")
         except Exception as e:
             logger.warning(f"Error saving domain state: {e}")
@@ -153,7 +153,7 @@ class DifferentialUpdateDetector:
     async def get_changes_summary(
         self,
         domain: str,
-        current_keywords: list,
+        keywords: list,
         competitor_domains: list,
     ) -> Dict[str, Any]:
         """
@@ -163,7 +163,7 @@ class DifferentialUpdateDetector:
             Dict with flags indicating which components changed
         """
         domain_changed = await self.domain_changed(domain)
-        keywords_changed = await self.keywords_changed(current_keywords)
+        keywords_changed = await self.keywords_changed(keywords)
         competitors_changed = await self.competitors_changed(competitor_domains)
         
         # If domain/competitors changed, everything must be rescanned
