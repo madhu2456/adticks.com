@@ -47,7 +47,7 @@ class DifferentialUpdateDetector:
         except Exception as e:
             logger.warning(f"Error saving keywords state: {e}")
     
-    async def keywords_changed(self, current_keywords: list) -> bool:
+    async def keywords_changed(self, keywords: list) -> bool:
         """Detect if keywords have changed since last scan."""
         redis = await get_redis_client()
         if not redis:
@@ -61,7 +61,7 @@ class DifferentialUpdateDetector:
                 logger.info(f"No previous keywords state found for project {self.project_id}")
                 return True
             
-            current_hash = await self._get_state_hash({"keywords": current_keywords})
+            current_hash = await self._get_state_hash({"keywords": keywords})
             
             changed = current_hash != previous_hash
             if changed:
@@ -85,7 +85,7 @@ class DifferentialUpdateDetector:
         except Exception as e:
             logger.warning(f"Error saving domain state: {e}")
     
-    async def domain_changed(self, current_domain: str) -> bool:
+    async def domain_changed(self, domain: str) -> bool:
         """Detect if domain has changed."""
         redis = await get_redis_client()
         if not redis:
@@ -99,11 +99,11 @@ class DifferentialUpdateDetector:
                 logger.info(f"No previous domain state found for project {self.project_id}")
                 return False
             
-            changed = previous_domain != current_domain
+            changed = previous_domain != domain
             if changed:
                 logger.warning(
                     f"Domain changed for project {self.project_id}: "
-                    f"{previous_domain} -> {current_domain}"
+                    f"{previous_domain} -> {domain}"
                 )
             
             return changed
@@ -111,21 +111,21 @@ class DifferentialUpdateDetector:
             logger.warning(f"Error detecting domain changes: {e}")
             return False
     
-    async def save_competitors_state(self, competitor_domains: list) -> None:
+    async def save_competitors_state(self, competitors: list) -> None:
         """Save current competitor domains."""
         redis = await get_redis_client()
         if not redis:
             return
         
         try:
-            state_hash = await self._get_state_hash({"competitors": sorted(competitor_domains)})
+            state_hash = await self._get_state_hash({"competitors": sorted(competitors)})
             key = f"diff:competitors_state:{self.project_id}"
             await redis.setex(key, 86400 * 30, state_hash)  # 30 days
             logger.debug(f"Saved competitors state for project {self.project_id}: {state_hash[:8]}")
         except Exception as e:
             logger.warning(f"Error saving competitors state: {e}")
     
-    async def competitors_changed(self, current_competitors: list) -> bool:
+    async def competitors_changed(self, competitors: list) -> bool:
         """Detect if competitors have changed."""
         redis = await get_redis_client()
         if not redis:
@@ -139,7 +139,7 @@ class DifferentialUpdateDetector:
                 logger.info(f"No previous competitors state found for project {self.project_id}")
                 return False
             
-            current_hash = await self._get_state_hash({"competitors": sorted(current_competitors)})
+            current_hash = await self._get_state_hash({"competitors": sorted(competitors)})
             
             changed = current_hash != previous_hash
             if changed:
@@ -154,7 +154,7 @@ class DifferentialUpdateDetector:
         self,
         domain: str,
         keywords: list,
-        competitor_domains: list,
+        competitors: list,
     ) -> Dict[str, Any]:
         """
         Get a summary of all detected changes.
@@ -164,7 +164,7 @@ class DifferentialUpdateDetector:
         """
         domain_changed = await self.domain_changed(domain)
         keywords_changed = await self.keywords_changed(keywords)
-        competitors_changed = await self.competitors_changed(competitor_domains)
+        competitors_changed = await self.competitors_changed(competitors)
         
         # If domain/competitors changed, everything must be rescanned
         audit_needs_refresh = domain_changed
@@ -186,13 +186,13 @@ class DifferentialUpdateDetector:
         self,
         domain: str,
         keywords: list,
-        competitor_domains: list,
+        competitors: list,
     ) -> None:
         """Save all state hashes for future differential updates."""
         try:
             await self.save_domain_state(domain)
             await self.save_keywords_state(keywords)
-            await self.save_competitors_state(competitor_domains)
+            await self.save_competitors_state(competitors)
             logger.info(f"Saved all differential update states for project {self.project_id}")
         except Exception as e:
             logger.warning(f"Error saving differential update states: {e}")
