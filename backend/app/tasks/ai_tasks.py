@@ -180,11 +180,18 @@ async def _run_llm_scan_impl(project_id: str, prompt_limit: int, task_id: str) -
                 continue
 
             # Verify prompt exists in DB (it should from generate_prompts_task)
-            # If not, we skip silently
             try:
                 prompt_uuid = uuid.UUID(prompt_id_str)
             except (ValueError, AttributeError):
                 logger.warning("Invalid prompt_id_str: %s, skipping responses for this prompt", prompt_id_str)
+                continue
+
+            # Check if prompt exists in database before inserting responses
+            prompt_check = await session.execute(
+                select(Prompt).where(Prompt.id == prompt_uuid)
+            )
+            if not prompt_check.scalar_one_or_none():
+                logger.warning("Prompt %s not found in database (may have been deleted), skipping responses", prompt_uuid)
                 continue
 
             for resp_data in pr.get("responses", []):
