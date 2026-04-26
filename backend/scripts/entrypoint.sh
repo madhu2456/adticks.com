@@ -5,6 +5,9 @@ set -e
 
 echo "Starting AdTicks Backend entrypoint script..."
 
+# Ensure the current directory is in PYTHONPATH so "app" can be imported
+export PYTHONPATH=$PYTHONPATH:.
+
 # 1. Run Force Schema Fix (handles cases where Alembic is out of sync)
 echo "Running force schema fix (direct SQL)..."
 python3 scripts/force_schema_fix.py
