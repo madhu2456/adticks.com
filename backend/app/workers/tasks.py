@@ -2,6 +2,7 @@
 AdTicks — Main orchestration tasks.
 Master tasks that chain sub-tasks for full project scans.
 """
+import asyncio
 import logging
 import uuid
 from uuid import UUID
@@ -546,12 +547,17 @@ async def _cache_scan_results_impl(project_id: str, scan_results: dict | None = 
             # Save state for differential updates
             try:
                 detector = DifferentialUpdateDetector(project_id)
-                await detector.save_all_states(
-                    domain=project.domain,
-                    keywords=keyword_list,
-                    competitors=competitor_domains
+                await asyncio.wait_for(
+                    detector.save_all_states(
+                        domain=project.domain,
+                        keywords=keyword_list,
+                        competitors=competitor_domains
+                    ),
+                    timeout=5  # 5 second timeout for this operation
                 )
                 logger.info(f"Saved differential update state for project {project_id}")
+            except asyncio.TimeoutError:
+                logger.warning(f"Timeout saving differential update state for {project_id} (non-fatal)")
             except Exception as e:
                 logger.warning(f"Failed to save differential update state: {e}")
         

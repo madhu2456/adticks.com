@@ -13,6 +13,7 @@ Cache Structure:
 import json
 import hashlib
 import logging
+import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Any, Optional
 
@@ -163,12 +164,20 @@ async def save_scan_results(project_id: str, results: dict) -> bool:
         metadata_key = _get_scan_metadata_key(project_id)
         await redis.setex(metadata_key, SCAN_METADATA_TTL, json.dumps(metadata))
         
-        # Save project state hash for change detection
-        async with AsyncSessionLocal() as session:
-            state_hash = await _get_project_state_hash(session, project_id)
-            if state_hash:
-                hash_key = _get_invalidation_key(project_id)
-                await redis.set(hash_key, state_hash)
+        # Save project state hash for change detection (with timeout to prevent hanging)
+        try:
+            async with AsyncSessionLocal() as session:
+                state_hash = await asyncio.wait_for(
+                    _get_project_state_hash(session, project_id),
+                    timeout=10  # 10 second timeout
+                )
+                if state_hash:
+                    hash_key = _get_invalidation_key(project_id)
+                    await redis.set(hash_key, state_hash)
+        except asyncio.TimeoutError:
+            logger.warning(f"Timeout saving project state hash for {project_id} (non-fatal)")
+        except Exception as e:
+            logger.warning(f"Error saving project state hash for {project_id}: {e} (non-fatal)")
         
         logger.info(f"Cached scan results for project {project_id}, TTL: {SCAN_RESULTS_TTL}s")
         return True
