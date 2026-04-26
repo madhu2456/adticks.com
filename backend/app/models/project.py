@@ -83,3 +83,39 @@ class Project(Base):
     locations = relationship(
         "Location", back_populates="project", cascade="all, delete-orphan"
     )
+    meta_tag_audits = relationship(
+        "MetaTagAudit", back_populates="project", cascade="all, delete-orphan"
+    )
+    structured_data_audits = relationship(
+        "StructuredDataAudit", back_populates="project", cascade="all, delete-orphan"
+    )
+    page_speed_metrics = relationship(
+        "PageSpeedMetrics", back_populates="project", cascade="all, delete-orphan"
+    )
+    crawlability_audits = relationship(
+        "CrawlabilityAudit", back_populates="project", cascade="all, delete-orphan"
+    )
+    internal_link_maps = relationship(
+        "InternalLinkMap", back_populates="project", cascade="all, delete-orphan"
+    )
+    seo_health_score = relationship(
+        "SEOHealthScore", back_populates="project", cascade="all, delete-orphan", uselist=False
+    )
+    content_analysis = relationship(
+        "ContentAnalysis", back_populates="project", cascade="all, delete-orphan"
+    )
+    image_audits = relationship(
+        "ImageAudit", back_populates="project", cascade="all, delete-orphan"
+    )
+    duplicate_content = relationship(
+        "DuplicateContent", back_populates="project", cascade="all, delete-orphan"
+    )
+    seo_recommendations = relationship(
+        "SEORecommendation", back_populates="project", cascade="all, delete-orphan"
+    )
+    url_redirects = relationship(
+        "URLRedirect", back_populates="project", cascade="all, delete-orphan"
+    )
+    broken_links = relationship(
+        "BrokenLink", back_populates="project", cascade="all, delete-orphan"
+    )

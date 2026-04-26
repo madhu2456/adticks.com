@@ -29,7 +29,23 @@ from app.models.project import Project
 from app.models.prompt import Mention, Prompt, Response
 from app.models.recommendation import Recommendation
 from app.models.score import Score
-from app.models.seo import RankHistory, SerpFeatures
+from app.models.seo import RankHistory, SerpFeatures, CompetitorKeywords, Backlinks, SiteAuditHistory
+from app.models.seo_audit import (
+    MetaTagAudit,
+    StructuredDataAudit,
+    PageSpeedMetrics,
+    CrawlabilityAudit,
+    InternalLinkMap,
+    SEOHealthScore,
+)
+from app.models.seo_content import (
+    ContentAnalysis,
+    ImageAudit,
+    DuplicateContent,
+    SEORecommendation,
+    URLRedirect,
+    BrokenLink,
+)
 from app.models.user import User
 
 __all__ = [
@@ -40,6 +56,21 @@ __all__ = [
     "Ranking",
     "RankHistory",
     "SerpFeatures",
+    "CompetitorKeywords",
+    "Backlinks",
+    "SiteAuditHistory",
+    "MetaTagAudit",
+    "StructuredDataAudit",
+    "PageSpeedMetrics",
+    "CrawlabilityAudit",
+    "InternalLinkMap",
+    "SEOHealthScore",
+    "ContentAnalysis",
+    "ImageAudit",
+    "DuplicateContent",
+    "SEORecommendation",
+    "URLRedirect",
+    "BrokenLink",
     "Prompt",
     "Response",
     "Mention",

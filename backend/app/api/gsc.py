@@ -85,6 +85,7 @@ async def gsc_auth(current_user: User = Depends(get_current_user)):
         scopes=_SCOPES,
     )
     flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
+    # Disable PKCE by not sending code_challenge in authorization_url
     auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline")
     
     logger.info(f"Generated GSC auth URL with redirect_uri: {flow.redirect_uri}")
