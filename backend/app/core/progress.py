@@ -26,6 +26,7 @@ class ScanStage(str, Enum):
     INITIALIZING = "initializing"
     KEYWORD_GENERATION = "keyword_generation"
     RANK_TRACKING = "rank_tracking"
+    BACKLINK_ANALYSIS = "backlink_analysis"
     TECHNICAL_AUDIT = "technical_audit"
     ON_PAGE_ANALYSIS = "on_page_analysis"
     AI_SCAN = "ai_scan"

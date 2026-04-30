@@ -23,6 +23,8 @@ from app.services.seo.rank_tracker import bulk_rank_check
 from app.services.seo.on_page_analyzer import analyze_url
 from app.services.seo.technical_seo import check_technical
 from app.services.seo.content_gap_analyzer import find_gaps
+from app.services.seo.backlink_analyzer import sync_backlinks as backlinks_sync
+from app.services.seo.competitor_research import sync_competitor_keywords as competitor_keywords_sync
 from app.services.gsc.gsc_service import sync_gsc_data as gsc_sync
 from app.services.ads.ads_service import sync_ads_data as ads_sync
 from app.core.component_cache import ComponentCache
@@ -309,7 +311,17 @@ async def _run_rank_tracking_impl(project_id: str, task_id: str) -> dict:
         await session.commit()
         logger.info("Persisted all ranking records")
         
-        # Cache rankings
+        # Invalidate API caches
+        from app.core.caching import invalidate_cache
+        try:
+            await invalidate_cache(f"cache:get_rankings:{project_id}:*")
+            await invalidate_cache(f"cache:get_sov_stats:{project_id}*")
+            await invalidate_cache(f"cache:get_rank_history:{project_id}:*")
+            logger.info("Invalidated API caches for project %s", project_id)
+        except Exception as e:
+            logger.warning("Cache invalidation failed: %s", e)
+        
+        # Cache rankings in ComponentCache
         await progress.update(ScanStage.RANK_TRACKING, 92, "⚡ Caching rankings in Redis...")
         try:
             component_cache = ComponentCache(project_id)
@@ -439,6 +451,14 @@ async def _run_seo_audit_impl(project_id: str, url: str | None, audit_type: str 
         tech_issues = len(technical.get("issues", []))
         logger.info("Technical audit complete: %d issues found", tech_issues)
 
+    if audit_type == "full":
+        await progress.update(ScanStage.BACKLINK_ANALYSIS, 75, f"🔗 Analyzing backlink profile...")
+        try:
+            await backlinks_sync(project_id, domain)
+            logger.info("Backlink sync complete")
+        except Exception as e:
+            logger.warning(f"Backlink sync failed: {e}")
+
     await progress.update(audit_stage, 82, "📊 Compiling audit report...")
     audit = {
         "project_id": project_id,
@@ -448,7 +468,7 @@ async def _run_seo_audit_impl(project_id: str, url: str | None, audit_type: str 
         "on_page": on_page,
         "technical": technical,
         "overall_score": (
-            (on_page.get("score", 0) + technical.get("score", 0)) // 2
+            (on_page.get("overall_score", 0) + technical.get("score", 0)) // 2
         ),
         "total_issues": (
             on_page.get("issues_count", len(on_page.get("issues", [])))
@@ -461,8 +481,14 @@ async def _run_seo_audit_impl(project_id: str, url: str | None, audit_type: str 
     try:
         component_cache = ComponentCache(project_id)
         await component_cache.cache_audit(on_page, technical)
+        
+        # Invalidate API caches
+        from app.core.caching import invalidate_cache
+        await invalidate_cache(f"cache:get_onpage_audit:{project_id}*")
+        await invalidate_cache(f"cache:get_technical_seo:{project_id}*")
+        logger.info("Invalidated audit API caches for project %s", project_id)
     except Exception as e:
-        logger.warning(f"Error caching audit: {e}")
+        logger.warning(f"Error caching audit or invalidating: {e}")
 
     try:
         storage.upload_json(
@@ -559,6 +585,19 @@ async def _find_content_gaps_impl(project_id: str, task_id: str = "") -> dict:
     except Exception as e:
         logger.warning(f"Error caching gaps: {e}")
 
+    # --- ADDED: Sync competitor keywords as well ---
+    if competitor_domains:
+        await progress.update(ScanStage.GAP_ANALYSIS, 80, f"🔍 Researching competitor keywords...")
+        try:
+            await competitor_keywords_sync(project_id, competitor_domains, project.industry or "Technology")
+            
+            # Invalidate cache
+            from app.core.caching import invalidate_cache
+            await invalidate_cache(f"cache:get_competitor_keywords:{project_id}*")
+            logger.info("Sync'd competitor keywords during gap analysis")
+        except Exception as e:
+            logger.warning(f"Failed to sync competitor keywords: {e}")
+
     payload = {
         "project_id": project_id,
         "analyzed_at": datetime.now(timezone.utc).isoformat(),
@@ -581,6 +620,61 @@ async def _find_content_gaps_impl(project_id: str, task_id: str = "") -> dict:
         "project_id": project_id,
         "gaps_found": len(gaps),
         "top_gap": gaps[0].get("topic") if gaps else None,
+        "status": "completed",
+    }
+
+
+# ---------------------------------------------------------------------------
+# sync_backlinks_task
+# ---------------------------------------------------------------------------
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_backlinks_task(self, project_id: str, parent_task_id: str | None = None) -> dict:
+    """Sync backlinks for a project and persist to DB."""
+    async def _run():
+        try:
+            return await _sync_backlinks_impl(project_id, parent_task_id or self.request.id)
+        finally:
+            await engine.dispose()
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.exception("sync_backlinks_task failed for project %s: %s", project_id, exc)
+        raise self.retry(exc=exc)
+
+
+async def _sync_backlinks_impl(project_id: str, task_id: str = "") -> dict:
+    # Initialize progress tracking
+    progress = ScanProgress(project_id, task_id)
+    
+    logger.info("Syncing backlinks for project=%s", project_id)
+    await progress.update(ScanStage.BACKLINK_ANALYSIS, 10, "⏳ Loading project data...")
+
+    async with AsyncSessionLocal() as session:
+        project = await _load_project(session, project_id)
+        if not project:
+            await progress.complete()
+            return {"project_id": project_id, "links_synced": 0, "status": "project_not_found"}
+        domain = project.domain
+
+    await progress.update(ScanStage.BACKLINK_ANALYSIS, 30, f"🔍 Analyzing backlinks for {domain}...")
+    
+    # Call service
+    links_count = await backlinks_sync(project_id, domain)
+    
+    # Invalidate API caches
+    from app.core.caching import invalidate_cache
+    try:
+        await invalidate_cache(f"cache:get_backlinks:{project_id}*")
+        await invalidate_cache(f"cache:get_backlinks_stats:{project_id}*")
+        logger.info("Invalidated backlink API caches for project %s", project_id)
+    except Exception as e:
+        logger.warning(f"Error invalidating backlink caches: {e}")
+
+    await progress.complete()
+    return {
+        "project_id": project_id,
+        "links_synced": links_count,
         "status": "completed",
     }
 

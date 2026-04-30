@@ -24,7 +24,7 @@ from app.api import (
     auth, projects, seo, ai, gsc, ads, insights, scores, aeo, seo_suite, geo,
     progress, cache, clusters
 )
-from app.api import seo_meta_tags, seo_content_analysis, seo_technical
+from app.api import seo_meta_tags, seo_content_analysis, seo_technical, seo_advanced, seo_extra
 from app.core.config import settings
 from app.core.database import Base, engine
 from app.core.exceptions import AdTicksException
@@ -287,6 +287,8 @@ app.include_router(seo_suite.router, prefix=API_PREFIX)
 app.include_router(seo_meta_tags.router, prefix=API_PREFIX)
 app.include_router(seo_content_analysis.router, prefix=API_PREFIX)
 app.include_router(seo_technical.router, prefix=API_PREFIX)
+app.include_router(seo_advanced.router, prefix=API_PREFIX)
+app.include_router(seo_extra.router, prefix=API_PREFIX)
 app.include_router(ai.router, prefix=API_PREFIX)
 app.include_router(aeo.router, prefix=API_PREFIX)
 app.include_router(gsc.router, prefix=API_PREFIX)

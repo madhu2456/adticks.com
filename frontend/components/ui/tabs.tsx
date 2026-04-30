@@ -36,7 +36,10 @@ function Tabs({ value, defaultValue, onValueChange, children, className }: TabsP
 
 function TabsList({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("inline-flex h-10 items-center rounded-lg bg-surface2 p-1 gap-1", className)}>
+    <div
+      role="tablist"
+      className={cn("inline-flex h-10 items-center rounded-lg bg-surface2 p-1 gap-1", className)}
+    >
       {children}
     </div>
   );
@@ -47,6 +50,9 @@ function TabsTrigger({ value, children, className }: { value: string; children: 
   const active = ctx.value === value;
   return (
     <button
+      type="button"
+      role="tab"
+      aria-selected={active}
       onClick={() => ctx.onValueChange(value)}
       className={cn(
         "inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-1.5 text-sm font-medium transition-all focus-visible:outline-none",
@@ -62,7 +68,14 @@ function TabsTrigger({ value, children, className }: { value: string; children: 
 function TabsContent({ value, children, className }: { value: string; children: React.ReactNode; className?: string }) {
   const ctx = React.useContext(TabsContext);
   if (ctx.value !== value) return null;
-  return <div className={cn("mt-4 animate-fade-in", className)}>{children}</div>;
+  return (
+    <div
+      role="tabpanel"
+      className={cn("mt-4 animate-fade-in", className)}
+    >
+      {children}
+    </div>
+  );
 }
 
 export { Tabs, TabsList, TabsTrigger, TabsContent };

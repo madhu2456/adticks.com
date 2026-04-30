@@ -34,11 +34,13 @@ from app.core.scan_cache import (
 )
 from app.services.insights.insight_engine import InsightEngine
 from app.services.insights.recommendation_generator import generate_recommendations
+from app.services.seo.competitor_research import identify_competitors
 from app.tasks.seo_tasks import (
     generate_keywords_task,
     run_rank_tracking_task,
     run_seo_audit_task,
     find_content_gaps_task,
+    sync_backlinks_task,
     sync_gsc_data_task,
     sync_ads_data_task,
 )
@@ -186,6 +188,7 @@ def run_full_scan_task(self, project_id: str, force_refresh: bool = False) -> di
     # GSC and Ads: always sync for fresh daily data
     parallel_tasks.append(sync_gsc_data_task.si(project_id=project_id, parent_task_id=master_task_id))
     parallel_tasks.append(sync_ads_data_task.si(project_id=project_id, parent_task_id=master_task_id))
+    parallel_tasks.append(sync_backlinks_task.si(project_id=project_id, parent_task_id=master_task_id))
     
     if ai_enabled:
         # Prompt generation: only if keywords or competitors changed
@@ -267,6 +270,21 @@ async def _get_project_info(project_id: str) -> dict | None:
         if not project:
             return None
         competitors = await _load_competitors(session, project_id)
+        comp_domains = [c.domain for c in competitors]
+        
+        # If no competitors are defined, automatically identify and persist them
+        if not comp_domains:
+            comp_domains = await identify_competitors(project.domain, project.industry or "Technology")
+            if comp_domains:
+                for domain in comp_domains:
+                    new_comp = Competitor(
+                        id=uuid.uuid4(),
+                        project_id=UUID(project_id),
+                        domain=domain
+                    )
+                    session.add(new_comp)
+                await session.commit()
+                logger.info(f"Auto-identified and persisted {len(comp_domains)} competitors for project {project_id}: {comp_domains}")
         
         # Also load keyword texts for differential update detection
         kw_result = await session.execute(
@@ -278,7 +296,7 @@ async def _get_project_info(project_id: str) -> dict | None:
             "domain": project.domain,
             "brand_name": project.brand_name,
             "industry": project.industry,
-            "competitors": [c.domain for c in competitors],
+            "competitors": comp_domains,
             "keywords": keywords,
             "ai_scans_enabled": project.ai_scans_enabled,
         }

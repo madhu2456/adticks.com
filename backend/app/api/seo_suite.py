@@ -96,48 +96,59 @@ async def get_rank_history(
 
     # Build base query
     cutoff_date = datetime.now(tz=timezone.utc) - timedelta(days=days)
+    # Using Ranking table as RankHistory is currently not being populated by tasks
+    from app.models.keyword import Ranking
     query = (
-        select(RankHistory)
+        select(Ranking)
         .join(Keyword)
         .where(
             Keyword.project_id == project_id,
-            RankHistory.timestamp >= cutoff_date,
+            Ranking.timestamp >= cutoff_date,
         )
     )
 
     # Apply optional filters
     if keyword_id:
-        query = query.where(RankHistory.keyword_id == keyword_id)
-    if device:
-        query = query.where(RankHistory.device == device)
+        query = query.where(Ranking.keyword_id == keyword_id)
+    # Note: Ranking table doesn't have device field, so we ignore it if using Ranking table
 
     # Get total count
     count_query = (
-        select(func.count(RankHistory.id))
+        select(func.count(Ranking.id))
         .join(Keyword)
         .where(
             Keyword.project_id == project_id,
-            RankHistory.timestamp >= cutoff_date,
+            Ranking.timestamp >= cutoff_date,
         )
     )
     if keyword_id:
-        count_query = count_query.where(RankHistory.keyword_id == keyword_id)
-    if device:
-        count_query = count_query.where(RankHistory.device == device)
+        count_query = count_query.where(Ranking.keyword_id == keyword_id)
 
     count_result = await db.execute(count_query)
     total = count_result.scalar() or 0
 
     # Get paginated results
     results = await db.execute(
-        query.order_by(desc(RankHistory.timestamp))
+        query.order_by(desc(Ranking.timestamp))
         .offset(skip)
         .limit(limit)
     )
-    rank_history = results.scalars().all()
+    rankings = results.scalars().all()
+    
+    # Map Ranking to RankHistoryResponse (position -> rank)
+    history_data = [
+        RankHistoryResponse(
+            id=r.id,
+            keyword_id=r.keyword_id,
+            rank=r.position,
+            timestamp=r.timestamp,
+            device="desktop" # Default
+        )
+        for r in rankings
+    ]
 
     return PaginatedResponse.create(
-        data=rank_history,
+        data=history_data,
         total=total,
         skip=skip,
         limit=limit,

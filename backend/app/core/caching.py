@@ -66,7 +66,8 @@ def cache_key(*args: Any, **kwargs: Any) -> str:
             serializable_args.append(f"{arg.__class__.__name__}:{arg.id}")
     
     serializable_kwargs = {
-        k: v for k, v in kwargs.items()
+        k: str(v) if isinstance(v, uuid.UUID) else v 
+        for k, v in kwargs.items()
         if isinstance(v, (str, int, float, bool, type(None), uuid.UUID))
     }
     
@@ -75,7 +76,8 @@ def cache_key(*args: Any, **kwargs: Any) -> str:
         if serializable_kwargs:
             key_parts.append(json.dumps(serializable_kwargs, sort_keys=True))
         return ":".join(key_parts)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Error generating cache key: {e}")
         return str(uuid.uuid4())
 
 

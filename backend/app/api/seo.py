@@ -180,28 +180,49 @@ async def get_rankings(
     limit: int = Query(50, ge=1, le=500, description="Number of items to return (max 500)"),
 ):
     """
-    Retrieve all SERP ranking snapshots for a project with pagination.
+    Retrieve current keyword rankings for a project.
+    Returns the latest ranking for each keyword associated with the project.
     """
     await _assert_project_owner(project_id, current_user, db)
     
     try:
-        # Get total count
+        # Get total keyword count for this project
         count_result = await db.execute(
-            select(func.count(Ranking.id))
-            .join(Keyword, Ranking.keyword_id == Keyword.id)
+            select(func.count(Keyword.id))
             .where(Keyword.project_id == project_id)
         )
         total = count_result.scalar() or 0
         
-        # Get paginated results with keyword info
-        result = await db.execute(
-            select(Ranking, Keyword)
+        # Subquery to get the latest ranking per keyword
+        latest_rank_sub = (
+            select(
+                Ranking.id,
+                Ranking.keyword_id,
+                Ranking.position,
+                Ranking.url,
+                Ranking.timestamp,
+                func.row_number().over(
+                    partition_by=Ranking.keyword_id,
+                    order_by=Ranking.timestamp.desc()
+                ).label("rn")
+            )
             .join(Keyword, Ranking.keyword_id == Keyword.id)
             .where(Keyword.project_id == project_id)
-            .order_by(Ranking.timestamp.desc())
+            .subquery()
+        )
+        
+        # Main query: All keywords for the project with their latest ranking (if any)
+        query = (
+            select(Keyword, latest_rank_sub)
+            .outerjoin(latest_rank_sub, Keyword.id == latest_rank_sub.c.keyword_id)
+            .where(Keyword.project_id == project_id, (latest_rank_sub.c.rn == 1) | (latest_rank_sub.c.rn == None))
+            .order_by(Keyword.keyword.asc())
             .offset(skip)
             .limit(limit)
         )
+        
+        result = await db.execute(query)
+        rows = result.all()
         
         # Get latest URLs per keyword for cannibalization check (last 24h)
         yesterday = datetime.now(tz=timezone.utc) - timedelta(days=1)
@@ -214,25 +235,35 @@ async def get_rankings(
         )
         cannibal_ids = {r[0] for r in cannibal_res.all()}
 
-        # Build response with keyword data
-        rankings_with_keywords = []
-        for ranking, keyword in result.all():
+        # Build response with keyword and latest ranking data
+        response_data = []
+        for row in rows:
+            # SQLAlchemy result row contains Keyword then the columns from subquery
+            kw = row[0]
+            
+            # Extract ranking fields from subquery columns (row[1:] contains the subquery fields)
+            # row[1] is Ranking.id, row[2] is Ranking.keyword_id, etc.
+            rank_id = row[1]
+            position = row[3]
+            url = row[4]
+            timestamp = row[5] or kw.created_at # Fallback to keyword creation if no rankings
+            
             response = RankingResponse(
-                id=ranking.id,
-                keyword_id=ranking.keyword_id,
-                position=ranking.position,
-                url=ranking.url,
-                timestamp=ranking.timestamp,
-                keyword=keyword.keyword,
-                intent=keyword.intent,
-                difficulty=keyword.difficulty,
-                volume=keyword.volume,
-                is_cannibalized=ranking.keyword_id in cannibal_ids
+                id=rank_id or kw.id, # Use keyword ID if no ranking record exists
+                keyword_id=kw.id,
+                position=position,
+                url=url,
+                timestamp=timestamp,
+                keyword=kw.keyword,
+                intent=kw.intent,
+                difficulty=kw.difficulty,
+                volume=kw.volume,
+                is_cannibalized=kw.id in cannibal_ids
             )
-            rankings_with_keywords.append(response)
+            response_data.append(response)
         
         return PaginatedResponse.create(
-            data=rankings_with_keywords,
+            data=response_data,
             total=total,
             skip=skip,
             limit=limit,
@@ -333,9 +364,41 @@ async def get_keyword_gaps(
             "message": "Run keyword research first"
         }
     
-    gaps = cached_data.get("gaps", [])
-    total = len(gaps)
-    paginated_data = gaps[skip : skip + limit]
+    raw_gaps = cached_data.get("gaps", [])
+    
+    # Aggregate gaps by topic to match frontend ContentGap schema
+    import uuid
+    aggregated = {}
+    for gap in raw_gaps:
+        topic = gap.get("topic", "Unknown").strip()
+        topic_lower = topic.lower()
+        if topic_lower not in aggregated:
+            # Map priority_score (0-10) to opportunity_score (0-100)
+            score = int(min(100, gap.get("priority_score", 0) * 10))
+            aggregated[topic_lower] = {
+                "id": str(uuid.uuid4()),
+                "topic": topic,
+                "estimated_volume": gap.get("estimated_monthly_traffic", 0),
+                "competitor_domains": set(),
+                "opportunity_score": score,
+                "keywords": gap.get("example_keywords", [])
+            }
+        
+        comp_domain = gap.get("competitor_domain")
+        if comp_domain:
+            aggregated[topic_lower]["competitor_domains"].add(comp_domain)
+            
+    # Finalize format
+    formatted_gaps = []
+    for data in aggregated.values():
+        data["competitor_coverage"] = len(data.pop("competitor_domains"))
+        formatted_gaps.append(data)
+        
+    # Sort by opportunity_score descending
+    formatted_gaps.sort(key=lambda x: x["opportunity_score"], reverse=True)
+    
+    total = len(formatted_gaps)
+    paginated_data = formatted_gaps[skip : skip + limit]
     
     return {
         "project_id": str(project_id),
@@ -406,31 +469,113 @@ async def get_technical_seo(
         }
     
     technical = cached_data["technical"]
-    issues = technical.get("issues", [])
     
-    # Transform issues to technical check objects for frontend
+    # Transform technical data to frontend TechnicalCheck objects
     formatted_checks = []
     
-    if technical.get("robots_txt", {}).get("present"):
+    # 1. Robots.txt
+    robots = technical.get("robots_txt", {})
+    if robots.get("present"):
+        if robots.get("disallows_all"):
+            formatted_checks.append({
+                "check": "Robots.txt",
+                "status": "fail",
+                "description": "robots.txt is present but disallows all crawlers.",
+                "fix": "Remove 'Disallow: /' from your robots.txt file to allow search engines to index your site."
+            })
+        else:
+            formatted_checks.append({
+                "check": "Robots.txt",
+                "status": "pass",
+                "description": "robots.txt is present and properly configured."
+            })
+    else:
         formatted_checks.append({
             "check": "Robots.txt",
-            "status": "pass",
-            "description": "robots.txt is present and valid."
+            "status": "fail",
+            "description": "No robots.txt file found.",
+            "fix": "Create a robots.txt file at the root of your domain to guide search engine crawlers."
         })
-    
-    if technical.get("https", {}).get("https_available"):
+        
+    # 2. Sitemap
+    sitemap = technical.get("sitemap", {})
+    if sitemap.get("present"):
+        if sitemap.get("url_count", 0) > 0 or sitemap.get("is_sitemap_index"):
+            formatted_checks.append({
+                "check": "XML Sitemap",
+                "status": "pass",
+                "description": f"Valid XML sitemap found with {sitemap.get('url_count', 0)} URLs."
+            })
+        else:
+            formatted_checks.append({
+                "check": "XML Sitemap",
+                "status": "warning",
+                "description": "Sitemap exists but appears to contain no URLs.",
+                "fix": "Ensure your sitemap generation tool is correctly outputting your site's pages."
+            })
+    else:
         formatted_checks.append({
-            "check": "HTTPS",
-            "status": "pass",
-            "description": "Website is correctly served over HTTPS."
+            "check": "XML Sitemap",
+            "status": "fail",
+            "description": "No sitemap.xml found.",
+            "fix": "Generate an XML sitemap and submit it via Google Search Console."
         })
-
-    for issue in issues:
-        status = "fail" if "CRITICAL" in issue.upper() or "HTTPS not available" in issue else "warning"
+        
+    # 3. HTTPS
+    https = technical.get("https", {})
+    if https.get("https_available"):
+        if https.get("http_redirects_to_https"):
+            formatted_checks.append({
+                "check": "HTTPS Encryption",
+                "status": "pass",
+                "description": "Website is correctly served over HTTPS with proper HTTP redirects."
+            })
+        else:
+            formatted_checks.append({
+                "check": "HTTPS Encryption",
+                "status": "warning",
+                "description": "HTTPS is available, but HTTP does not automatically redirect to HTTPS.",
+                "fix": "Configure your web server to 301 redirect all HTTP traffic to HTTPS."
+            })
+    else:
         formatted_checks.append({
-            "check": issue.split("—")[0].strip() if "—" in issue else "Technical Issue",
-            "status": status,
-            "description": issue
+            "check": "HTTPS Encryption",
+            "status": "fail",
+            "description": "HTTPS is not properly configured or the certificate is invalid.",
+            "fix": "Install a valid SSL certificate (e.g., via Let's Encrypt) and force HTTPS."
+        })
+        
+    # 4. WWW/Non-WWW Redirects
+    www = technical.get("www_redirect", {})
+    if www.get("consistent"):
+        formatted_checks.append({
+            "check": "WWW Resolution",
+            "status": "pass",
+            "description": f"Successfully redirects to a single canonical version ({www.get('canonical_version')})."
+        })
+    else:
+        formatted_checks.append({
+            "check": "WWW Resolution",
+            "status": "warning",
+            "description": "Both www and non-www versions are accessible without redirecting.",
+            "fix": "Choose one version as canonical and set up a 301 redirect from the other."
+        })
+        
+    # 5. Performance Headers
+    headers = technical.get("performance_headers", {})
+    issues = headers.get("issues", [])
+    if not issues:
+        formatted_checks.append({
+            "check": "Performance Headers",
+            "status": "pass",
+            "description": "Cache-Control and Content-Encoding (Gzip/Brotli) are properly configured."
+        })
+    else:
+        formatted_checks.append({
+            "check": "Performance Headers",
+            "status": "warning",
+            "description": "Missing optimal performance headers (Cache-Control or Compression).",
+            "fix": "Enable Gzip/Brotli compression and configure Cache-Control headers for static assets."
         })
     
     total = len(formatted_checks)

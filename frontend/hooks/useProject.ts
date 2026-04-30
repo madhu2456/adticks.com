@@ -3,8 +3,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { Project } from "@/lib/types";
+import { create } from 'zustand';
 
 const MOCK_PROJECTS: Project[] = [];
+
+interface ProjectStore {
+  activeId: string | null;
+  setActiveId: (id: string | null) => void;
+}
+
+export const useProjectStore = create<ProjectStore>((set) => ({
+  activeId: null,
+  setActiveId: (id) => set({ activeId: id }),
+}));
 
 export function useProjects() {
   return useQuery({
@@ -25,11 +36,15 @@ export function useProject(id: string | null) {
 
 export function useCreateProject() {
   const queryClient = useQueryClient();
+  const setActiveId = useProjectStore((state) => state.setActiveId);
   return useMutation({
     mutationFn: (data: { brand_name: string; domain: string; industry?: string }) =>
       api.projects.create(data),
-    onSuccess: () => {
+    onSuccess: (newProject) => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
+      if (newProject?.id) {
+        setActiveId(newProject.id);
+      }
     },
   });
 }
@@ -47,7 +62,8 @@ export function useUpdateProject() {
 }
 
 export function useActiveProject() {
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const activeId = useProjectStore((state) => state.activeId);
+  const setActiveId = useProjectStore((state) => state.setActiveId);
   const query = useProjects();
   const projects = Array.isArray(query.data) ? query.data : [];
   

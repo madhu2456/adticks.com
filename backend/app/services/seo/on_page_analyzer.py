@@ -393,6 +393,62 @@ async def analyze_url(
         "issues_count": len(issues),
     }
 
-    analysis["score"] = _score_page(analysis)
+    score = _score_page(analysis)
+    analysis["score"] = score
+    analysis["overall_score"] = score
+    
+    # --- Build frontend-compatible items list ---
+    items = []
+    
+    # Title check
+    items.append({
+        "check": "Title Tag",
+        "status": "pass" if title_analysis["present"] and title_analysis["length_ok"] else "warning" if title_analysis["present"] else "fail",
+        "message": title_analysis["recommendation"],
+        "score": 100 if title_analysis["present"] and title_analysis["length_ok"] else 70 if title_analysis["present"] else 0
+    })
+    
+    # Meta Description check
+    items.append({
+        "check": "Meta Description",
+        "status": "pass" if meta_analysis["present"] and meta_analysis["length_ok"] else "warning" if meta_analysis["present"] else "fail",
+        "message": meta_analysis["recommendation"],
+        "score": 100 if meta_analysis["present"] and meta_analysis["length_ok"] else 70 if meta_analysis["present"] else 0
+    })
+    
+    # H1 check
+    items.append({
+        "check": "H1 Heading",
+        "status": "pass" if heading_analysis["h1_count"] == 1 else "fail",
+        "message": f"Found {heading_analysis['h1_count']} H1 tag(s). One is ideal." if heading_analysis["h1_count"] != 1 else "H1 tag is present and unique.",
+        "score": 100 if heading_analysis["h1_count"] == 1 else 0
+    })
+    
+    # Content Length
+    items.append({
+        "check": "Content Length",
+        "status": "pass" if word_count >= 600 else "warning" if word_count >= 300 else "fail",
+        "message": f"Page has {word_count} words." + (" Ideal is 600+." if word_count < 600 else ""),
+        "score": 100 if word_count >= 600 else 60 if word_count >= 300 else 30
+    })
+    
+    # Image Alts
+    items.append({
+        "check": "Image Alt Text",
+        "status": "pass" if image_analysis["alt_coverage_pct"] >= 90 else "warning" if image_analysis["alt_coverage_pct"] >= 50 else "fail",
+        "message": f"{image_analysis['alt_coverage_pct']}% of images have alt text." + (f" Missing {image_analysis['images_missing_alt']} alts." if image_analysis["images_missing_alt"] > 0 else ""),
+        "score": int(image_analysis["alt_coverage_pct"])
+    })
+    
+    # Schema check
+    items.append({
+        "check": "Structured Data",
+        "status": "pass" if schema_analysis["has_schema"] else "warning",
+        "message": f"Found {schema_analysis['schema_count']} schema types." if schema_analysis["has_schema"] else "No structured data found.",
+        "score": 100 if schema_analysis["has_schema"] else 0
+    })
+    
+    analysis["items"] = items
+
     logger.info(f"On-page analysis complete for {url}: score={analysis['score']}, issues={len(issues)}")
     return analysis

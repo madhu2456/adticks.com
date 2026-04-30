@@ -349,6 +349,185 @@ export const api = {
       axiosInstance.get<PaginatedResponse<any>>(`/seo/projects/${projectId}/keywords/history?days=${days}&skip=${skip}&limit=${limit}${keywordId ? `&keyword_id=${keywordId}` : ''}${device ? `&device=${device}` : ''}`).then(unwrap),
   },
 
+  // Advanced SEO — superset of Ahrefs / SEMrush / Moz features
+  seoAdvanced: {
+    // Site Audit
+    runAudit: (projectId: string, url: string, max_pages = 50, max_depth = 3) =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/audit/run`, { url, max_pages, max_depth }).then(unwrap),
+    getAuditSummary: (projectId: string) =>
+      axiosInstance.get<any>(`/seo/projects/${projectId}/audit/summary`).then(unwrap),
+    getAuditIssues: (projectId: string, params?: { severity?: string; category?: string; limit?: number }) => {
+      const qs = new URLSearchParams();
+      if (params?.severity) qs.set("severity", params.severity);
+      if (params?.category) qs.set("category", params.category);
+      if (params?.limit) qs.set("limit", String(params.limit));
+      return axiosInstance.get<any[]>(`/seo/projects/${projectId}/audit/issues?${qs}`).then(unwrap);
+    },
+    getCrawledPages: (projectId: string, limit = 100) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/audit/pages?limit=${limit}`).then(unwrap),
+    getSchemas: (projectId: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/audit/schemas`).then(unwrap),
+
+    // Core Web Vitals
+    runCWV: (projectId: string, url: string, strategy: "mobile" | "desktop" = "mobile") =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/cwv/run?url=${encodeURIComponent(url)}&strategy=${strategy}`).then(unwrap),
+    getCWV: (projectId: string, limit = 20) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/cwv?limit=${limit}`).then(unwrap),
+
+    // Keyword Magic
+    keywordMagic: (projectId: string, payload: { seed: string; location?: string; include_questions?: boolean; limit?: number }) =>
+      axiosInstance.post<any[]>(`/seo/projects/${projectId}/keyword-magic`, payload).then(unwrap),
+    getKeywordIdeas: (projectId: string, params?: { seed?: string; match_type?: string; limit?: number }) => {
+      const qs = new URLSearchParams();
+      if (params?.seed) qs.set("seed", params.seed);
+      if (params?.match_type) qs.set("match_type", params.match_type);
+      if (params?.limit) qs.set("limit", String(params.limit));
+      return axiosInstance.get<any[]>(`/seo/projects/${projectId}/keyword-magic?${qs}`).then(unwrap);
+    },
+
+    // SERP Analyzer
+    analyzeSerp: (projectId: string, keyword: string, location = "us", device = "desktop") =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/serp/analyze?keyword=${encodeURIComponent(keyword)}&location=${location}&device=${device}`).then(unwrap),
+
+    // Backlink intelligence
+    refreshAnchors: (projectId: string) =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/backlinks/anchors/refresh`).then(unwrap),
+    getAnchors: (projectId: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/backlinks/anchors`).then(unwrap),
+    scanToxic: (projectId: string, minScore = 40) =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/backlinks/toxic/scan?min_score=${minScore}`).then(unwrap),
+    getToxic: (projectId: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/backlinks/toxic`).then(unwrap),
+    disavowToxic: (projectId: string, toxicId: string) =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/backlinks/toxic/${toxicId}/disavow`).then(unwrap),
+    exportDisavow: (projectId: string) =>
+      axiosInstance.get<{ content: string; format: string }>(`/seo/projects/${projectId}/backlinks/disavow.txt`).then(unwrap),
+    intersect: (projectId: string) =>
+      axiosInstance.post<any[]>(`/seo/projects/${projectId}/backlinks/intersect`).then(unwrap),
+
+    // Content
+    createBrief: (projectId: string, payload: { target_keyword: string; competitors?: string[]; target_word_count?: number }) =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/content/brief`, payload).then(unwrap),
+    listBriefs: (projectId: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/content/briefs`).then(unwrap),
+    optimize: (projectId: string, payload: { target_keyword: string; content: string; url?: string }) =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/content/optimize`, payload).then(unwrap),
+    buildCluster: (projectId: string, pillar: string) =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/content/clusters/build?pillar_topic=${encodeURIComponent(pillar)}`).then(unwrap),
+    listClusters: (projectId: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/content/clusters`).then(unwrap),
+
+    // Local SEO
+    getCitations: (projectId: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/local/citations`).then(unwrap),
+    getConsistency: (projectId: string) =>
+      axiosInstance.get<any>(`/seo/projects/${projectId}/local/consistency`).then(unwrap),
+    runGrid: (projectId: string, params: { keyword: string; center_lat: number; center_lng: number; radius_km?: number; grid_size?: number }) => {
+      const qs = new URLSearchParams();
+      qs.set("keyword", params.keyword);
+      qs.set("center_lat", String(params.center_lat));
+      qs.set("center_lng", String(params.center_lng));
+      if (params.radius_km) qs.set("radius_km", String(params.radius_km));
+      if (params.grid_size) qs.set("grid_size", String(params.grid_size));
+      return axiosInstance.post<any[]>(`/seo/projects/${projectId}/local/grid/run?${qs}`).then(unwrap);
+    },
+    getGrid: (projectId: string, keyword?: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/local/grid${keyword ? `?keyword=${encodeURIComponent(keyword)}` : ""}`).then(unwrap),
+
+    // Logs
+    uploadLog: (projectId: string, file: File) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      return axiosInstance.post<any>(`/seo/projects/${projectId}/logs/upload`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      }).then(unwrap);
+    },
+    getLogs: (projectId: string, bot?: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/logs${bot ? `?bot=${bot}` : ""}`).then(unwrap),
+
+    // Reports
+    generateReport: (projectId: string, payload: { report_type: string; title: string; branding?: any }) =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/reports/generate`, payload).then(unwrap),
+    listReports: (projectId: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/reports`).then(unwrap),
+
+    // Hub overview
+    hubOverview: (projectId: string) =>
+      axiosInstance.get<any>(`/seo/projects/${projectId}/hub-overview`).then(unwrap),
+  },
+
+  // SEO gap-fill (cannibalization, internal links, domain compare, bulk,
+  // sitemap/robots/schema generators, outreach, snippet/PAA/volatility)
+  seoExtra: {
+    // Cannibalization
+    scanCannibalization: (projectId: string, payload?: { rows?: any[]; min_pages?: number }) =>
+      axiosInstance.post<any[]>(`/seo/projects/${projectId}/cannibalization/scan`, payload || { min_pages: 2 }).then(unwrap),
+    listCannibalization: (projectId: string, severity?: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/cannibalization${severity ? `?severity=${severity}` : ""}`).then(unwrap),
+
+    // Internal links / orphans
+    analyzeInternalLinks: (projectId: string, urls: string[]) =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/internal-links/analyze`, { urls }).then(unwrap),
+    listInternalLinks: (projectId: string, target?: string, limit = 200) => {
+      const qs = new URLSearchParams();
+      qs.set("limit", String(limit));
+      if (target) qs.set("target", target);
+      return axiosInstance.get<any[]>(`/seo/projects/${projectId}/internal-links?${qs}`).then(unwrap);
+    },
+    listOrphanPages: (projectId: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/orphan-pages`).then(unwrap),
+
+    // Domain comparison
+    compareDomains: (projectId: string, primary_domain: string, competitor_domains: string[]) =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/domain-compare`, { primary_domain, competitor_domains }).then(unwrap),
+    domainCompareHistory: (projectId: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/domain-compare/history`).then(unwrap),
+
+    // Bulk
+    runBulk: (projectId: string, urls: string[], job_type: "onpage" | "cwv" = "onpage") =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/bulk/run`, { urls, job_type }).then(unwrap),
+    listBulkJobs: (projectId: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/bulk`).then(unwrap),
+    getBulkItems: (projectId: string, jobId: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/bulk/${jobId}/items`).then(unwrap),
+
+    // Sitemap / robots / schema
+    generateSitemap: (projectId: string, payload: { urls: any[]; default_changefreq?: string; default_priority?: number }) =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/sitemap/generate`, payload).then(unwrap),
+    validateRobots: (projectId: string, payload: { url?: string; raw_content?: string }) =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/robots/validate`, payload).then(unwrap),
+    generateSchema: (projectId: string, payload: { schema_type: string; name: string; inputs: any }) =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/schema/generate`, payload).then(unwrap),
+    listSchemaTemplates: (projectId: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/schema/templates`).then(unwrap),
+
+    // Outreach
+    createCampaign: (projectId: string, payload: { name: string; goal?: string; target_link_count?: number }) =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/outreach/campaigns`, payload).then(unwrap),
+    listCampaigns: (projectId: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/outreach/campaigns`).then(unwrap),
+    createProspect: (projectId: string, campaignId: string, payload: any) =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/outreach/campaigns/${campaignId}/prospects`, payload).then(unwrap),
+    listProspects: (projectId: string, campaignId: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/outreach/campaigns/${campaignId}/prospects`).then(unwrap),
+    updateProspect: (projectId: string, prospectId: string, payload: any) =>
+      axiosInstance.patch<any>(`/seo/projects/${projectId}/outreach/prospects/${prospectId}`, payload).then(unwrap),
+    campaignSummary: (projectId: string, campaignId: string) =>
+      axiosInstance.get<any>(`/seo/projects/${projectId}/outreach/campaigns/${campaignId}/summary`).then(unwrap),
+
+    // Featured snippet / PAA / volatility
+    listSnippets: (projectId: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/snippets`).then(unwrap),
+    checkSnippet: (projectId: string, keyword: string) =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/snippets/check?keyword=${encodeURIComponent(keyword)}`).then(unwrap),
+    listPAA: (projectId: string, seed?: string) =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/paa${seed ? `?seed=${encodeURIComponent(seed)}` : ""}`).then(unwrap),
+    scanVolatility: (projectId: string, rank_diffs: any[], drop_threshold = 5, rise_threshold = 5) =>
+      axiosInstance.post<any[]>(`/seo/projects/${projectId}/volatility/scan`, { rank_diffs, drop_threshold, rise_threshold }).then(unwrap),
+    listVolatility: (projectId: string, direction?: "up" | "down") =>
+      axiosInstance.get<any[]>(`/seo/projects/${projectId}/volatility${direction ? `?direction=${direction}` : ""}`).then(unwrap),
+  },
+
   // Cache
   cache: {
     stats: (projectId: string) =>

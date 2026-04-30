@@ -16,7 +16,7 @@ export function RankTracker({ projectId }: RankTrackerProps) {
   const keywords = data?.data ?? [];
   const [selectedId, setSelectedId] = useState("");
 
-  const activeKeywordId = selectedId || keywords[0]?.id || "";
+  const activeKeywordId = selectedId || keywords[0]?.keyword_id || "";
 
   const { data: historyResponse, isLoading } = useRankHistory(projectId, activeKeywordId);
   const { data: sovData } = useSOV(projectId);
@@ -27,7 +27,7 @@ export function RankTracker({ projectId }: RankTrackerProps) {
   const historyData = rawHistoryData
     .map((item: any) => ({
       date: item.timestamp.split("T")[0].slice(5),
-      position: item.position,
+      position: item.rank !== undefined ? item.rank : item.position,
     }))
     .reverse();
 
@@ -64,7 +64,7 @@ export function RankTracker({ projectId }: RankTrackerProps) {
         </div>
         <Select value={activeKeywordId} onValueChange={setSelectedId} className="w-64">
           {keywords.map((k) => (
-            <SelectItem key={k.id} value={k.id}>{k.keyword || "Unknown"}</SelectItem>
+            <SelectItem key={k.id} value={k.keyword_id}>{k.keyword || "Unknown"}</SelectItem>
           ))}
         </Select>
       </CardHeader>
