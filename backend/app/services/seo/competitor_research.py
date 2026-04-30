@@ -13,6 +13,7 @@ from uuid import UUID
 
 from app.models.seo import CompetitorKeywords
 from app.core.database import AsyncSessionLocal
+from app.core.config import settings
 
 try:
     from openai import AsyncOpenAI

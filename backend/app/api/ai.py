@@ -63,12 +63,15 @@ async def get_scan_status(task_id: str, current_user: User = Depends(get_current
 
         if progress_data:
             progress_val = progress_data.get("progress", 0)
-            # If progress is 100%, consider it SUCCESS for the UI
+            # Override Celery state based on truth in Redis progress tracker
             if progress_val == 100:
                 state = "SUCCESS"
-            # If status in Redis is failed, consider it FAILURE
             elif progress_data.get("status") == "failed":
                 state = "FAILURE"
+            elif state == "SUCCESS" and progress_val < 100:
+                # If Celery says success but progress is < 100, the master task
+                # successfully launched the chain, but the chain is still running.
+                state = "STARTED"
 
         return {
             "task_id": task_id,

@@ -8,6 +8,8 @@ import json
 import re
 from typing import List, Dict, Any, Optional
 
+from app.core.config import settings
+
 try:
     from openai import AsyncOpenAI
     OPENAI_AVAILABLE = True
