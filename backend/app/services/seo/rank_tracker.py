@@ -9,8 +9,14 @@ import random
 import re
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
+from urllib.parse import unquote
 
 import httpx
+try:
+    from playwright.async_api import async_playwright
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -86,8 +92,8 @@ async def _check_via_serpapi(keyword: str, domain: str, api_key: str) -> Optiona
 
 async def _check_via_scrape(keyword: str, domain: str) -> Optional[int]:
     """
-    Scrape Google search results for a keyword (fallback).
-    Uses rotating user agents and basic result parsing.
+    Scrape Google search results for a keyword using Playwright (fallback).
+    Uses a headless browser to better mimic real user activity.
 
     Args:
         keyword: Search keyword
@@ -96,45 +102,108 @@ async def _check_via_scrape(keyword: str, domain: str) -> Optional[int]:
     Returns:
         Integer position or None
     """
+    if not PLAYWRIGHT_AVAILABLE:
+        logger.warning("Playwright not available, falling back to basic scrape")
+        return await _check_via_scrape_basic(keyword, domain)
+
+    url = f"https://www.google.com/search?q={keyword}&num=100&hl=en&gl=us"
+    
+    try:
+        async with async_playwright() as p:
+            # Launch browser
+            browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context(
+                user_agent=_get_random_ua(),
+                viewport={'width': 1280, 'height': 800}
+            )
+            page = await context.new_page()
+            
+            # Navigate to Google
+            logger.info(f"Playwright: Navigating to Google for '{keyword}'")
+            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            
+            # Check for CAPTCHA or 'sorry' page
+            if "sorry/index" in page.url:
+                logger.warning(f"Google detected automated traffic for '{keyword}'")
+                await browser.close()
+                return None
+
+            # Extract links from organic results
+            # Typical Google organic result link selector: div.g a[data-ved] or just h3 + a
+            # We'll use a more generic approach to find all organic links
+            links = await page.evaluate('''() => {
+                const results = [];
+                const anchors = document.querySelectorAll('div.g a');
+                for (const a of anchors) {
+                    const href = a.href;
+                    if (href && href.startsWith('http') && !href.includes('google.com')) {
+                        results.push(href);
+                    }
+                }
+                return results;
+            }''')
+            
+            await browser.close()
+
+            position = 1
+            seen = set()
+            for link in links:
+                # Clean URL (remove tracking params if any)
+                clean_link = link.split('#')[0].split('?')[0].rstrip('/')
+                if clean_link in seen:
+                    continue
+                seen.add(clean_link)
+                
+                if domain.lower().rstrip("/") in clean_link.lower():
+                    logger.info(f"Found '{domain}' at position {position} for '{keyword}' via Playwright")
+                    return position
+                position += 1
+                if position > 100:
+                    break
+                    
+    except Exception as e:
+        logger.error(f"Playwright scraping failed for '{keyword}': {e}")
+        # Final fallback to basic scrape if playwright fails
+        return await _check_via_scrape_basic(keyword, domain)
+
+    return None
+
+
+async def _check_via_scrape_basic(keyword: str, domain: str) -> Optional[int]:
+    """Basic HTTP-based scrape fallback."""
     url = "https://www.google.com/search"
     params = {"q": keyword, "num": 100, "hl": "en", "gl": "us"}
     headers = {
         "User-Agent": _get_random_ua(),
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.5",
-        "Accept-Encoding": "gzip, deflate",
-        "DNT": "1",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
     }
     try:
         async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
             resp = await client.get(url, params=params, headers=headers)
+            if resp.status_code == 429:
+                logger.warning(f"Basic scrape hit 429 for '{keyword}'")
+                return None
             resp.raise_for_status()
             html = resp.text
 
-            # Simple regex-based extraction of result URLs
             pattern = re.compile(r'href="/url\?q=(https?://[^&"]+)', re.IGNORECASE)
             matches = pattern.findall(html)
 
             position = 1
             seen = set()
             for link in matches:
-                # Decode URL encoding
-                from urllib.parse import unquote
                 link = unquote(link)
                 if link in seen:
                     continue
                 seen.add(link)
                 if domain.lower().rstrip("/") in link.lower():
-                    logger.info(f"Found '{domain}' at position {position} for '{keyword}' via scrape")
                     return position
                 position += 1
                 if position > 100:
                     break
     except Exception as e:
-        logger.warning(f"Scraping failed for '{keyword}': {e}")
-
+        logger.warning(f"Basic scraping failed for '{keyword}': {e}")
     return None
 
 
@@ -234,7 +303,7 @@ async def bulk_rank_check(
     keywords: List[Dict[str, Any]],
     domain: str,
     serpapi_key: Optional[str] = None,
-    concurrency: int = 10,
+    concurrency: int = 5,
 ) -> List[Dict[str, Any]]:
     """
     Batch rank checking for a list of keywords with improved performance.
@@ -244,11 +313,16 @@ async def bulk_rank_check(
         keywords: List of keyword dicts (must contain 'keyword' field)
         domain: Target domain
         serpapi_key: Optional SerpAPI key
-        concurrency: Max concurrent requests (default 10 for better throughput)
+        concurrency: Max concurrent requests (default 5 for better stability)
 
     Returns:
         List of ranking result dicts (same shape as check_rankings output)
     """
+    # Reduce concurrency if scraping to avoid Google blocks
+    if not serpapi_key:
+        concurrency = min(concurrency, 2)
+        logger.info(f"Scraping mode: Limiting concurrency to {concurrency} to avoid 429s")
+
     logger.info(f"Bulk rank check: project_id={project_id} keywords={len(keywords)} domain={domain} concurrency={concurrency}")
     results = []
     semaphore = asyncio.Semaphore(concurrency)

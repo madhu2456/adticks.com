@@ -27,6 +27,7 @@ boto3>=1.34.140
 # HTTP
 httpx>=0.27.0
 beautifulsoup4>=4.12.3
+playwright>=1.41.0
 
 # AI
 openai>=1.40.0

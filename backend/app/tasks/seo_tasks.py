@@ -285,7 +285,7 @@ async def _run_rank_tracking_impl(project_id: str, task_id: str) -> dict:
             project_id=project_id,
             keywords=kw_dicts,
             domain=domain,
-            concurrency=10,  # Increased from default 5 for better performance
+            concurrency=5,  # Reduced from 10 for better stability
         )
         logger.info("Completed ranking check: %d results", len(ranking_results))
 

@@ -65,6 +65,23 @@ class RateLimiter:
 _openai_limiter = RateLimiter(OPENAI_RPM)
 
 
+async def pull_ollama_model(model_name: str):
+    """Pull a model from Ollama library."""
+    logger.info(f"🚚 Pulling Ollama model: {model_name}... This may take a few minutes.")
+    try:
+        async with httpx.AsyncClient(timeout=600.0) as client:
+            response = await client.post(
+                f"{OLLAMA_HOST}/api/pull",
+                json={"name": model_name, "stream": False},
+            )
+            if response.status_code == 200:
+                logger.info(f"✅ Successfully pulled Ollama model: {model_name}")
+            else:
+                logger.error(f"❌ Failed to pull Ollama model: {response.text}")
+    except Exception as e:
+        logger.error(f"❌ Error pulling Ollama model: {e}")
+
+
 async def query_ollama(
     prompt_text: str,
     system_prompt: Optional[str] = None,
@@ -92,6 +109,14 @@ async def query_ollama(
                 },
             )
             
+            if response.status_code == 404:
+                error_data = response.json()
+                if "not found" in error_data.get("error", "").lower():
+                    logger.warning(f"⚠️  Ollama model '{OLLAMA_MODEL}' not found. Attempting automatic pull...")
+                    await pull_ollama_model(OLLAMA_MODEL)
+                    # Retry once after pulling
+                    return await query_ollama(prompt_text, system_prompt, temperature, max_tokens)
+
             if response.status_code != 200:
                 raise Exception(f"Ollama returned {response.status_code}: {response.text}")
             
