@@ -72,7 +72,8 @@ async def generate_keywords(
 
     keywords: List[Dict[str, Any]] = []
 
-    if OPENAI_AVAILABLE:
+    from app.core.config import settings
+    if OPENAI_AVAILABLE and settings.OPENAI_API_KEY:
         try:
             client = AsyncOpenAI()
             seed_str = ", ".join(seed_keywords)

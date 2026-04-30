@@ -174,7 +174,7 @@ async def generate_prompts(
     competitors = competitors or []
     prompts_raw: List[Dict[str, Any]] = []
 
-    if OPENAI_AVAILABLE:
+    if OPENAI_AVAILABLE and settings.OPENAI_API_KEY:
         try:
             client = AsyncOpenAI()
             comp_str = ", ".join(competitors[:5]) if competitors else "major industry players"

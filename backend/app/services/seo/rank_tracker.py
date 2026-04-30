@@ -112,15 +112,43 @@ async def _check_via_scrape(keyword: str, domain: str) -> Optional[int]:
         async with async_playwright() as p:
             # Launch browser
             browser = await p.chromium.launch(headless=True)
+            
+            # Randomized viewport
+            width = random.randint(1024, 1920)
+            height = random.randint(768, 1080)
+            
             context = await browser.new_context(
                 user_agent=_get_random_ua(),
-                viewport={'width': 1280, 'height': 800}
+                viewport={'width': width, 'height': height},
+                locale="en-US",
+                timezone_id="America/New_York",
             )
             page = await context.new_page()
+
+            # --- Stealth Script: Hide WebDriver ---
+            await page.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+            """)
             
-            # Navigate to Google
+            # Additional stealth headers
+            await page.set_extra_http_headers({
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": "https://www.google.com/",
+                "DNT": "1",
+            })
+            
+            # Navigate to Google with a small delay
             logger.info(f"Playwright: Navigating to Google for '{keyword}'")
-            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            # Using a more natural navigation
+            await page.goto("https://www.google.com", wait_until="networkidle")
+            
+            # Wait a bit then search instead of direct URL
+            await asyncio.sleep(random.uniform(1.0, 2.0))
+            
+            search_url = f"https://www.google.com/search?q={keyword}&num=100&hl=en&gl=us"
+            await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
             
             # Check for CAPTCHA or 'sorry' page
             if "sorry/index" in page.url:
@@ -232,8 +260,9 @@ async def check_rankings(
         source = "serpapi"
     else:
         try:
-            # Add jitter to avoid rate limiting
-            await asyncio.sleep(random.uniform(1.5, 3.5))
+            # Add significant jitter to avoid rate limiting
+            # 3-7 seconds is more human-like than the previous 1.5-3.5s
+            await asyncio.sleep(random.uniform(3.0, 7.0))
             position = await _check_via_scrape(keyword, domain)
             source = "scrape"
         except Exception as e:
@@ -320,8 +349,8 @@ async def bulk_rank_check(
     """
     # Reduce concurrency if scraping to avoid Google blocks
     if not serpapi_key:
-        concurrency = min(concurrency, 2)
-        logger.info(f"Scraping mode: Limiting concurrency to {concurrency} to avoid 429s")
+        concurrency = 1
+        logger.info(f"Scraping mode: Limiting concurrency to {concurrency} (conservative) to avoid 429s")
 
     logger.info(f"Bulk rank check: project_id={project_id} keywords={len(keywords)} domain={domain} concurrency={concurrency}")
     results = []

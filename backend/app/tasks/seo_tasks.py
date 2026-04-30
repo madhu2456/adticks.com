@@ -404,6 +404,15 @@ def run_seo_technical_task(self, project_id: str, parent_task_id: str | None = N
 
 
 async def _run_seo_audit_impl(project_id: str, url: str | None, audit_type: str = "full", task_id: str = "") -> dict:
+    try:
+        return await _run_seo_audit_impl_inner(project_id, url, audit_type, task_id)
+    except Exception as e:
+        import traceback
+        logger.error(f"DETAILED SEO AUDIT FAILURE for project {project_id}: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise
+
+async def _run_seo_audit_impl_inner(project_id: str, url: str | None, audit_type: str = "full", task_id: str = "") -> dict:
     # Initialize progress tracking
     progress = ScanProgress(project_id, task_id)
     # await progress.initialize() # Don't initialize if part of chain
@@ -424,14 +433,19 @@ async def _run_seo_audit_impl(project_id: str, url: str | None, audit_type: str 
     on_page = {}
     technical = {}
 
+    def _ensure_dict(val: Any) -> Dict[str, Any]:
+        if isinstance(val, dict):
+            return val
+        return {}
+
     # Load existing cached audit to merge if doing partial audit
     await progress.update(audit_stage, 15, "📂 Loading previous audit results...")
     try:
         component_cache = ComponentCache(project_id)
         cached_audit = await component_cache.get_cached_audit()
-        if cached_audit:
-            on_page = cached_audit.get("on_page", {})
-            technical = cached_audit.get("technical", {})
+        if cached_audit and isinstance(cached_audit, dict):
+            on_page = _ensure_dict(cached_audit.get("on_page", {}))
+            technical = _ensure_dict(cached_audit.get("technical", {}))
             logger.info("Loaded cached audit data")
     except Exception as e:
         logger.warning(f"Error loading cached audit for merge: {e}")
@@ -440,16 +454,16 @@ async def _run_seo_audit_impl(project_id: str, url: str | None, audit_type: str 
     if audit_type in ("full", "on_page"):
         await progress.update(ScanStage.ON_PAGE_ANALYSIS, 35, f"🔍 Analyzing page elements • URL: {target_url[:50]}...")
         logger.info("Starting on-page analysis for %s", target_url)
-        on_page = await analyze_url(target_url)
-        on_page_issues = len(on_page.get("issues", []))
-        logger.info("On-page analysis complete: %d issues found", on_page_issues)
+        raw_on_page = await analyze_url(target_url)
+        on_page = _ensure_dict(raw_on_page)
+        logger.info(f"On-page analysis complete (type: {type(on_page)}): {len(on_page.get('issues', []))} issues found")
     
     if audit_type in ("full", "technical"):
         await progress.update(ScanStage.TECHNICAL_AUDIT, 60, f"⚙️ Running technical checks • Domain: {domain}")
         logger.info("Starting technical audit for %s", domain)
-        technical = await check_technical(domain)
-        tech_issues = len(technical.get("issues", []))
-        logger.info("Technical audit complete: %d issues found", tech_issues)
+        raw_tech = await check_technical(domain)
+        technical = _ensure_dict(raw_tech)
+        logger.info(f"Technical audit complete (type: {type(technical)}): {len(technical.get('issues', []))} issues found")
 
     if audit_type == "full":
         await progress.update(ScanStage.BACKLINK_ANALYSIS, 75, f"🔗 Analyzing backlink profile...")
@@ -507,10 +521,14 @@ async def _run_seo_audit_impl(project_id: str, url: str | None, audit_type: str 
             project_id=UUID(project_id),
             url=target_url,
             score=audit["overall_score"],
-            total_errors=len([i for i in on_page.get("issues", []) if i.get("severity") == "error"]) + 
-                         len([i for i in technical.get("issues", []) if i.get("severity") == "error"]),
-            total_warnings=len([i for i in on_page.get("issues", []) if i.get("severity") == "warning"]) +
-                           len([i for i in technical.get("issues", []) if i.get("severity") == "warning"]),
+            total_errors=sum(1 for i in on_page.get("issues", []) if isinstance(i, dict) and i.get("severity") == "error") + 
+                         sum(1 for i in technical.get("issues", []) if isinstance(i, dict) and i.get("severity") == "error") +
+                         sum(1 for i in on_page.get("issues", []) if isinstance(i, str) and "CRITICAL" in i.upper()) +
+                         sum(1 for i in technical.get("issues", []) if isinstance(i, str) and "CRITICAL" in i.upper()),
+            total_warnings=sum(1 for i in on_page.get("issues", []) if isinstance(i, dict) and i.get("severity") == "warning") +
+                           sum(1 for i in technical.get("issues", []) if isinstance(i, dict) and i.get("severity") == "warning") +
+                           sum(1 for i in on_page.get("issues", []) if isinstance(i, str) and "CRITICAL" not in i.upper()) +
+                           sum(1 for i in technical.get("issues", []) if isinstance(i, str) and "CRITICAL" not in i.upper()),
             pages_crawled=1, # Initial basic crawler
             crawl_depth=1,
             timestamp=datetime.now(timezone.utc)

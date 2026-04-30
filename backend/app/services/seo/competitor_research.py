@@ -39,7 +39,9 @@ async def identify_competitors(domain: str, industry: str) -> List[str]:
     """
     logger.info(f"Identifying competitors for domain: {domain} in industry: {industry}")
     
-    if not OPENAI_AVAILABLE:
+    if not OPENAI_AVAILABLE or not settings.OPENAI_API_KEY:
+        if not settings.OPENAI_API_KEY:
+            logger.info("OPENAI_API_KEY not set, using fallback competitor generation")
         return _fallback_identify_competitors(domain, industry)
 
     try:
@@ -108,7 +110,7 @@ async def research_competitor_keywords(
     """
     logger.info(f"Researching keywords for competitor: {domain}")
     
-    if not OPENAI_AVAILABLE:
+    if not OPENAI_AVAILABLE or not settings.OPENAI_API_KEY:
         return _fallback_competitor_keywords(domain, industry)
 
     try:

@@ -81,8 +81,9 @@ async def find_gaps(
     """
     logger.info(f"Finding content gaps for {len(project_keywords)} project keywords vs {len(competitor_domains)} competitors")
 
-    if not OPENAI_AVAILABLE:
-        logger.warning("OpenAI not available — returning fallback gap analysis")
+    if not OPENAI_AVAILABLE or not settings.OPENAI_API_KEY:
+        if not settings.OPENAI_API_KEY:
+            logger.info("OPENAI_API_KEY not set, using fallback gap analysis")
         return _fallback_gaps(project_keywords, competitor_domains)
 
     try:
