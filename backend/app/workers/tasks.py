@@ -94,6 +94,7 @@ def run_full_scan_task(self, project_id: str, force_refresh: bool = False) -> di
                 return None, None
 
             # Check if we can use cached results
+            # Bypassing cache if force_refresh is True OR if this was manually triggered
             if not force_refresh:
                 try:
                     # Check if cache exists and is still valid
@@ -119,6 +120,8 @@ def run_full_scan_task(self, project_id: str, force_refresh: bool = False) -> di
                         logger.info(f"Scan cache invalidated for project {project_id} (project state changed)")
                 except Exception as e:
                     logger.warning(f"Error checking scan cache: {e}")
+            else:
+                logger.info(f"Bypassing cache for project {project_id} (force_refresh=True)")
             
             return None, project_info
         finally:
