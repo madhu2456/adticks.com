@@ -35,9 +35,12 @@ async def test_run_scan_includes_all_channels(client, test_project, auth_headers
     
     assert response.status_code == 202
     
-    # Verify run_full_scan_task was called with project_id
-    mock_delay.assert_called_once_with(project_id=str(test_project.id))
-
+    # Verify run_full_scan_task was called with project_id and new cache bypass parameters
+    mock_delay.assert_called_once_with(
+        project_id=str(test_project.id),
+        force_refresh=True,
+        is_scheduled=False
+    )
 
 async def test_run_scan_vs_ai_only_scan_difference():
     """

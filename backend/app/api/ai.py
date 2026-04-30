@@ -133,7 +133,7 @@ async def generate_prompts(
 @router.post("/scan/run", status_code=status.HTTP_202_ACCEPTED)
 async def run_scan(
     project_id: UUID,
-    force_refresh: bool = Query(False, description="Force a full scan and bypass cache"),
+    force_refresh: bool = Query(True, description="Force a full scan and bypass cache"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -171,7 +171,8 @@ async def run_scan(
         from app.workers.tasks import run_full_scan_task
         task = run_full_scan_task.delay(
             project_id=str(project.id),
-            force_refresh=force_refresh
+            force_refresh=force_refresh,
+            is_scheduled=False
         )
         return {"status": "queued", "task_id": task.id}
     except Exception as e:

@@ -77,15 +77,22 @@ from celery import chain
 # ---------------------------------------------------------------------------
 
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=120, time_limit=3600, soft_time_limit=3300)
-def run_full_scan_task(self, project_id: str, force_refresh: bool = False) -> dict:
+def run_full_scan_task(self, project_id: str, force_refresh: bool = False, is_scheduled: bool = False) -> dict:
     """
     Master task: orchestrate the full AdTicks pipeline for a project using non-blocking chains.
+    
+    Args:
+        project_id: UUID of the project
+        force_refresh: If True, bypass cache even if scheduled
+        is_scheduled: If True, allow using cached results (daily runs)
     """
     async def _run_init():
         try:
             # Initialize progress tracking
             progress = ScanProgress(project_id, self.request.id)
             await progress.initialize()
+            
+            logger.info(f"Initializing run_full_scan_task for project {project_id} (force_refresh={force_refresh}, is_scheduled={is_scheduled})")
             
             project_info = await _get_project_info(project_id)
             
@@ -94,8 +101,9 @@ def run_full_scan_task(self, project_id: str, force_refresh: bool = False) -> di
                 return None, None
 
             # Check if we can use cached results
-            # Bypassing cache if force_refresh is True OR if this was manually triggered
-            if not force_refresh:
+            # Bypassing cache if it's NOT a scheduled run OR if force_refresh is True
+            # Manual scans (is_scheduled=False) always run fresh logic.
+            if is_scheduled and not force_refresh:
                 try:
                     # Check if cache exists and is still valid
                     cache_exists = await has_scan_cache(project_id)
@@ -121,7 +129,8 @@ def run_full_scan_task(self, project_id: str, force_refresh: bool = False) -> di
                 except Exception as e:
                     logger.warning(f"Error checking scan cache: {e}")
             else:
-                logger.info(f"Bypassing cache for project {project_id} (force_refresh=True)")
+                reason = "force_refresh=True" if force_refresh else "manual trigger"
+                logger.info(f"Bypassing cache for project {project_id} ({reason})")
             
             return None, project_info
         finally:
@@ -658,7 +667,7 @@ async def _schedule_daily_scans_impl() -> dict:
     scheduled = 0
     for project in projects:
         try:
-            run_full_scan_task.delay(project_id=str(project.id))
+            run_full_scan_task.delay(project_id=str(project.id), is_scheduled=True)
             scheduled += 1
             logger.info("Scheduled full scan for project %s (%s)", project.id, project.brand_name)
         except Exception as exc:
