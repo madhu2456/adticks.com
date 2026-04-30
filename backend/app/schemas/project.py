@@ -1,7 +1,7 @@
 """AdTicks project Pydantic schemas."""
 from datetime import datetime
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 class ProjectCreate(BaseModel):
     brand_name: str
@@ -27,12 +27,11 @@ class ProjectResponse(BaseModel):
     competitors: list[str] = []
     created_at: datetime
     
+    @field_validator("competitors", mode="before")
     @classmethod
-    def model_validate(cls, obj, **kwargs):
-        # Extract competitor domains for the response
-        res = super().model_validate(obj, **kwargs)
-        if hasattr(obj, "competitors") and obj.competitors:
-            res.competitors = [c.domain for c in obj.competitors]
-        return res
+    def extract_competitor_domains(cls, v):
+        if isinstance(v, list) and len(v) > 0 and not isinstance(v[0], str):
+            return [c.domain for c in v]
+        return v
 
     model_config = {"from_attributes": True}

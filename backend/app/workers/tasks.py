@@ -325,7 +325,7 @@ def generate_insights_task(self, project_id: str, parent_task_id: str | None = N
 
 async def _generate_insights_impl(project_id: str, task_id: str = "") -> dict:
     progress = ScanProgress(project_id, task_id)
-    await progress.update(ScanStage.INSIGHT_GENERATION, 5, "⏳ Initializing insight engine...")
+    await progress.update(ScanStage.INSIGHTS_GENERATION, 5, "⏳ Initializing insight engine...")
     
     logger.info("Generating insights for project=%s", project_id)
 
