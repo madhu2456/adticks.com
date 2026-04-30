@@ -133,6 +133,7 @@ async def generate_prompts(
 @router.post("/scan/run", status_code=status.HTTP_202_ACCEPTED)
 async def run_scan(
     project_id: UUID,
+    force_refresh: bool = Query(False, description="Force a full scan and bypass cache"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -152,6 +153,7 @@ async def run_scan(
     
     **Query parameters:**
     - **project_id**: UUID of the project to scan (required)
+    - **force_refresh**: If true, bypasses the 24h cache and runs all steps (optional)
     
     **Returns:**
     - **status**: Task status ("queued")
@@ -167,7 +169,10 @@ async def run_scan(
     project = await _assert_owner(project_id, current_user, db)
     try:
         from app.workers.tasks import run_full_scan_task
-        task = run_full_scan_task.delay(project_id=str(project.id))
+        task = run_full_scan_task.delay(
+            project_id=str(project.id),
+            force_refresh=force_refresh
+        )
         return {"status": "queued", "task_id": task.id}
     except Exception as e:
         logger.error(f"Error triggering full scan: {e}", exc_info=True)

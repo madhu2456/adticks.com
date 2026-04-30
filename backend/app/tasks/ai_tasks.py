@@ -156,62 +156,123 @@ async def _run_llm_scan_impl(project_id: str, prompt_limit: int, task_id: str) -
         competitors = await _load_competitors(session, project_id)
         competitor_domains = [c.domain for c in competitors]
 
-    # Run full AI visibility scan via service
-    scan_result = await run_ai_visibility_scan(
-        project_id=project_id,
-        brand_name=project.brand_name,
-        domain=project.domain,
-        industry=project.industry or "Technology",
-        competitors=competitor_domains,
-        prompt_limit=prompt_limit,
-        models=["openai"],
-    )
+        # Load existing prompts from DB instead of re-generating them
+        prompt_result = await session.execute(
+            select(Prompt).where(Prompt.project_id == project_id)
+        )
+        db_prompts = prompt_result.scalars().all()
+        
+        if not db_prompts:
+            logger.info("No prompts found in DB for project %s, generating now...", project_id)
+            # This is a safety fallback if generate_prompts_task wasn't run or failed
+            from app.services.ai.prompt_generator import generate_prompts
+            prompts_raw = await generate_prompts(
+                project.brand_name, project.domain, 
+                project.industry or "Technology", competitor_domains
+            )
+            for p in prompts_raw:
+                session.add(Prompt(
+                    id=uuid.UUID(p["id"]),
+                    project_id=UUID(project_id),
+                    text=p["text"],
+                    category=p.get("category"),
+                ))
+            await session.commit()
+            # Reload
+            prompt_result = await session.execute(
+                select(Prompt).where(Prompt.project_id == project_id)
+            )
+            db_prompts = prompt_result.scalars().all()
 
-    prompt_results = scan_result.get("prompt_results", [])
-    all_responses = scan_result.get("responses", [])
-    score_data = scan_result.get("score", {})
+    # Convert DB prompts to the format expected by run_prompt_batch
+    prompts_to_run = [
+        {"id": str(p.id), "text": p.text, "category": p.category}
+        for p in db_prompts
+    ]
+    
+    if prompt_limit and len(prompts_to_run) > prompt_limit:
+        prompts_to_run = prompts_to_run[:prompt_limit]
+
+    # Execute prompts against LLMs (Ollama with fallback to OpenAI)
+    from app.services.ai.llm_executor import run_prompt_batch
+    responses = await run_prompt_batch(prompts_to_run, models=["openai"], concurrency=5)
+
+    # Extract mentions and compute scores locally instead of calling run_ai_visibility_scan
+    # which would re-generate prompts.
+    from app.services.ai.mention_extractor import extract_mentions
+    from app.services.ai.scorer import compute_visibility_score
+
+    # Group responses by prompt_id
+    response_map = {}
+    for resp in responses:
+        pid = resp.get("prompt_id")
+        if pid not in response_map:
+            response_map[pid] = []
+        response_map[pid].append(resp)
+
+    prompt_results = []
+    all_responses_to_store = []
+
+    for p_dict in prompts_to_run:
+        pid = p_dict["id"]
+        p_responses = response_map.get(pid, [])
+        prompt_mentions = []
+        prompt_all_mentions = []
+
+        for resp in p_responses:
+            if not resp.get("success") or not resp.get("response_text"):
+                continue
+            
+            mentions = extract_mentions(
+                resp["response_text"], project.brand_name, competitor_domains, response_id=resp["id"]
+            )
+            prompt_mentions.extend([m for m in mentions if m.get("is_target_brand")])
+            prompt_all_mentions.extend(mentions)
+        
+        prompt_results.append({
+            "prompt": p_dict,
+            "responses": p_responses,
+            "mentions": prompt_mentions,
+            "all_mentions": prompt_all_mentions,
+            "mentioned": len(prompt_mentions) > 0
+        })
+        all_responses_to_store.extend(p_responses)
+
+    # Compute score
+    score_data = compute_visibility_score(
+        project_id=project_id,
+        prompt_results=prompt_results,
+        target_brand=project.brand_name,
+        industry=project.industry or "Technology"
+    )
 
     # Persist responses and mentions
     async with AsyncSessionLocal() as session:
         for pr in prompt_results:
-            prompt_info = pr.get("prompt", {})
-            prompt_id_str = prompt_info.get("id")
-            if not prompt_id_str:
-                continue
-
-            # Verify prompt exists in DB (it should from generate_prompts_task)
-            try:
-                prompt_uuid = uuid.UUID(prompt_id_str)
-            except (ValueError, AttributeError):
-                logger.warning("Invalid prompt_id_str: %s, skipping responses for this prompt", prompt_id_str)
-                continue
-
-            # Check if prompt exists in database before inserting responses
-            prompt_check = await session.execute(
-                select(Prompt).where(Prompt.id == prompt_uuid)
-            )
-            if not prompt_check.scalar_one_or_none():
-                logger.warning("Prompt %s not found in database (may have been deleted), skipping responses", prompt_uuid)
-                continue
-
+            prompt_id = uuid.UUID(pr["prompt"]["id"])
+            
             for resp_data in pr.get("responses", []):
+                if not resp_data.get("success"):
+                    continue
+
                 resp_id = uuid.uuid4()
                 storage_path = StorageService.ai_path(
-                    project_id, f"responses/{str(prompt_uuid)}.json"
+                    project_id, f"responses/{str(prompt_id)}.json"
                 )
+                
                 # Store raw response to Spaces
                 try:
                     storage.upload_json(storage_path, {
-                        "prompt_id": str(prompt_uuid),
+                        "prompt_id": str(prompt_id),
                         "response": resp_data,
-                        "scan_id": scan_result.get("project_id"),
+                        "project_id": project_id,
                     })
                 except Exception as exc:
                     logger.warning("Response Spaces upload failed: %s", exc)
 
                 resp_row = Response(
                     id=resp_id,
-                    prompt_id=prompt_uuid,
+                    prompt_id=prompt_id,
                     response_text=resp_data.get("response_text", ""),
                     storage_path=storage_path,
                     model=resp_data.get("model"),
@@ -220,10 +281,8 @@ async def _run_llm_scan_impl(project_id: str, prompt_limit: int, task_id: str) -
                 session.add(resp_row)
                 await session.flush()
 
-                # Persist mentions for this response
+                # Persist mentions
                 for mention_data in pr.get("all_mentions", []):
-                    if mention_data.get("response_id") and mention_data["response_id"] != resp_data.get("id"):
-                        continue
                     mention_row = Mention(
                         id=uuid.uuid4(),
                         response_id=resp_id,
@@ -248,12 +307,9 @@ async def _run_llm_scan_impl(project_id: str, prompt_limit: int, task_id: str) -
 
     return {
         "project_id": project_id,
-        "prompts_run": scan_result.get("prompt_count", 0),
-        "responses_stored": len(all_responses),
-        "mentions_found": scan_result.get("mention_stats", {}).get("total_mentions", 0),
+        "prompts_run": len(prompts_to_run),
+        "responses_stored": len(all_responses_to_store),
         "visibility_score": score_data.get("visibility_score", 0.0),
-        "sov_score": score_data.get("sov_score", 0.0),
-        "impact_score": score_data.get("impact_score", 0.0),
         "status": "completed",
     }
 
