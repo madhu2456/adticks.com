@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -72,6 +73,7 @@ export interface ButtonProps
   loading?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  asChild?: boolean;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -85,29 +87,37 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       rightIcon,
       children,
       disabled,
+      asChild = false,
       ...props
     },
     ref
   ) => {
+    const Comp = asChild ? Slot : 'button';
     const isDisabled = disabled || loading;
 
     return (
-      <button
+      <Comp
         ref={ref}
         className={cn(buttonVariants({ variant, size }), className)}
         disabled={isDisabled}
         {...props}
       >
-        {loading ? (
-          <Loader2 className="animate-spin shrink-0" size={size === 'sm' ? 12 : size === 'lg' ? 18 : 14} />
-        ) : leftIcon ? (
-          <span className="shrink-0">{leftIcon}</span>
-        ) : null}
-        {size !== 'icon' && children}
-        {!loading && rightIcon && (
-          <span className="shrink-0">{rightIcon}</span>
+        {asChild ? (
+          children
+        ) : (
+          <>
+            {loading ? (
+              <Loader2 className="animate-spin shrink-0" size={size === 'sm' ? 12 : size === 'lg' ? 18 : 14} />
+            ) : leftIcon ? (
+              <span className="shrink-0">{leftIcon}</span>
+            ) : null}
+            {size !== 'icon' && children}
+            {!loading && rightIcon && (
+              <span className="shrink-0">{rightIcon}</span>
+            )}
+          </>
         )}
-      </button>
+      </Comp>
     );
   }
 );

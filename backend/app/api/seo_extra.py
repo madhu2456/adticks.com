@@ -350,7 +350,7 @@ async def sitemap_generate(
     from app.core.config import settings
     out_dir = os.path.join(settings.STORAGE_ROOT, "sitemaps", str(project_id))
     os.makedirs(out_dir, exist_ok=True)
-    fname = f"{int(datetime.utcnow().timestamp())}_sitemap.xml"
+    fname = f"{int(datetime.now(tz=timezone.utc).timestamp())}_sitemap.xml"
     path = os.path.join(out_dir, fname)
     with open(path, "w", encoding="utf-8") as f:
         f.write(xml)

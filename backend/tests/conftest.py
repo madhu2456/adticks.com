@@ -10,7 +10,7 @@ from typing import AsyncGenerator
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import delete
+from sqlalchemy import delete, event
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -41,6 +41,14 @@ async def engine():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+
+    # Enable foreign keys for SQLite
+    @event.listens_for(_engine.sync_engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     async with _engine.begin() as conn:
         # SQLite does not understand postgresql.UUID — use native_uuid=False
         # so UUID columns are stored as VARCHAR.
@@ -223,6 +231,17 @@ async def test_location(db_session: AsyncSession, test_project: Project):
     await db_session.commit()
     await db_session.refresh(location)
     return location
+
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def cleanup_redis_session():
+    """Close Redis client at the end of the test session."""
+    yield
+    from app.core.caching import close_redis_client
+    try:
+        await close_redis_client()
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------

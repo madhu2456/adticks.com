@@ -438,7 +438,7 @@ async def refresh_anchor_distribution(
         for b in backlinks_rows
     ]
     from app.services.seo.backlink_intelligence import aggregate_anchor_distribution
-    brand_terms = [project.name] if project.name else []
+    brand_terms = [project.brand_name] if project.brand_name else []
     target_keywords_rows = (await db.execute(
         select(Keyword.keyword).where(Keyword.project_id == project_id)
     )).scalars().all()
@@ -555,7 +555,7 @@ async def export_disavow_file(
             ToxicBacklink.project_id == project_id, ToxicBacklink.disavowed.is_(True)
         )
     )).scalars().all()
-    lines = ["# AdTicks disavow export", f"# generated: {datetime.utcnow().isoformat()}"]
+    lines = ["# AdTicks disavow export", f"# generated: {datetime.now(tz=timezone.utc).isoformat()}"]
     for r in rows:
         lines.append(f"domain:{r.referring_domain}")
     return {"content": "\n".join(lines), "format": "google_disavow"}
@@ -976,17 +976,17 @@ async def generate_report(
     from app.core.config import settings
     out_dir = os.path.join(settings.STORAGE_ROOT, "reports", str(project_id))
     os.makedirs(out_dir, exist_ok=True)
-    fname = f"{int(datetime.utcnow().timestamp())}_{payload.report_type}.pdf"
+    fname = f"{int(datetime.now(tz=timezone.utc).timestamp())}_{payload.report_type}.pdf"
     path = os.path.join(out_dir, fname)
 
     try:
-        actual_path = build_pdf_report(project.name, summary, path, payload.branding)
+        actual_path = build_pdf_report(project.brand_name, summary, path, payload.branding)
     except Exception:
         logger.exception("report generation failed")
         actual_path = path.replace(".pdf", ".md")
         from app.services.seo.report_generator import build_markdown_report
         with open(actual_path, "w", encoding="utf-8") as f:
-            f.write(build_markdown_report(project.name, summary, payload.branding))
+            f.write(build_markdown_report(project.brand_name, summary, payload.branding))
 
     rel = os.path.relpath(actual_path, settings.STORAGE_ROOT).replace(os.sep, "/")
     file_url = f"/api/storage/{rel}"

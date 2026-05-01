@@ -13,7 +13,7 @@ import logging
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Iterable
 
 logger = logging.getLogger(__name__)
@@ -74,7 +74,7 @@ def parse_lines(lines: Iterable[str]) -> LogParseResult:
         try:
             ts = datetime.strptime(m.group("time"), "%d/%b/%Y:%H:%M:%S %z")
         except Exception:
-            ts = datetime.utcnow()
+            ts = datetime.now(tz=timezone.utc)
         key = (bot, url, status)
         bucket[key] += 1
         last_seen[key] = max(last_seen.get(key, ts), ts)

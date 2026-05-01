@@ -50,8 +50,12 @@ describe("LogFileAnalyzer", () => {
     const { container } = render(<LogFileAnalyzer projectId="p1"/>);
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
     const file = new File(["log line"], "access.log", { type: "text/plain" });
-    fireEvent.change(input, { target: { files: [file] } });
-    await new Promise((r) => setTimeout(r, 0));
+    
+    await React.act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    
     expect(mutateAsync).toHaveBeenCalled();
     expect(mutateAsync.mock.calls[0][0].projectId).toBe("p1");
   });

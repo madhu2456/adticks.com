@@ -12,6 +12,7 @@ const config: Config = {
   },
   testMatch: ['**/__tests__/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
   testPathIgnorePatterns: ['/node_modules/', '/.next/', '/e2e/'],
+  modulePathIgnorePatterns: ['<rootDir>/.next/'],
   collectCoverageFrom: [
     'components/**/*.{ts,tsx}',
     'lib/**/*.{ts,tsx}',

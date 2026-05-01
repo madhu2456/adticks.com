@@ -261,8 +261,13 @@ await db.commit()
 
 ```python
 def create_access_token(subject: str, expires_delta: timedelta) -> str:
-    expire = datetime.utcnow() + expires_delta
-    payload = {"sub": subject, "exp": expire}
+    now = datetime.now(tz=timezone.utc)
+    expire = now + expires_delta
+    payload = {
+        "sub": subject,
+        "iat": int(now.timestamp()),
+        "exp": int(expire.timestamp())
+    }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 ```
 

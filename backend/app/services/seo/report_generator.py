@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ def build_markdown_report(
     branding = branding or {}
     brand_name = branding.get("brand_name", "AdTicks")
     primary = branding.get("primary_color", "#6366F1")
-    today = datetime.utcnow().strftime("%B %d, %Y")
+    today = datetime.now(tz=timezone.utc).strftime("%B %d, %Y")
 
     lines: list[str] = [
         f"# {brand_name} — SEO Performance Report",
@@ -126,7 +126,7 @@ def build_pdf_report(
     body.fontSize = 10
     body.leading = 14
 
-    today = datetime.utcnow().strftime("%B %d, %Y")
+    today = datetime.now(tz=timezone.utc).strftime("%B %d, %Y")
     flow = [
         Paragraph(f"{brand_name} — SEO Performance Report", title_style),
         Paragraph(f"<b>Project:</b> {project_name}", body),

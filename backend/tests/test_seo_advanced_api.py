@@ -153,7 +153,7 @@ class TestRunSiteAudit:
     ):
         from app.services.seo.site_crawler import CrawlResult, CrawledPageData, CrawlIssue
 
-        async def fake_crawl(url, max_pages, max_depth):
+        async def fake_crawl(url, max_pages, max_depth, stay_within_path=True):
             return CrawlResult(
                 pages=[CrawledPageData(url=url, status_code=200, title="t", word_count=50)],
                 issues=[CrawlIssue(url=url, category="on_page", severity="warning",

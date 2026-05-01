@@ -8,6 +8,7 @@ Provides endpoints for:
 """
 
 import logging
+import uuid
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -68,7 +69,7 @@ async def purge_all_cache(current_user=Depends(get_current_user)):
 
 @router.post("/clear-db", name="Clear database records")
 async def clear_database_records(
-    project_id: str,
+    project_id: uuid.UUID,
     current_user=Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
@@ -95,67 +96,48 @@ async def clear_database_records(
     
     try:
         from sqlalchemy import delete
-        from app.models.keyword import Keyword
-        from app.models.ranking import Ranking, RankHistory
-        from app.models.score import Score
-        from app.models.prompt import Prompt
-        from app.models.response import Response
-        from app.models.audit import (
-            OnPageAudit, TechnicalCheck, ContentAnalysis,
-            ContentRecommendation, BrokenLink, URLRedirect,
-            DuplicateContent, ImageAudit, MetaTagAudit,
-            StructuredDataAudit, CrawlabilityAudit,
-            InternalLinkMap, PageSpeedMetrics
-        )
-        from app.models.gsc import GSCData
-        from app.models.ads import AdsData
-        from app.models.backlink import Backlink
-        from app.models.cluster import Cluster
-        from app.models.competitor import Competitor, CompetitorKeywords
+        import app.models as models
         
-        tables_to_clear = [
-            (Keyword, "keywords"),
-            (RankHistory, "rank_history"),
-            (Ranking, "rankings"),
-            (Score, "scores"),
-            (Response, "responses"),
-            (Prompt, "prompts"),
-            (OnPageAudit, "on_page_audit"),
-            (TechnicalCheck, "technical_checks"),
-            (ContentAnalysis, "content_analysis"),
-            (ContentRecommendation, "content_recommendations"),
-            (BrokenLink, "broken_links"),
-            (URLRedirect, "url_redirects"),
-            (DuplicateContent, "duplicate_content"),
-            (ImageAudit, "image_audits"),
-            (MetaTagAudit, "meta_tag_audits"),
-            (StructuredDataAudit, "structured_data_audits"),
-            (CrawlabilityAudit, "crawlability_audits"),
-            (InternalLinkMap, "internal_link_maps"),
-            (PageSpeedMetrics, "page_speed_metrics"),
-            (GSCData, "gsc_data"),
-            (AdsData, "ads_data"),
-            (Backlink, "backlinks"),
-            (CompetitorKeywords, "competitor_keywords"),
-            (Competitor, "competitors"),
-            (Cluster, "clusters"),
-        ]
+        # We want to clear all data associated with this project.
+        # We iterate through all models that have a 'project_id' field.
+        # Database-level CASCADE will handle child records (like Rankings for Keywords).
         
         deleted_count = 0
-        for model, table_name in tables_to_clear:
-            stmt = delete(model).where(model.project_id == project_id)
-            result = await session.execute(stmt)
-            deleted_count += result.rowcount
-            logger.info(f"Cleared {result.rowcount} records from {table_name} for project {project_id}")
+        cleared_tables = []
+        
+        for model_name in models.__all__:
+            # Skip User and Project models
+            if model_name in ["User", "Project"]:
+                continue
+                
+            model = getattr(models, model_name)
+            
+            # Check if this model has a project_id field
+            if hasattr(model, "project_id"):
+                stmt = delete(model).where(model.project_id == project_id)
+                result = await session.execute(stmt)
+                count = result.rowcount
+                deleted_count += count
+                if count > 0:
+                    cleared_tables.append(model_name)
+                    logger.info(f"Cleared {count} records from {model_name} for project {project_id}")
         
         await session.commit()
         
-        logger.warning(f"DATABASE CLEARED: User {current_user.email} cleared all records for project {project_id} ({deleted_count} records deleted)")
+        # Also invalidate project cache in Redis to ensure fresh data
+        try:
+            await invalidate_scan_cache(project_id)
+            logger.info(f"Invalidated cache for project {project_id} after database clear")
+        except Exception as cache_err:
+            logger.warning(f"Failed to invalidate cache after DB clear: {cache_err}")
+        
+        logger.warning(f"DATABASE CLEARED: User {current_user.email} cleared all records for project {project_id} ({deleted_count} records deleted from {len(cleared_tables)} tables)")
         
         return {
             "status": "success",
             "message": f"Successfully cleared {deleted_count} records from project database.",
             "records_cleared": deleted_count,
+            "tables_cleared": cleared_tables
         }
     except Exception as e:
         await session.rollback()
@@ -165,7 +147,7 @@ async def clear_database_records(
 
 
 @router.get("/stats/{project_id}", name="Get cache stats")
-async def get_cache_stats(project_id: str, session: AsyncSession = Depends(get_db)):
+async def get_cache_stats(project_id: uuid.UUID, session: AsyncSession = Depends(get_db)):
     """
     Get cache statistics for a project (hits, misses, size, TTL).
     
@@ -185,11 +167,11 @@ async def get_cache_stats(project_id: str, session: AsyncSession = Depends(get_d
         raise HTTPException(status_code=404, detail="Project not found")
     
     try:
-        component_cache = ComponentCache(project_id)
+        component_cache = ComponentCache(str(project_id))
         component_stats = await component_cache.get_cache_stats()
         
         # Get scan-level cache status
-        scan_status = await get_cache_status(project_id)
+        scan_status = await get_cache_status(str(project_id))
         
         return {
             "project_id": project_id,
@@ -203,7 +185,7 @@ async def get_cache_stats(project_id: str, session: AsyncSession = Depends(get_d
 
 
 @router.post("/invalidate/{project_id}", name="Invalidate project cache")
-async def invalidate_cache(project_id: str, session: AsyncSession = Depends(get_db)):
+async def invalidate_cache(project_id: uuid.UUID, session: AsyncSession = Depends(get_db)):
     """
     Manually invalidate all cache for a project (forces full rescan).
     
@@ -229,10 +211,10 @@ async def invalidate_cache(project_id: str, session: AsyncSession = Depends(get_
     
     try:
         # Invalidate scan-level cache
-        await invalidate_scan_cache(project_id)
+        await invalidate_scan_cache(str(project_id))
         
         # Invalidate all component caches
-        component_cache = ComponentCache(project_id)
+        component_cache = ComponentCache(str(project_id))
         await component_cache.invalidate_all()
         
         logger.info(f"Manually invalidated all cache for project {project_id}")
@@ -249,7 +231,7 @@ async def invalidate_cache(project_id: str, session: AsyncSession = Depends(get_
 
 @router.post("/invalidate-component/{project_id}/{component}", name="Invalidate specific component")
 async def invalidate_component(
-    project_id: str,
+    project_id: uuid.UUID,
     component: str,
     session: AsyncSession = Depends(get_db),
 ):
@@ -282,7 +264,7 @@ async def invalidate_component(
         raise HTTPException(status_code=404, detail="Project not found")
     
     try:
-        component_cache = ComponentCache(project_id)
+        component_cache = ComponentCache(str(project_id))
         await component_cache.invalidate_component(component)
         
         logger.info(f"Manually invalidated {component} cache for project {project_id}")
