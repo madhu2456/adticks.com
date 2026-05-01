@@ -34,14 +34,16 @@ async def get_projects():
 async def start_scan(project_id):
     """Start a full scan."""
     async with aiohttp.ClientSession() as session:
-        data = {"force_refresh": True}
+        # Note: In the actual API, project_id is a query parameter for /api/scan/run
         async with session.post(
-            f"{API_URL}/scan/start/{project_id}",
-            json=data,
+            f"{API_URL}/scan/run?project_id={project_id}&force_refresh=true",
             headers={"Authorization": "Bearer test"}
         ) as resp:
-            if resp.status == 200:
+            if resp.status == 202:  # Accepted
                 return await resp.json()
+            else:
+                text = await resp.text()
+                print(f"❌ Failed to start scan: {resp.status} - {text}")
     return None
 
 async def get_scan_status(task_id):

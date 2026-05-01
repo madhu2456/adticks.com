@@ -1,6 +1,7 @@
 """
 Rank tracking service for AdTicks SEO module.
 Checks keyword rankings via SerpAPI or Google scraping with user-agent rotation.
+Optimized for low resource usage.
 """
 
 import logging
@@ -13,7 +14,7 @@ from urllib.parse import unquote
 
 import httpx
 try:
-    from playwright.async_api import async_playwright
+    from playwright.async_api import async_playwright, Browser, BrowserContext
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
@@ -29,6 +30,54 @@ USER_AGENTS = [
 ]
 
 SERPAPI_BASE = "https://serpapi.com/search"
+
+
+class PlaywrightManager:
+    """Manages a shared Playwright browser instance to save resources."""
+    _browser: Optional[Browser] = None
+    _playwright = None
+    _lock = asyncio.Lock()
+
+    @classmethod
+    async def get_browser(cls) -> Browser:
+        async with cls._lock:
+            if cls._browser is None:
+                logger.info("🚀 Launching optimized headless Chrome instance...")
+                cls._playwright = await async_playwright().start()
+                cls._browser = await cls._playwright.chromium.launch(
+                    headless=True,
+                    args=[
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-accelerated-2d-canvas",
+                        "--disable-gpu",
+                        "--no-first-run",
+                        "--no-zygote",
+                        "--disable-extensions",
+                        "--disable-default-apps",
+                        "--mute-audio",
+                    ]
+                )
+            return cls._browser
+
+    @classmethod
+    async def close(cls):
+        async with cls._lock:
+            if cls._browser:
+                await cls._browser.close()
+                cls._browser = None
+            if cls._playwright:
+                await cls._playwright.stop()
+                cls._playwright = None
+
+
+async def _intercept_requests(route):
+    """Block images, fonts, and stylesheets to save CPU/RAM."""
+    if route.request.resource_type in ["image", "font", "stylesheet", "media", "other"]:
+        await route.abort()
+    else:
+        await route.continue_()
 
 
 def _get_random_ua() -> str:
@@ -56,14 +105,6 @@ def _mock_position(keyword: str, domain: str) -> Optional[int]:
 async def _check_via_serpapi(keyword: str, domain: str, api_key: str) -> Optional[int]:
     """
     Query SerpAPI for a keyword and return the domain's position (1-100) or None.
-
-    Args:
-        keyword: Search keyword to look up
-        domain: Domain to find in results
-        api_key: SerpAPI key
-
-    Returns:
-        Integer position 1-100 or None if not found in top 100
     """
     params = {
         "q": keyword,
@@ -83,8 +124,6 @@ async def _check_via_serpapi(keyword: str, domain: str, api_key: str) -> Optiona
                 link = result.get("link", "")
                 if domain.lower().rstrip("/") in link.lower():
                     return result.get("position", organic.index(result) + 1)
-    except httpx.HTTPStatusError as e:
-        logger.warning(f"SerpAPI HTTP error for '{keyword}': {e}")
     except Exception as e:
         logger.warning(f"SerpAPI error for '{keyword}': {e}")
     return None
@@ -93,105 +132,67 @@ async def _check_via_serpapi(keyword: str, domain: str, api_key: str) -> Optiona
 async def _check_via_scrape(keyword: str, domain: str) -> Optional[int]:
     """
     Scrape Google search results for a keyword using Playwright (fallback).
-    Uses a headless browser to better mimic real user activity.
-
-    Args:
-        keyword: Search keyword
-        domain: Domain to locate
-
-    Returns:
-        Integer position or None
+    Optimized for resource efficiency.
     """
     if not PLAYWRIGHT_AVAILABLE:
         logger.warning("Playwright not available, falling back to basic scrape")
         return await _check_via_scrape_basic(keyword, domain)
 
-    url = f"https://www.google.com/search?q={keyword}&num=100&hl=en&gl=us"
-    
     try:
-        async with async_playwright() as p:
-            # Launch browser
-            browser = await p.chromium.launch(headless=True)
-            
-            # Randomized viewport
-            width = random.randint(1024, 1920)
-            height = random.randint(768, 1080)
-            
-            context = await browser.new_context(
-                user_agent=_get_random_ua(),
-                viewport={'width': width, 'height': height},
-                locale="en-US",
-                timezone_id="America/New_York",
-            )
-            page = await context.new_page()
+        browser = await PlaywrightManager.get_browser()
+        
+        # Fresh context for each keyword to avoid cookie persistence/detection
+        context = await browser.new_context(
+            user_agent=_get_random_ua(),
+            viewport={'width': 1280, 'height': 720},
+            locale="en-US",
+        )
+        page = await context.new_page()
 
-            # --- Stealth Script: Hide WebDriver ---
-            await page.add_init_script("""
-                Object.defineProperty(navigator, 'webdriver', {
-                    get: () => undefined
-                });
-            """)
-            
-            # Additional stealth headers
-            await page.set_extra_http_headers({
-                "Accept-Language": "en-US,en;q=0.9",
-                "Referer": "https://www.google.com/",
-                "DNT": "1",
-            })
-            
-            # Navigate to Google with a small delay
-            logger.info(f"Playwright: Navigating to Google for '{keyword}'")
-            # Using a more natural navigation
-            await page.goto("https://www.google.com", wait_until="networkidle")
-            
-            # Wait a bit then search instead of direct URL
-            await asyncio.sleep(random.uniform(1.0, 2.0))
-            
+        # Optimize: Block heavy resources
+        await page.route("**/*", _intercept_requests)
+
+        # Stealth Script
+        await page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
+        
+        try:
             search_url = f"https://www.google.com/search?q={keyword}&num=100&hl=en&gl=us"
-            await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+            logger.info(f"Playwright: Scraping Google for '{keyword}'")
             
-            # Check for CAPTCHA or 'sorry' page
+            # Navigate with aggressive timeout and wait for minimal state
+            await page.goto(search_url, wait_until="domcontentloaded", timeout=25000)
+            
             if "sorry/index" in page.url:
                 logger.warning(f"Google detected automated traffic for '{keyword}'")
-                await browser.close()
                 return None
 
-            # Extract links from organic results
-            # Typical Google organic result link selector: div.g a[data-ved] or just h3 + a
-            # We'll use a more generic approach to find all organic links
+            # Extract links efficiently
             links = await page.evaluate('''() => {
-                const results = [];
-                const anchors = document.querySelectorAll('div.g a');
-                for (const a of anchors) {
-                    const href = a.href;
-                    if (href && href.startsWith('http') && !href.includes('google.com')) {
-                        results.push(href);
-                    }
-                }
-                return results;
+                return Array.from(document.querySelectorAll('div.g a'))
+                    .map(a => a.href)
+                    .filter(href => href && href.startsWith('http') && !href.includes('google.com'));
             }''')
             
-            await browser.close()
-
             position = 1
             seen = set()
             for link in links:
-                # Clean URL (remove tracking params if any)
                 clean_link = link.split('#')[0].split('?')[0].rstrip('/')
                 if clean_link in seen:
                     continue
                 seen.add(clean_link)
                 
                 if domain.lower().rstrip("/") in clean_link.lower():
-                    logger.info(f"Found '{domain}' at position {position} for '{keyword}' via Playwright")
+                    logger.info(f"Found '{domain}' at position {position} for '{keyword}'")
                     return position
                 position += 1
-                if position > 100:
-                    break
+                if position > 100: break
+                    
+        finally:
+            await page.close()
+            await context.close()
                     
     except Exception as e:
         logger.error(f"Playwright scraping failed for '{keyword}': {e}")
-        # Final fallback to basic scrape if playwright fails
         return await _check_via_scrape_basic(keyword, domain)
 
     return None
@@ -242,14 +243,6 @@ async def check_rankings(
 ) -> Dict[str, Any]:
     """
     Check the ranking position of a domain for a given keyword.
-
-    Args:
-        keyword: The keyword to check
-        domain: The domain to find
-        serpapi_key: Optional SerpAPI key; falls back to scraping then mock
-
-    Returns:
-        Dict with: keyword, domain, position (int or None), url (str or None), timestamp, source
     """
     logger.info(f"Checking ranking for keyword='{keyword}' domain='{domain}'")
     position: Optional[int] = None
@@ -260,22 +253,19 @@ async def check_rankings(
         source = "serpapi"
     else:
         try:
-            # Add significant jitter to avoid rate limiting
-            # 3-7 seconds is more human-like than the previous 1.5-3.5s
-            await asyncio.sleep(random.uniform(3.0, 7.0))
+            # Human-like jitter
+            await asyncio.sleep(random.uniform(4.0, 8.0))
             position = await _check_via_scrape(keyword, domain)
             source = "scrape"
         except Exception as e:
             logger.warning(f"Scraping unavailable: {e}")
 
-    # Final fallback to mock
-    if position is None and source in ("scrape",):
+    # Fallback to mock
+    if position is None:
         position = _mock_position(keyword, domain)
         source = "mock"
-    elif source == "mock":
-        position = _mock_position(keyword, domain)
 
-    result = {
+    return {
         "keyword": keyword,
         "domain": domain,
         "position": position,
@@ -283,48 +273,6 @@ async def check_rankings(
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "source": source,
     }
-    logger.info(f"Ranking result: {result}")
-    return result
-
-
-async def _batch_check_via_serpapi(
-    keywords: List[str],
-    domain: str,
-    api_key: str,
-    timeout: float = 30.0,
-) -> Dict[str, Optional[int]]:
-    """
-    Batch check multiple keywords via SerpAPI.
-    Makes individual requests but with optimized concurrency control.
-    
-    Args:
-        keywords: List of keywords to check
-        domain: Target domain
-        api_key: SerpAPI key
-        timeout: Request timeout
-    
-    Returns:
-        Dict mapping keyword -> position (or None if not ranked)
-    """
-    results = {}
-    semaphore = asyncio.Semaphore(5)  # SerpAPI rate limiting: 5 concurrent
-    
-    async def _check_one(keyword: str) -> tuple[str, Optional[int]]:
-        async with semaphore:
-            try:
-                position = await _check_via_serpapi(keyword, domain, api_key)
-                return keyword, position
-            except Exception as e:
-                logger.warning(f"Batch check error for '{keyword}': {e}")
-                return keyword, None
-    
-    tasks = [_check_one(kw) for kw in keywords]
-    batch_results = await asyncio.gather(*tasks, return_exceptions=False)
-    
-    for keyword, position in batch_results:
-        results[keyword] = position
-    
-    return results
 
 
 async def bulk_rank_check(
@@ -335,68 +283,37 @@ async def bulk_rank_check(
     concurrency: int = 5,
 ) -> List[Dict[str, Any]]:
     """
-    Batch rank checking for a list of keywords with improved performance.
-
-    Args:
-        project_id: The project ID for logging/storage reference
-        keywords: List of keyword dicts (must contain 'keyword' field)
-        domain: Target domain
-        serpapi_key: Optional SerpAPI key
-        concurrency: Max concurrent requests (default 5 for better stability)
-
-    Returns:
-        List of ranking result dicts (same shape as check_rankings output)
+    Batch rank checking with resource management.
     """
-    # Reduce concurrency if scraping to avoid Google blocks
+    # Force low concurrency for scraping
     if not serpapi_key:
         concurrency = 1
-        logger.info(f"Scraping mode: Limiting concurrency to {concurrency} (conservative) to avoid 429s")
+        logger.info("Scraping mode: Using serial execution to save resources and avoid blocks.")
 
-    logger.info(f"Bulk rank check: project_id={project_id} keywords={len(keywords)} domain={domain} concurrency={concurrency}")
     results = []
     semaphore = asyncio.Semaphore(concurrency)
 
-    async def _check_one_with_retry(kw_dict: Dict[str, Any], max_retries: int = 3) -> Dict[str, Any]:
+    async def _check_one(kw_dict: Dict[str, Any]) -> Dict[str, Any]:
         async with semaphore:
             kw_text = kw_dict.get("keyword", "")
-            for attempt in range(max_retries):
-                try:
-                    result = await check_rankings(kw_text, domain, serpapi_key)
-                    result["keyword_id"] = kw_dict.get("id")
-                    result["project_id"] = project_id
-                    return result
-                except asyncio.TimeoutError:
-                    if attempt < max_retries - 1:
-                        wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
-                        logger.warning(f"Timeout checking '{kw_text}', retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})")
-                        await asyncio.sleep(wait_time)
-                    else:
-                        logger.error(f"Failed to check '{kw_text}' after {max_retries} attempts")
-                        return {
-                            "keyword": kw_text,
-                            "domain": domain,
-                            "position": None,
-                            "url": None,
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                            "source": "error",
-                            "keyword_id": kw_dict.get("id"),
-                            "project_id": project_id,
-                        }
-                except Exception as e:
-                    logger.warning(f"Error checking '{kw_text}': {e}")
-                    return {
-                        "keyword": kw_text,
-                        "domain": domain,
-                        "position": None,
-                        "url": None,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                        "source": "error",
-                        "keyword_id": kw_dict.get("id"),
-                        "project_id": project_id,
-                    }
+            try:
+                res = await check_rankings(kw_text, domain, serpapi_key)
+                res["keyword_id"] = kw_dict.get("id")
+                res["project_id"] = project_id
+                return res
+            except Exception as e:
+                logger.error(f"Error checking '{kw_text}': {e}")
+                return {
+                    "keyword": kw_text, "domain": domain, "position": None,
+                    "url": None, "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "source": "error", "keyword_id": kw_dict.get("id"), "project_id": project_id
+                }
 
-    tasks = [_check_one_with_retry(kw) for kw in keywords]
-    results = await asyncio.gather(*tasks, return_exceptions=False)
+    tasks = [_check_one(kw) for kw in keywords]
+    results = await asyncio.gather(*tasks)
 
-    logger.info(f"Bulk rank check complete: {len(results)} results processed")
-    return results
+    # Clean up browser after bulk operation
+    if not serpapi_key and PLAYWRIGHT_AVAILABLE:
+        await PlaywrightManager.close()
+
+    return list(results)

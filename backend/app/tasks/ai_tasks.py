@@ -194,7 +194,7 @@ async def _run_llm_scan_impl(project_id: str, prompt_limit: int, task_id: str) -
     if prompt_limit and len(prompts_to_run) > prompt_limit:
         prompts_to_run = prompts_to_run[:prompt_limit]
 
-    # Execute prompts against LLMs (Ollama with fallback to OpenAI)
+    # Execute prompts against LLMs (OpenAI with fallback to Mock)
     from app.services.ai.llm_executor import run_prompt_batch
     responses = await run_prompt_batch(prompts_to_run, models=["openai"], concurrency=5)
 
