@@ -12,6 +12,7 @@ Returns:
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import Any
@@ -37,24 +38,46 @@ async def run_pagespeed(
     """Run PageSpeed Insights against a URL.
 
     Returns a dict shaped to fit the CoreWebVitals model.
+    Implements exponential backoff for rate limiting (429 responses).
+    
+    API Key lookup order:
+    1. Explicit api_key parameter
+    2. PSI_API_KEY environment variable
+    3. GOOGLE_API_KEY environment variable (can reuse from same GCP project)
     """
-    api_key = api_key or os.environ.get("PSI_API_KEY", "")
+    if api_key is None:
+        api_key = os.environ.get("PSI_API_KEY") or os.environ.get("GOOGLE_API_KEY", "")
+    
     params = [("url", url), ("strategy", strategy)]
     for c in categories:
         params.append(("category", c))
     if api_key:
         params.append(("key", api_key))
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        try:
-            resp = await client.get(PSI_ENDPOINT, params=params)
-            if resp.status_code != 200:
-                logger.warning("PSI returned %s for %s", resp.status_code, url)
+    max_retries = 3
+    base_delay = 1.0
+    
+    for attempt in range(max_retries):
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            try:
+                resp = await client.get(PSI_ENDPOINT, params=params)
+                if resp.status_code == 429:
+                    if attempt < max_retries - 1:
+                        delay = base_delay * (2 ** attempt)
+                        logger.warning("PSI rate limited (429) for %s. Retrying in %.1f seconds (attempt %d/%d)", url, delay, attempt + 1, max_retries)
+                        await asyncio.sleep(delay)
+                        continue
+                    else:
+                        logger.warning("PSI returned 429 for %s after %d retries", url, max_retries)
+                        return _empty_result(url, strategy)
+                elif resp.status_code != 200:
+                    logger.warning("PSI returned %s for %s", resp.status_code, url)
+                    return _empty_result(url, strategy)
+                data = resp.json()
+                break
+            except Exception as e:
+                logger.exception("PSI failed for %s: %s", url, e)
                 return _empty_result(url, strategy)
-            data = resp.json()
-        except Exception as e:
-            logger.exception("PSI failed for %s: %s", url, e)
-            return _empty_result(url, strategy)
 
     lh = data.get("lighthouseResult", {})
     audits = lh.get("audits", {})

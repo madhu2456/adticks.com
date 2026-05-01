@@ -288,7 +288,8 @@ async def run_cwv(
 ):
     await _get_project_or_404(project_id, current_user, db)
     from app.services.seo.core_web_vitals import run_pagespeed
-    data = await run_pagespeed(url=url, strategy=strategy)
+    psi_api_key = os.environ.get("PSI_API_KEY")
+    data = await run_pagespeed(url=url, strategy=strategy, api_key=psi_api_key)
     row = CoreWebVitals(
         project_id=project_id,
         url=data["url"],
