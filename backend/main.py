@@ -122,26 +122,6 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------------------------
-# Security Headers Middleware
-# ---------------------------------------------------------------------------
-@app.middleware("http")
-async def add_security_headers(request: Request, call_next):
-    """Add security headers and suppress Privacy Sandbox console errors."""
-    response = await call_next(request)
-    # Explicitly disable Privacy Sandbox features to stop browser "Unrecognized feature" errors
-    # and provide standard security hardening.
-    response.headers["Permissions-Policy"] = (
-        "camera=(), microphone=(), geolocation=(), "
-        "browsing-topics=(), join-ad-interest-group=(), "
-        "run-ad-auction=(), attribution-reporting=(), "
-        "private-state-token-issuance=(), private-state-token-redemption=()"
-    )
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    return response
-
-
-# ---------------------------------------------------------------------------
 # Request ID Tracking Middleware
 # ---------------------------------------------------------------------------
 @app.middleware("http")
@@ -195,6 +175,26 @@ async def log_requests(request: Request, call_next):
             },
         )
         raise
+
+
+# ---------------------------------------------------------------------------
+# Security Headers Middleware
+# ---------------------------------------------------------------------------
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    """Add security headers and suppress Privacy Sandbox console errors."""
+    response = await call_next(request)
+    # Explicitly disable Privacy Sandbox features to stop browser "Unrecognized feature" errors
+    # and provide standard security hardening.
+    response.headers["Permissions-Policy"] = (
+        "camera=(), microphone=(), geolocation=(), "
+        "browsing-topics=(), join-ad-interest-group=(), "
+        "run-ad-auction=(), attribution-reporting=(), "
+        "private-state-token-issuance=(), private-state-token-redemption=()"
+    )
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    return response
 
 
 # ---------------------------------------------------------------------------

@@ -16,7 +16,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status, BackgroundTasks
 from sqlalchemy import select, func, desc, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -97,76 +97,87 @@ async def _get_project_or_404(project_id: UUID, user: User, db: AsyncSession) ->
 async def run_site_audit(
     project_id: UUID,
     payload: SiteAuditTriggerRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Run a fresh site crawl + audit. Persists pages + issues to the DB."""
-    project = await _get_project_or_404(project_id, current_user, db)
-    from app.services.seo.site_crawler import crawl_site
+    """Run a fresh site crawl + audit in the background. Persists pages + issues to the DB."""
+    await _get_project_or_404(project_id, current_user, db)
 
-    audit_id = uuid.uuid4()
-    try:
-        result = await crawl_site(
-            payload.url, 
-            max_pages=payload.max_pages, 
-            max_depth=payload.max_depth,
-            stay_within_path=payload.stay_within_path
-        )
-    except Exception as e:
-        logger.exception("audit_failed")
-        raise HTTPException(status_code=500, detail=f"Site audit failed: {e}")
+    async def _audit_task_impl():
+        # Inner function to run in background
+        from app.core.database import AsyncSessionLocal
+        from app.services.seo.site_crawler import crawl_site
+        from app.models.seo_advanced import SiteAuditIssue, CrawledPage, SchemaMarkup
+        
+        async with AsyncSessionLocal() as session:
+            try:
+                result = await crawl_site(
+                    payload.url, 
+                    max_pages=payload.max_pages, 
+                    max_depth=payload.max_depth,
+                    stay_within_path=payload.stay_within_path
+                )
+                
+                # clear previous unresolved issues for the same project
+                await session.execute(delete(SiteAuditIssue).where(SiteAuditIssue.project_id == project_id))
+                await session.execute(delete(CrawledPage).where(CrawledPage.project_id == project_id))
+                await session.execute(delete(SchemaMarkup).where(SchemaMarkup.project_id == project_id))
 
-    # clear previous unresolved issues for the same URL
-    await db.execute(delete(SiteAuditIssue).where(SiteAuditIssue.project_id == project_id))
-    await db.execute(delete(CrawledPage).where(CrawledPage.project_id == project_id))
+                audit_id = uuid.uuid4()
+                for page in result.pages:
+                    session.add(CrawledPage(
+                        project_id=project_id,
+                        url=page.url,
+                        status_code=page.status_code,
+                        content_type=page.content_type,
+                        title=page.title,
+                        meta_description=page.meta_description,
+                        h1=page.h1,
+                        word_count=page.word_count,
+                        internal_links=page.internal_links,
+                        external_links=page.external_links,
+                        images=page.images,
+                        images_missing_alt=page.images_missing_alt,
+                        canonical_url=page.canonical_url,
+                        is_indexable=page.is_indexable,
+                        response_time_ms=page.response_time_ms,
+                        page_size_bytes=page.page_size_bytes,
+                        depth=page.depth,
+                        schema_types=page.schema_types,
+                    ))
+                for issue in result.issues:
+                    session.add(SiteAuditIssue(
+                        project_id=project_id,
+                        audit_id=audit_id,
+                        url=issue.url,
+                        category=issue.category,
+                        severity=issue.severity,
+                        code=issue.code,
+                        message=issue.message,
+                        recommendation=issue.recommendation,
+                        details=issue.details,
+                    ))
+                for sch in result.schemas:
+                    session.add(SchemaMarkup(
+                        project_id=project_id,
+                        url=sch["url"],
+                        schema_type=sch["type"],
+                        raw_data=sch["data"] if isinstance(sch.get("data"), dict) else {},
+                        is_valid=bool(sch.get("valid", True)),
+                        validation_errors=[sch["error"]] if sch.get("error") else [],
+                    ))
+                
+                await session.commit()
+                logger.info(f"Background audit completed for project {project_id}")
+            except Exception as e:
+                logger.exception(f"Background audit failed for project {project_id}")
 
-    for page in result.pages:
-        db.add(CrawledPage(
-            project_id=project_id,
-            url=page.url,
-            status_code=page.status_code,
-            content_type=page.content_type,
-            title=page.title,
-            meta_description=page.meta_description,
-            h1=page.h1,
-            word_count=page.word_count,
-            internal_links=page.internal_links,
-            external_links=page.external_links,
-            images=page.images,
-            images_missing_alt=page.images_missing_alt,
-            canonical_url=page.canonical_url,
-            is_indexable=page.is_indexable,
-            response_time_ms=page.response_time_ms,
-            page_size_bytes=page.page_size_bytes,
-            depth=page.depth,
-            schema_types=page.schema_types,
-        ))
-    for issue in result.issues:
-        db.add(SiteAuditIssue(
-            project_id=project_id,
-            audit_id=audit_id,
-            url=issue.url,
-            category=issue.category,
-            severity=issue.severity,
-            code=issue.code,
-            message=issue.message,
-            recommendation=issue.recommendation,
-            details=issue.details,
-        ))
-    for sch in result.schemas:
-        db.add(SchemaMarkup(
-            project_id=project_id,
-            url=sch["url"],
-            schema_type=sch["type"],
-            raw_data=sch["data"] if isinstance(sch.get("data"), dict) else {},
-            is_valid=bool(sch.get("valid", True)),
-            validation_errors=[sch["error"]] if sch.get("error") else [],
-        ))
-    await db.commit()
+    background_tasks.add_task(_audit_task_impl)
+    
     return {
-        "status": "completed",
-        "audit_id": str(audit_id),
-        "summary": result.summary,
+        "status": "accepted",
+        "message": "Site audit started in background. Results will be available in a few moments.",
     }
 
 

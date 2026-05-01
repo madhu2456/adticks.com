@@ -47,7 +47,12 @@ class JSONFormatter(logging.Formatter):
 def setup_logging(environment: str = "development"):
     """Configure logging for the application."""
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)
+    
+    # Root level: INFO for production, DEBUG for development
+    if environment == "production":
+        root_logger.setLevel(logging.INFO)
+    else:
+        root_logger.setLevel(logging.DEBUG)
 
     # Remove existing handlers
     for handler in root_logger.handlers[:]:
@@ -69,7 +74,10 @@ def setup_logging(environment: str = "development"):
     # Suppress verbose third-party logs
     logging.getLogger("sqlalchemy").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("hpack").setLevel(logging.WARNING)
     logging.getLogger("fastapi").setLevel(logging.INFO)
+    logging.getLogger("uvicorn").setLevel(logging.INFO)
 
 
 def get_logger(name: str) -> logging.LoggerAdapter:

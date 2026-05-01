@@ -174,8 +174,7 @@ class TestRunSiteAudit:
         )
         assert resp.status_code == 202, resp.text
         body = resp.json()
-        assert body["status"] == "completed"
-        assert body["summary"]["score"] == 98
+        assert body["status"] == "accepted"
 
 
 # ===========================================================================
