@@ -44,7 +44,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
 type FeatureKey =
-  | 'seo' | 'ai' | 'geo' | 'gsc' | 'ads' | 'full' | 'keywords_gsc'
+  | 'seo' | 'ai' | 'geo' | 'gsc' | 'ads' | 'keywords_gsc'
   | 'on_page' | 'technical' | 'gaps';
 
 interface NavItem {
@@ -262,14 +262,46 @@ export default function SEOPage() {
                 <Activity size={12} className="text-emerald-500"/>
                 <span>Real-time Monitoring Active</span>
              </div>
-             <Button
-                onClick={() => triggerScan('full')}
-                size="sm"
-                className="gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 border-0 shadow-lg shadow-indigo-500/20 h-9 px-4"
-              >
-                <Zap size={14} />
-                Full Scan
-              </Button>
+             <div className="relative group">
+               <Button
+                  size="sm"
+                  className="gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 border-0 shadow-lg shadow-indigo-500/20 h-9 px-4"
+                >
+                  <Zap size={14} />
+                  Scan
+                  <ChevronDown size={12} className="group-hover:rotate-180 transition-transform" />
+                </Button>
+                <div className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all bg-[#1e293b] border border-[#334155] z-50">
+                  <button
+                    onClick={() => triggerScan('seo')}
+                    className="w-full text-left px-4 py-2.5 text-[13px] font-medium text-text-2 hover:text-text-1 hover:bg-white/[0.05] transition-all first:rounded-t-lg flex items-center gap-2"
+                  >
+                    <ShieldCheck size={13} className="text-indigo-400" />
+                    SEO Audit
+                  </button>
+                  <button
+                    onClick={() => triggerScan('on_page')}
+                    className="w-full text-left px-4 py-2.5 text-[13px] font-medium text-text-2 hover:text-text-1 hover:bg-white/[0.05] transition-all flex items-center gap-2"
+                  >
+                    <FileSearch size={13} className="text-purple-400" />
+                    On-Page Audit
+                  </button>
+                  <button
+                    onClick={() => triggerScan('technical')}
+                    className="w-full text-left px-4 py-2.5 text-[13px] font-medium text-text-2 hover:text-text-1 hover:bg-white/[0.05] transition-all flex items-center gap-2"
+                  >
+                    <ListChecks size={13} className="text-blue-400" />
+                    Technical Audit
+                  </button>
+                  <button
+                    onClick={() => triggerScan('gaps')}
+                    className="w-full text-left px-4 py-2.5 text-[13px] font-medium text-text-2 hover:text-text-1 hover:bg-white/[0.05] transition-all last:rounded-b-lg flex items-center gap-2"
+                  >
+                    <FileSearch size={13} className="text-emerald-400" />
+                    Content Gaps
+                  </button>
+                </div>
+              </div>
           </div>
         </header>
 
