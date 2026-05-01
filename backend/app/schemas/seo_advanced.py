@@ -50,6 +50,7 @@ class SiteAuditTriggerRequest(BaseModel):
     url: str = Field(..., description="Starting URL to crawl")
     max_pages: int = Field(50, ge=1, le=500)
     max_depth: int = Field(3, ge=1, le=8)
+    stay_within_path: bool = Field(False, description="If true, only crawl URLs starting with the same path as the start URL")
 
 
 class SiteAuditSummary(BaseModel):

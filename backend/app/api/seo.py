@@ -561,21 +561,23 @@ async def get_technical_seo(
             "fix": "Choose one version as canonical and set up a 301 redirect from the other."
         })
         
-    # 5. Performance Headers
-    headers = technical.get("performance_headers", {})
-    issues = headers.get("issues", [])
-    if not issues:
+    # 5. Performance
+    perf = technical.get("performance", {})
+    issues = perf.get("issues", [])
+    ttfb = perf.get("ttfb_ms", 0)
+    
+    if not issues and ttfb < 800:
         formatted_checks.append({
-            "check": "Performance Headers",
+            "check": "Performance",
             "status": "pass",
-            "description": "Cache-Control and Content-Encoding (Gzip/Brotli) are properly configured."
+            "description": f"Page loaded quickly (TTFB: {ttfb}ms). Compression and Cache-Control are active."
         })
     else:
         formatted_checks.append({
-            "check": "Performance Headers",
-            "status": "warning",
-            "description": "Missing optimal performance headers (Cache-Control or Compression).",
-            "fix": "Enable Gzip/Brotli compression and configure Cache-Control headers for static assets."
+            "check": "Performance",
+            "status": "warning" if ttfb < 1500 else "fail",
+            "description": f"Performance issues detected. TTFB: {ttfb}ms.",
+            "fix": "Optimize server response time and ensure Gzip/Brotli and Cache-Control headers are active."
         })
     
     total = len(formatted_checks)

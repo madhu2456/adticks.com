@@ -107,7 +107,10 @@ async def run_site_audit(
     audit_id = uuid.uuid4()
     try:
         result = await crawl_site(
-            payload.url, max_pages=payload.max_pages, max_depth=payload.max_depth
+            payload.url, 
+            max_pages=payload.max_pages, 
+            max_depth=payload.max_depth,
+            stay_within_path=payload.stay_within_path
         )
     except Exception as e:
         logger.exception("audit_failed")
@@ -268,7 +271,7 @@ async def list_schemas(
 async def run_cwv(
     project_id: UUID,
     url: str = Query(..., description="URL to analyze"),
-    strategy: str = Query("mobile", regex="^(mobile|desktop)$"),
+    strategy: str = Query("mobile", pattern="^(mobile|desktop)$"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

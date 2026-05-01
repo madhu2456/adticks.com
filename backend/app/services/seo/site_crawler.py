@@ -120,11 +120,14 @@ class SiteCrawler:
         max_depth: int = 3,
         concurrency: int = 5,
         user_agent: str = DEFAULT_USER_AGENT,
+        stay_within_path: bool = False,
     ):
         if not start_url.startswith(("http://", "https://")):
             start_url = "https://" + start_url
         self.start_url = start_url.rstrip("/")
         self.origin = urlparse(self.start_url)
+        self.start_path = self.origin.path or "/"
+        self.stay_within_path = stay_within_path
         self.max_pages = max_pages
         self.max_depth = max_depth
         self.semaphore = asyncio.Semaphore(concurrency)
@@ -138,6 +141,18 @@ class SiteCrawler:
         self._titles: dict[str, list[str]] = {}
         self._h1s: dict[str, list[str]] = {}
         self._descriptions: dict[str, list[str]] = {}
+
+    def _should_crawl(self, link: str) -> bool:
+        """Determine if a link should be added to the crawl queue."""
+        if not _same_origin(self.start_url, link):
+            return False
+        
+        if self.stay_within_path:
+            parsed = urlparse(link)
+            if not parsed.path.startswith(self.start_path):
+                return False
+                
+        return True
 
     # ---- public API --------------------------------------------------------
     async def run(self) -> CrawlResult:
@@ -176,7 +191,7 @@ class SiteCrawler:
                             normalized_link = _normalize(link)
                             if normalized_link in self.visited or normalized_link in self.queued:
                                 continue
-                            if not _same_origin(self.start_url, normalized_link):
+                            if not self._should_crawl(normalized_link):
                                 continue
                             queue.append((normalized_link, page.depth + 1))
                             self.queued.add(normalized_link)
@@ -360,11 +375,21 @@ class SiteCrawler:
             self._h1s.setdefault(page.h1, []).append(url)
 
         # Heading hierarchy check
-        for level in range(2, 7):
+        headings_found = []
+        for level in range(1, 7):
             tag = f"h{level}"
-            for h in soup.find_all(tag):
-                # if a heading exists but its parent level is missing, that's a hierarchy break
-                pass
+            if soup.find(tag):
+                headings_found.append(level)
+        
+        # Check for gaps (e.g., 1, 3 found but no 2)
+        if headings_found:
+            max_h = max(headings_found)
+            for level in range(1, max_h):
+                if level not in headings_found and (level + 1) in headings_found:
+                    self._issue(url, "on_page", "warning", f"heading-gap-h{level}",
+                                f"Missing H{level} while H{level+1} is present",
+                                f"Maintain a logical heading structure (H1 > H2 > H3)")
+                    break
 
         # Word count + thin content
         text = soup.get_text(" ")
@@ -546,7 +571,17 @@ class SiteCrawler:
         }
 
 
-async def crawl_site(start_url: str, max_pages: int = 50, max_depth: int = 3) -> CrawlResult:
+async def crawl_site(
+    start_url: str, 
+    max_pages: int = 50, 
+    max_depth: int = 3,
+    stay_within_path: bool = False
+) -> CrawlResult:
     """Convenience entrypoint."""
-    crawler = SiteCrawler(start_url=start_url, max_pages=max_pages, max_depth=max_depth)
+    crawler = SiteCrawler(
+        start_url=start_url, 
+        max_pages=max_pages, 
+        max_depth=max_depth,
+        stay_within_path=stay_within_path
+    )
     return await crawler.run()

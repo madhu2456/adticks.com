@@ -28,29 +28,39 @@ HEADERS = {
 }
 
 
-def _compute_keyword_density(text: str, keywords: Optional[List[str]] = None) -> Dict[str, float]:
+def _compute_keyword_density(text: str, keywords: Optional[List[str]] = None, title: str = "", h1: str = "") -> Dict[str, Any]:
     """
-    Compute keyword density for a list of keywords against the page text.
+    Compute keyword density and check placement in critical tags.
 
     Args:
         text: Full page text content
         keywords: Optional list of keywords to check density for
+        title: Page title
+        h1: Primary H1 text
 
     Returns:
-        Dict mapping keyword -> density percentage
+        Dict mapping keyword -> {density, in_title, in_h1}
     """
     if not text or not keywords:
         return {}
     text_lower = text.lower()
+    title_lower = title.lower()
+    h1_lower = h1.lower()
+    
     total_words = len(text_lower.split())
     if total_words == 0:
         return {}
-    density = {}
+    
+    results = {}
     for kw in keywords:
         kw_lower = kw.lower()
         count = len(re.findall(r'\b' + re.escape(kw_lower) + r'\b', text_lower))
-        density[kw] = round((count / total_words) * 100, 2)
-    return density
+        results[kw] = {
+            "density_pct": round((count / total_words) * 100, 2),
+            "in_title": kw_lower in title_lower,
+            "in_h1": kw_lower in h1_lower,
+        }
+    return results
 
 
 def _check_heading_hierarchy(soup: BeautifulSoup) -> Dict[str, Any]:
@@ -81,6 +91,7 @@ def _check_heading_hierarchy(soup: BeautifulSoup) -> Dict[str, Any]:
 
     if h4s and not h3s:
         issues.append("H4 tags present without H3 tags — broken hierarchy")
+        hierarchy_valid = False
 
     return {
         "h1_count": len(h1s),
@@ -91,6 +102,55 @@ def _check_heading_hierarchy(soup: BeautifulSoup) -> Dict[str, Any]:
         "h1_texts": [h.get_text(strip=True) for h in h1s],
         "issues": issues,
     }
+
+
+def _check_social_tags(soup: BeautifulSoup) -> Dict[str, Any]:
+    """Detect Open Graph and Twitter card tags."""
+    og_tags = soup.find_all("meta", property=re.compile(r"^og:"))
+    twitter_tags = soup.find_all("meta", attrs={"name": re.compile(r"^twitter:")})
+    
+    return {
+        "has_og": len(og_tags) > 0,
+        "og_count": len(og_tags),
+        "has_twitter": len(twitter_tags) > 0,
+        "twitter_count": len(twitter_tags),
+    }
+
+
+def _check_mobile_compatibility(soup: BeautifulSoup) -> Dict[str, Any]:
+    """Check for meta viewport and other mobile signals."""
+    viewport = soup.find("meta", attrs={"name": "viewport"})
+    return {
+        "has_viewport": viewport is not None,
+        "viewport_content": viewport.get("content", "") if viewport else None,
+    }
+
+
+def _check_html_attributes(soup: BeautifulSoup) -> Dict[str, Any]:
+    """Check lang attribute and charset."""
+    html_tag = soup.find("html")
+    lang = html_tag.get("lang") if html_tag else None
+    
+    meta_charset = soup.find("meta", charset=True)
+    charset = meta_charset.get("charset") if meta_charset else None
+    if not charset:
+        meta_http_equiv = soup.find("meta", attrs={"http-equiv": re.compile(r"^content-type$", re.I)})
+        if meta_http_equiv:
+            content = meta_http_equiv.get("content", "")
+            match = re.search(r"charset=(.*)", content, re.I)
+            if match:
+                charset = match.group(1)
+
+    return {
+        "lang": lang,
+        "charset": charset,
+    }
+
+
+def _check_favicon(soup: BeautifulSoup) -> bool:
+    """Check for favicon declaration."""
+    icon = soup.find("link", rel=re.compile(r"^(shortcut )?icon$", re.I))
+    return icon is not None
 
 
 def _check_images(soup: BeautifulSoup) -> Dict[str, Any]:
@@ -320,6 +380,18 @@ async def analyze_url(
     # --- Headings ---
     heading_analysis = _check_heading_hierarchy(soup)
 
+    # --- Social Tags ---
+    social_analysis = _check_social_tags(soup)
+
+    # --- Mobile ---
+    mobile_analysis = _check_mobile_compatibility(soup)
+
+    # --- HTML Attributes ---
+    html_attr_analysis = _check_html_attributes(soup)
+
+    # --- Favicon ---
+    has_favicon = _check_favicon(soup)
+
     # --- Body Text ---
     for tag in soup(["script", "style", "noscript", "header", "footer", "nav"]):
         tag.decompose()
@@ -327,7 +399,12 @@ async def analyze_url(
     word_count = len(body_text.split())
 
     # --- Keyword Density ---
-    kw_density = _compute_keyword_density(body_text, target_keywords)
+    kw_density = _compute_keyword_density(
+        body_text, 
+        target_keywords, 
+        title_analysis.get("title", ""), 
+        heading_analysis.get("h1_texts", [""])[0] if heading_analysis.get("h1_texts") else ""
+    )
 
     # --- Images ---
     image_analysis = _check_images(soup)
@@ -366,6 +443,18 @@ async def analyze_url(
     if not schema_analysis["has_schema"]:
         issues.append("No structured data/schema markup found")
 
+    if not social_analysis["has_og"]:
+        issues.append("Missing Open Graph tags (OG)")
+    
+    if not mobile_analysis["has_viewport"]:
+        issues.append("CRITICAL: Missing meta viewport tag — not mobile optimized")
+
+    if not html_attr_analysis["lang"]:
+        issues.append("Missing 'lang' attribute on <html> tag")
+
+    if not has_favicon:
+        issues.append("Favicon not found")
+
     if word_count < 300:
         issues.append(f"Low word count ({word_count} words) — aim for 600+ for most pages")
 
@@ -382,6 +471,10 @@ async def analyze_url(
         "title": title_analysis,
         "meta_description": meta_analysis,
         "headings": heading_analysis,
+        "social": social_analysis,
+        "mobile": mobile_analysis,
+        "html_attributes": html_attr_analysis,
+        "favicon_present": has_favicon,
         "word_count": word_count,
         "keyword_density": kw_density,
         "images": image_analysis,
@@ -424,6 +517,22 @@ async def analyze_url(
         "score": 100 if heading_analysis["h1_count"] == 1 else 0
     })
     
+    # Mobile Optimization
+    items.append({
+        "check": "Mobile Friendly",
+        "status": "pass" if mobile_analysis["has_viewport"] else "fail",
+        "message": "Meta viewport found." if mobile_analysis["has_viewport"] else "Missing viewport tag.",
+        "score": 100 if mobile_analysis["has_viewport"] else 0
+    })
+
+    # Social Tags
+    items.append({
+        "check": "Social Presence",
+        "status": "pass" if social_analysis["has_og"] else "warning",
+        "message": f"Found {social_analysis['og_count']} OG tags." if social_analysis["has_og"] else "No social meta tags found.",
+        "score": 100 if social_analysis["has_og"] else 50
+    })
+
     # Content Length
     items.append({
         "check": "Content Length",
