@@ -40,13 +40,11 @@ async def run_pagespeed(
     Returns a dict shaped to fit the CoreWebVitals model.
     Implements exponential backoff for rate limiting (429 responses).
     
-    API Key lookup order:
-    1. Explicit api_key parameter
-    2. PSI_API_KEY environment variable
-    3. GOOGLE_API_KEY environment variable (can reuse from same GCP project)
+    Requires PSI_API_KEY environment variable (from Google Cloud Console).
+    Without it, limited to 5 req/sec (free tier quota).
     """
     if api_key is None:
-        api_key = os.environ.get("PSI_API_KEY") or os.environ.get("GOOGLE_API_KEY", "")
+        api_key = os.environ.get("PSI_API_KEY", "")
     
     params = [("url", url), ("strategy", strategy)]
     for c in categories:
