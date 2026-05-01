@@ -1,7 +1,7 @@
 """
 Technical SEO checker for AdTicks.
-Comprehensive 14-point technical SEO audit including crawlability, security,
-performance, on-page optimization, structured data, mobile, images, and international SEO.
+Comprehensive 19-point enterprise-grade technical SEO audit including crawlability, security,
+performance, on-page optimization, structured data, mobile, images, international SEO, and visual analysis.
 """
 
 import asyncio
@@ -15,6 +15,9 @@ import httpx
 from bs4 import BeautifulSoup
 
 from app.core.config import settings
+from app.services.seo.link_analyzer import LinkAnalyzer
+from app.services.seo.content_freshness import ContentFreshnessAnalyzer
+from app.services.seo.screenshot_analyzer import ScreenshotAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -625,44 +628,336 @@ async def _check_hreflang(full_url: str, client: httpx.AsyncClient) -> Dict[str,
     return result
 
 
+async def _check_broken_links(full_url: str, client: httpx.AsyncClient) -> Dict[str, Any]:
+    """
+    Check for broken links (404s, 410s, timeouts) by crawling internal links.
+    
+    Returns:
+        {
+            "broken_count": int,
+            "broken_links": [{"url": str, "status": int, "text": str}],
+            "redirects_count": int,
+            "internal_checked": int,
+            "external_checked": int,
+            "issues": [str],
+        }
+    """
+    result: Dict[str, Any] = {
+        "broken_count": 0,
+        "broken_links": [],
+        "redirects_count": 0,
+        "internal_checked": 0,
+        "external_checked": 0,
+        "issues": [],
+    }
+    
+    try:
+        # Fetch the main page HTML
+        response = await client.get(full_url, follow_redirects=True)
+        if response.status_code != 200:
+            result["issues"].append(f"Failed to fetch page: HTTP {response.status_code}")
+            return result
+        
+        html_content = response.text
+        root_url = _get_root_url(full_url)
+        
+        # Use LinkAnalyzer to check broken links
+        analyzer = LinkAnalyzer(root_url, timeout=TIMEOUT, max_links=200)
+        link_results = await analyzer.check_broken_links(html_content)
+        
+        result["broken_count"] = link_results.get("broken_count", 0)
+        result["broken_links"] = link_results.get("broken_links", [])
+        result["redirects_count"] = link_results.get("redirects_count", 0)
+        result["internal_checked"] = link_results.get("internal_checked", 0)
+        result["external_checked"] = link_results.get("external_checked", 0)
+        
+        # Determine pass/fail
+        if result["broken_count"] > 0:
+            result["issues"].append(f"Found {result['broken_count']} broken links")
+            # Add details for top broken links
+            for link in result["broken_links"][:5]:
+                status = link.get("status", 0)
+                url = link.get("url", "unknown")
+                result["issues"].append(f"  {status}: {url}")
+    
+    except Exception as e:
+        result["issues"].append(f"Broken link check failed: {str(e)}")
+    
+    return result
+
+
+async def _check_redirect_chains(full_url: str, client: httpx.AsyncClient) -> Dict[str, Any]:
+    """
+    Detect redirect loops, excessive chains (>3 hops), and protocol mixing.
+    
+    Returns:
+        {
+            "max_chain_length": int,
+            "chains": [...],
+            "issues": [str],
+            "passed": bool,
+        }
+    """
+    result: Dict[str, Any] = {
+        "max_chain_length": 0,
+        "chains": [],
+        "issues": [],
+        "passed": True,
+    }
+    
+    try:
+        root_url = _get_root_url(full_url)
+        analyzer = LinkAnalyzer(root_url, timeout=TIMEOUT)
+        
+        redirect_results = await analyzer.analyze_redirect_chains(full_url)
+        
+        result["max_chain_length"] = redirect_results.get("max_chain_length", 0)
+        result["chains"] = redirect_results.get("chains", [])
+        result["issues"] = redirect_results.get("issues", [])
+        result["passed"] = redirect_results.get("passed", True)
+        
+        if not result["passed"]:
+            result["issues"].insert(0, f"Redirect chain issues found (max {result['max_chain_length']} hops)")
+    
+    except Exception as e:
+        result["issues"].append(f"Redirect chain check failed: {str(e)}")
+        result["passed"] = False
+    
+    return result
+
+
+async def _check_link_metrics(full_url: str, client: httpx.AsyncClient) -> Dict[str, Any]:
+    """
+    Analyze external and internal links with quality scoring (authority flow proxy).
+    
+    Returns:
+        {
+            "internal_links": int,
+            "external_links": int,
+            "toxic_links": int,
+            "quality_external_links": int,
+            "external_domains": int,
+            "top_external_domains": [{"domain": str, "count": int, "quality": str}],
+            "issues": [str],
+            "passed": bool,
+        }
+    """
+    result: Dict[str, Any] = {
+        "internal_links": 0,
+        "external_links": 0,
+        "toxic_links": 0,
+        "quality_external_links": 0,
+        "external_domains": 0,
+        "top_external_domains": [],
+        "issues": [],
+        "passed": True,
+    }
+    
+    try:
+        # Fetch the main page HTML
+        response = await client.get(full_url, follow_redirects=True)
+        if response.status_code != 200:
+            result["issues"].append(f"Failed to fetch page: HTTP {response.status_code}")
+            return result
+        
+        html_content = response.text
+        root_url = _get_root_url(full_url)
+        
+        analyzer = LinkAnalyzer(root_url, timeout=TIMEOUT)
+        metrics = await analyzer.analyze_link_metrics(html_content)
+        
+        result["internal_links"] = metrics.get("internal_links", 0)
+        result["external_links"] = metrics.get("external_links", 0)
+        result["toxic_links"] = metrics.get("toxic_links", 0)
+        result["quality_external_links"] = metrics.get("quality_external_links", 0)
+        result["external_domains"] = metrics.get("external_domains", 0)
+        result["top_external_domains"] = metrics.get("top_external_domains", [])
+        result["passed"] = metrics.get("passed", True)
+        
+        if result["toxic_links"] > 0:
+            result["issues"].append(f"Found {result['toxic_links']} links to potentially toxic domains (shorteners, etc.)")
+        
+        if result["external_links"] > result["internal_links"] * 2:
+            result["issues"].append(f"Too many external links ({result['external_links']}) relative to internal ({result['internal_links']})")
+    
+    except Exception as e:
+        result["issues"].append(f"Link metrics check failed: {str(e)}")
+        result["passed"] = False
+    
+    return result
+
+
+async def _check_content_freshness(full_url: str, client: httpx.AsyncClient) -> Dict[str, Any]:
+    """
+    Analyze content freshness using Last-Modified headers and sitemap dates.
+    
+    Returns:
+        {
+            "overall_freshness": str,  # "fresh", "acceptable", "stale", "very_stale"
+            "page_age_days": int | None,
+            "sitemap_average_age_days": float,
+            "urls_analyzed": int,
+            "freshness_breakdown": {...},
+            "last_update": str,
+            "update_frequency": str,
+            "issues": [str],
+            "recommendations": [str],
+            "passed": bool,
+        }
+    """
+    result: Dict[str, Any] = {
+        "overall_freshness": "unknown",
+        "page_age_days": None,
+        "sitemap_average_age_days": 0,
+        "urls_analyzed": 0,
+        "freshness_breakdown": {},
+        "last_update": "unknown",
+        "update_frequency": "unknown",
+        "issues": [],
+        "recommendations": [],
+        "passed": True,
+    }
+    
+    try:
+        root_url = _get_root_url(full_url)
+        analyzer = ContentFreshnessAnalyzer(root_url, timeout=TIMEOUT)
+        
+        # Run comprehensive assessment
+        assessment = await analyzer.overall_freshness_assessment(client, full_url)
+        
+        # Extract key data
+        page_fresh = assessment.get("page_freshness", {})
+        sitemap_fresh = assessment.get("sitemap_freshness", {})
+        content_updates = assessment.get("content_updates", {})
+        
+        result["overall_freshness"] = assessment.get("overall_freshness", "unknown")
+        result["page_age_days"] = page_fresh.get("age_days")
+        result["sitemap_average_age_days"] = sitemap_fresh.get("average_age_days", 0)
+        result["urls_analyzed"] = sitemap_fresh.get("urls_analyzed", 0)
+        result["freshness_breakdown"] = sitemap_fresh.get("freshness_breakdown", {})
+        result["last_update"] = content_updates.get("time_since_update", "unknown")
+        result["update_frequency"] = content_updates.get("update_frequency_indicator", "unknown")
+        result["issues"] = assessment.get("issues", [])
+        result["recommendations"] = assessment.get("recommendations", [])
+        result["passed"] = assessment.get("passed", True)
+        
+        # Add context to recommendations
+        if page_fresh.get("age_days") and page_fresh["age_days"] > 365:
+            if "Update main page content" not in str(result["recommendations"]):
+                result["recommendations"].append(
+                    f"Main page hasn't been updated in {page_fresh['age_days']} days"
+                )
+        
+    except Exception as e:
+        result["issues"].append(f"Content freshness check failed: {str(e)}")
+        result["passed"] = False
+    
+    return result
+
+
+async def _check_page_screenshots(
+    full_url: str, client: httpx.AsyncClient
+) -> Dict[str, Any]:
+    """
+    Analyze page screenshots at multiple breakpoints.
+
+    Args:
+        full_url: Full URL to analyze
+        client: httpx.AsyncClient instance
+
+    Returns:
+        Dict with screenshot analysis results
+    """
+    result: Dict[str, Any] = {
+        "name": "page_screenshots",
+        "passed": False,
+        "issues": [],
+        "screenshots": {},
+    }
+
+    try:
+        analyzer = ScreenshotAnalyzer(timeout=TIMEOUT)
+        screenshots = await analyzer.capture_screenshots(full_url, client)
+
+        if screenshots["passed"]:
+            result["passed"] = True
+            result["screenshots"] = screenshots["screenshots"]
+            result["visual_metrics"] = screenshots.get("visual_metrics", {})
+            result["summary"] = screenshots.get("summary", "")
+
+            # Analyze responsive behavior
+            responsive = await analyzer.analyze_responsive_behavior(full_url, client)
+            result["responsive_score"] = responsive.get("responsive_score", 0)
+            result["responsive_analysis"] = {
+                "breakpoints_analyzed": responsive.get("breakpoints_analyzed", 0),
+                "issues": responsive.get("issues", []),
+                "recommendations": responsive.get("recommendations", []),
+            }
+
+            # Add visual metrics to issues if any problems found
+            for device, metrics in result.get("visual_metrics", {}).items():
+                checks = metrics.get("readability_checks", {})
+                if checks.get("low_contrast_risk"):
+                    result["issues"].append(f"{device}: Potential low contrast detected")
+                if checks.get("very_large_viewport"):
+                    result["issues"].append(f"{device}: Viewport very large (>2560px)")
+                if checks.get("very_small_viewport"):
+                    result["issues"].append(f"{device}: Viewport very small (<320px)")
+        else:
+            result["issues"].extend(screenshots.get("issues", []))
+
+    except Exception as e:
+        result["issues"].append(f"Screenshot analysis failed: {str(e)}")
+        logger.error(f"Screenshot check error: {e}")
+
+    return result
+
+
+
+
 async def check_technical(domain: str) -> Dict[str, Any]:
     """
-    Run a full technical SEO audit on a domain or specific path (14 checks).
+    Run a full technical SEO audit on a domain or specific path (19 checks).
 
     Args:
         domain: Domain name or URL (e.g. 'example.com' or 'https://example.com/blog')
 
     Returns:
-        Dict with 14 checks results, aggregated issues list, and health score (0-100)
+        Dict with 19 checks results, aggregated issues list, and health score (0-100)
     """
     logger.info(f"Running technical SEO check for: {domain}")
     full_url = _normalize_domain(domain)
     root_url = _get_root_url(full_url)
 
     async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=False) as client:
-        # Run all 14 checks in parallel
-        (robots, sitemap, https_check, www_check, perf_check, 
+        # Run all 19 checks in parallel
+        (robots, sitemap, https_check, www_check, perf_check,
          meta_tags, headings, canonical, structured_data, 
-         mobile, images, security) = await asyncio.gather(
-            _check_robots_txt(root_url, client),
-            _check_sitemap(root_url, client),
-            _check_https(domain, client),
-            _check_www_redirect(domain, client),
-            _check_page_performance(full_url, client),
-            _check_meta_tags(full_url, client),
-            _check_headings(full_url, client),
-            _check_canonical(full_url, client),
-            _check_structured_data(full_url, client),
-            _check_mobile_friendly(full_url, client),
-            _check_images(full_url, client),
-            _check_security_headers(full_url, client),
+         mobile, images, security, broken_links, redirect_chains, link_metrics, content_freshness, page_screenshots) = await asyncio.gather(
+        _check_robots_txt(root_url, client),
+        _check_sitemap(root_url, client),
+        _check_https(domain, client),
+        _check_www_redirect(domain, client),
+        _check_page_performance(full_url, client),
+        _check_meta_tags(full_url, client),
+        _check_headings(full_url, client),
+        _check_canonical(full_url, client),
+        _check_structured_data(full_url, client),
+        _check_mobile_friendly(full_url, client),
+        _check_images(full_url, client),
+        _check_security_headers(full_url, client),
+        _check_broken_links(full_url, client),
+        _check_redirect_chains(full_url, client),
+        _check_link_metrics(full_url, client),
+        _check_content_freshness(full_url, client),
+        _check_page_screenshots(full_url, client),
         )
         
-        # URL structure doesn't need async
-        url_structure = _check_url_structure(full_url)
+    # URL structure doesn't need async
+    url_structure = _check_url_structure(full_url)
         
-        # Hreflang as 14th check
-        hreflang = await _check_hreflang(full_url, client)
+    # Hreflang as 16th check
+    hreflang = await _check_hreflang(full_url, client)
 
     # Aggregate all issues
     all_issues: List[str] = []
@@ -680,58 +975,83 @@ async def check_technical(domain: str) -> Dict[str, Any]:
     all_issues.extend(url_structure.get("issues", []))
     all_issues.extend(security.get("issues", []))
     all_issues.extend(hreflang.get("issues", []))
+    all_issues.extend(broken_links.get("issues", []))
+    all_issues.extend(redirect_chains.get("issues", []))
+    all_issues.extend(link_metrics.get("issues", []))
+    all_issues.extend(content_freshness.get("issues", []))
+    all_issues.extend(page_screenshots.get("issues", []))
 
     # Score each check (1 pass, 0 fail)
     checks_passed = sum([
-        robots["present"] and not robots["disallows_all"],  # 1. robots
-        sitemap["present"] and sitemap["url_count"] > 0,  # 2. sitemap
-        https_check["https_available"] and https_check["http_redirects_to_https"],  # 3. https
-        www_check["consistent"],  # 4. www
-        bool(perf_check["cache_control"]),  # 5. performance
-        meta_tags["title_ok"],  # 6. meta_title
-        meta_tags["description_ok"],  # 7. meta_desc
-        headings["h1_ok"],  # 8. h1
-        canonical["canonical_present"],  # 9. canonical
-        structured_data["has_json_ld"] or structured_data["has_microdata"],  # 10. structured_data
-        mobile["viewport_present"],  # 11. mobile
-        images["total_images"] == 0 or images["images_with_alt"] > 0,  # 12. images
-        security["csp_present"] and bool(security["x_frame_options"]),  # 13. security_headers
-        hreflang["has_hreflang"] or True,  # 14. hreflang (N/A if not international)
+    robots["present"] and not robots["disallows_all"],  # 1. robots
+    sitemap["present"] and sitemap["url_count"] > 0,  # 2. sitemap
+    https_check["https_available"] and https_check["http_redirects_to_https"],  # 3. https
+    www_check["consistent"],  # 4. www
+    bool(perf_check["cache_control"]),  # 5. performance
+    meta_tags["title_ok"],  # 6. meta_title
+    meta_tags["description_ok"],  # 7. meta_desc
+    headings["h1_ok"],  # 8. h1
+    canonical["canonical_present"],  # 9. canonical
+    structured_data["has_json_ld"] or structured_data["has_microdata"],  # 10. structured_data
+    mobile["viewport_present"],  # 11. mobile
+    images["total_images"] == 0 or images["images_with_alt"] > 0,  # 12. images
+    security["csp_present"] and bool(security["x_frame_options"]),  # 13. security_headers
+    hreflang["has_hreflang"] or True,  # 14. hreflang (N/A if not international)
+    broken_links.get("broken_count", 0) == 0,  # 15. broken_links
+    redirect_chains.get("passed", True),  # 16. redirect_chains
+    link_metrics.get("passed", True),  # 17. link_metrics
+    content_freshness.get("passed", True),  # 18. content_freshness
+    page_screenshots.get("passed", True),  # 19. page_screenshots
     ])
 
-    total_checks = 14
+    total_checks = 19
     health_score = round((checks_passed / total_checks) * 100)
 
     result = {
-        "domain": domain,
-        "root_url": root_url,
-        "checks": {
-            "crawlability": {
-                "robots_txt": robots,
-                "sitemap": sitemap,
-            },
-            "security": {
-                "https": https_check,
-                "www_redirect": www_check,
-                "security_headers": security,
-            },
-            "performance": perf_check,
-            "on_page": {
-                "meta_tags": meta_tags,
-                "headings": headings,
-                "canonical": canonical,
-            },
-            "structured_data": structured_data,
-            "mobile": mobile,
-            "images": images,
-            "url_structure": url_structure,
-            "international": hreflang,
+    "domain": domain,
+    "root_url": root_url,
+    "checks": {
+        "crawlability": {
+            "robots_txt": robots,
+            "sitemap": sitemap,
+            "broken_links": broken_links,
         },
-        "all_issues": all_issues,
-        "issues_count": len(all_issues),
-        "health_score": health_score,
-        "checks_passed": checks_passed,
-        "checks_total": total_checks,
+        "security": {
+            "https": https_check,
+            "www_redirect": www_check,
+            "security_headers": security,
+        },
+        "performance": perf_check,
+        "on_page": {
+            "meta_tags": meta_tags,
+            "headings": headings,
+            "canonical": canonical,
+        },
+        "structured_data": structured_data,
+        "mobile": mobile,
+        "images": images,
+        "url_structure": url_structure,
+        "international": hreflang,
+        "link_analysis": {
+            "redirect_chains": redirect_chains,
+            "link_metrics": link_metrics,
+        },
+        "content": {
+            "freshness": content_freshness,
+        },
+        "visual": page_screenshots,
+    },
+    "all_issues": all_issues,
+    "issues_count": len(all_issues),
+    "health_score": health_score,
+    "checks_passed": checks_passed,
+    "checks_total": total_checks,
     }
     logger.info(f"Technical SEO complete for {domain}: score={health_score}, issues={len(all_issues)}")
     return result
+
+
+
+
+
+

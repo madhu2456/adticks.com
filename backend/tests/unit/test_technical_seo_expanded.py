@@ -542,9 +542,12 @@ class TestCheckTechnical:
         assert "images" in result["checks"]
         assert "url_structure" in result["checks"]
         assert "international" in result["checks"]
+        assert "link_analysis" in result["checks"]  # New enterprise feature
+        assert "content" in result["checks"]  # New: content freshness
+        assert "visual" in result["checks"]  # New: page screenshots
         
-        # Verify scoring
-        assert result["checks_total"] == 14
+        # Verify scoring (now 19 checks)
+        assert result["checks_total"] == 19
         assert 0 <= result["health_score"] <= 100
         assert result["checks_passed"] >= 0
         assert isinstance(result["all_issues"], list)
