@@ -13,6 +13,7 @@ export default function GSCCallbackPage() {
 
   useEffect(() => {
     const code = searchParams.get("code");
+    const state = searchParams.get("state");
     
     if (completedRef.current) return;
 
@@ -24,12 +25,12 @@ export default function GSCCallbackPage() {
     const completeAuth = async () => {
       try {
         completedRef.current = true;
-        // Retrieve pkce_state from sessionStorage
+        // Retrieve pkce_state from sessionStorage (fallback for backward compatibility)
         const pkce_state = sessionStorage.getItem("gsc_pkce_state");
         if (pkce_state) {
           sessionStorage.removeItem("gsc_pkce_state"); // Clear it after use
         }
-        await api.gsc.completeAuth(code, pkce_state || undefined);
+        await api.gsc.completeAuth(code, state || undefined, pkce_state || undefined);
         router.push("/gsc?success=true");
       } catch (err: any) {
         console.error("GSC Auth completion failed:", err);
@@ -63,3 +64,4 @@ export default function GSCCallbackPage() {
     </div>
   );
 }
+

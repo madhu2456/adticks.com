@@ -67,6 +67,7 @@ async def gsc_auth(current_user: User = Depends(get_current_user)):
     from google_auth_oauthlib.flow import Flow
     import json
     import base64
+    from app.core.caching import get_redis_client
     
     # We include all possible URIs in the flow config to be safe
     redirect_uris = [
@@ -91,7 +92,17 @@ async def gsc_auth(current_user: User = Depends(get_current_user)):
     # Google now requires PKCE - enable code_challenge (automatically done by flow)
     auth_url, state = flow.authorization_url(prompt="consent", access_type="offline")
     
-    # Store code_verifier in state for later use
+    # Store code_verifier in Redis with state as key (expires in 15 minutes)
+    redis_client = await get_redis_client()
+    if redis_client and flow.code_verifier:
+        try:
+            cache_key = f"gsc_pkce:{state}"
+            await redis_client.setex(cache_key, 900, flow.code_verifier)
+            logger.debug(f"Stored PKCE code_verifier in Redis for state: {state}")
+        except Exception as e:
+            logger.warning(f"Failed to store code_verifier in Redis: {e}")
+    
+    # Also send pkce_state for backward compatibility (in case Redis is unavailable)
     pkce_data = {
         "code_verifier": flow.code_verifier,
         "original_state": state,
@@ -132,7 +143,8 @@ async def gsc_legacy_callback(
 
 class GSCAuthComplete(BaseModel):
     code: str
-    pkce_state: str | None = None  # PKCE state with code_verifier
+    state: str | None = None  # Google's state parameter for retrieving PKCE verifier
+    pkce_state: str | None = None  # PKCE state with code_verifier (fallback)
 
 @router.post("/complete")
 async def complete_gsc_auth(
@@ -148,7 +160,8 @@ async def complete_gsc_auth(
     
     Required:
     - code: The authorization code from Google
-    - pkce_state: The PKCE state returned from /auth endpoint (contains code_verifier)
+    - state: The state parameter from Google's redirect (for PKCE retrieval)
+    - pkce_state: The PKCE state returned from /auth endpoint (fallback)
     """
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
         raise HTTPException(
@@ -160,13 +173,31 @@ async def complete_gsc_auth(
     from datetime import datetime, timezone, timedelta
     import json
     import base64
+    from app.core.caching import get_redis_client
     
-    # Decode PKCE state to get code_verifier
+    # Try to get code_verifier from Redis first (using state), then fallback to pkce_state
     code_verifier = None
-    if payload.pkce_state:
+    
+    # Primary method: Retrieve from Redis using state
+    if payload.state:
+        redis_client = await get_redis_client()
+        if redis_client:
+            try:
+                cache_key = f"gsc_pkce:{payload.state}"
+                code_verifier = await redis_client.get(cache_key)
+                if code_verifier:
+                    await redis_client.delete(cache_key)  # Clean up after use
+                    logger.debug(f"Retrieved PKCE code_verifier from Redis for state: {payload.state}")
+            except Exception as e:
+                logger.warning(f"Failed to retrieve code_verifier from Redis: {e}")
+    
+    # Fallback method: Decode from pkce_state
+    if not code_verifier and payload.pkce_state:
         try:
             pkce_data = json.loads(base64.urlsafe_b64decode(payload.pkce_state.encode()))
             code_verifier = pkce_data.get("code_verifier")
+            if code_verifier:
+                logger.debug(f"Retrieved PKCE code_verifier from pkce_state")
         except Exception as e:
             logger.warning(f"Failed to decode PKCE state: {e}")
     

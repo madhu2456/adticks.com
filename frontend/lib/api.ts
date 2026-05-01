@@ -233,8 +233,8 @@ export const api = {
   gsc: {
     getAuthUrl: (projectId: string) =>
       axiosInstance.get<{ auth_url: string; state: string; pkce_state: string }>(`/gsc/auth`).then(unwrap),
-    completeAuth: (code: string, pkce_state?: string) =>
-      axiosInstance.post<{ status: string }>(`/gsc/complete`, { code, pkce_state }).then(unwrap),
+    completeAuth: (code: string, state?: string, pkce_state?: string) =>
+      axiosInstance.post<{ status: string }>(`/gsc/complete`, { code, state, pkce_state }).then(unwrap),
     listProperties: () =>
       axiosInstance.get<any[]>(`/gsc/properties`).then(unwrap),
     connectProperty: (projectId: string, propertyUrl: string) =>
