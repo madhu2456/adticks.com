@@ -20,7 +20,6 @@ const featureLabels: Record<string, string> = {
   geo: 'Location Sync',
   gsc: 'GSC Sync',
   ads: 'Ads Sync',
-  full: 'Full Scan',
   keywords_gsc: 'GSC Keyword Sync',
   on_page: 'On-Page Audit',
   technical: 'Technical Audit',

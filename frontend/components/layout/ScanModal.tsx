@@ -12,13 +12,13 @@ interface ScanModalProps {
   isOpen: boolean
   onClose: () => void
   projectId?: string
-  featureType?: 'seo' | 'ai' | 'geo' | 'gsc' | 'ads' | 'full' | 'keywords_gsc' | 'on_page' | 'technical' | 'gaps'
+  featureType?: 'seo' | 'ai' | 'geo' | 'gsc' | 'ads' | 'keywords_gsc' | 'on_page' | 'technical' | 'gaps'
   url?: string
 }
 
 type ScanStatus = 'starting' | 'scanning' | 'cached' | 'completed' | 'error' | 'background'
 
-export function ScanModal({ isOpen, onClose, projectId, featureType = 'full', url = '' }: ScanModalProps) {
+export function ScanModal({ isOpen, onClose, projectId, featureType = 'ai', url = '' }: ScanModalProps) {
   const [status, setStatus] = useState<ScanStatus>('starting')
   const [taskId, setTaskId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -62,7 +62,6 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full', ur
     geo: 'Location Sync',
     gsc: 'GSC Sync',
     ads: 'Ads Sync',
-    full: 'Full Scan',
     keywords_gsc: 'GSC Keyword Import',
     on_page: 'On-Page Audit',
     technical: 'Technical SEO Audit',
@@ -103,7 +102,6 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'full', ur
             response = await api.ads.sync(projectId);
             break;
           case 'ai':
-          case 'full':
           default:
             response = await api.ai.runScan(projectId);
             break;

@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware'
 export interface BackgroundScan {
   id: string
   projectId: string
-  featureType: 'seo' | 'ai' | 'geo' | 'gsc' | 'ads' | 'full' | 'keywords_gsc' | 'on_page' | 'technical' | 'gaps'
+  featureType: 'seo' | 'ai' | 'geo' | 'gsc' | 'ads' | 'keywords_gsc' | 'on_page' | 'technical' | 'gaps'
   status: 'scanning' | 'completed' | 'error'
   startedAt: number
   progress: number

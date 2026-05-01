@@ -20,6 +20,7 @@ import { useAlertModal } from "@/hooks/useAlertModal";
 import { getUser } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { ScanProgressModal } from "@/components/projects/ScanProgressModal";
+import { ScanModal } from "@/components/layout/ScanModal";
 import { 
   mockStats, mockScore, mockChannelPerformance, 
   mockActivity, mockInsights 
@@ -182,8 +183,9 @@ export function DashboardContent() {
 
   const [isScanModalOpen, setIsScanModalOpen] = React.useState(false);
   const [activeTaskId, setActiveTaskId] = React.useState<string | null>(null);
+  const [selectedScanType, setSelectedScanType] = React.useState<'seo' | 'ai' | 'gsc' | 'ads'>('ai');
 
-  const handleRefresh = async () => {
+  const handleStartScan = (scanType: 'seo' | 'ai' | 'gsc' | 'ads') => {
     if (!activeProject) {
       showAlert({
         title: "Project Required",
@@ -194,19 +196,13 @@ export function DashboardContent() {
       return;
     }
 
-    try {
-      const data = await api.ai.runScan(activeProject.id);
-      setActiveTaskId(data.task_id);
-      setIsScanModalOpen(true);
-    } catch (err) {
-      console.error("Scan error:", err);
-      showAlert({
-        title: "Scan Failed",
-        message: "Failed to start scan. Please try again.",
-        type: "error",
-        confirmText: "Close",
-      });
-    }
+    setSelectedScanType(scanType);
+    setIsScanModalOpen(true);
+  };
+
+  const handleRefresh = () => {
+    // Show scan options when refresh button is clicked
+    handleStartScan('ai');
   };
 
   if (!activeProject) {
@@ -292,14 +288,47 @@ export function DashboardContent() {
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={handleRefresh}
-              className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-[13px] font-medium text-text-2 hover:text-text-1 hover:bg-white/[0.05] transition-all"
-              style={{ border: '1px solid rgba(255,255,255,0.07)' }}
-            >
-              <RefreshCw size={13} />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
+            <div className="relative group">
+              <button
+                onClick={handleRefresh}
+                className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-[13px] font-medium text-text-2 hover:text-text-1 hover:bg-white/[0.05] transition-all"
+                style={{ border: '1px solid rgba(255,255,255,0.07)' }}
+              >
+                <RefreshCw size={13} />
+                <span className="hidden sm:inline">Scans</span>
+                <ChevronRight size={12} className="group-hover:rotate-90 transition-transform" />
+              </button>
+              <div className="absolute right-0 mt-1 w-48 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all bg-[#1e293b] border border-[#334155] z-50">
+                <button
+                  onClick={() => handleStartScan('ai')}
+                  className="w-full text-left px-4 py-2.5 text-[13px] font-medium text-text-2 hover:text-text-1 hover:bg-white/[0.05] transition-all first:rounded-t-lg flex items-center gap-2"
+                >
+                  <Sparkles size={13} className="text-purple-400" />
+                  AI Visibility
+                </button>
+                <button
+                  onClick={() => handleStartScan('seo')}
+                  className="w-full text-left px-4 py-2.5 text-[13px] font-medium text-text-2 hover:text-text-1 hover:bg-white/[0.05] transition-all flex items-center gap-2"
+                >
+                  <Search size={13} className="text-indigo-400" />
+                  SEO Audit
+                </button>
+                <button
+                  onClick={() => handleStartScan('gsc')}
+                  className="w-full text-left px-4 py-2.5 text-[13px] font-medium text-text-2 hover:text-text-1 hover:bg-white/[0.05] transition-all flex items-center gap-2"
+                >
+                  <BarChart2 size={13} className="text-blue-400" />
+                  GSC Sync
+                </button>
+                <button
+                  onClick={() => handleStartScan('ads')}
+                  className="w-full text-left px-4 py-2.5 text-[13px] font-medium text-text-2 hover:text-text-1 hover:bg-white/[0.05] transition-all last:rounded-b-lg flex items-center gap-2"
+                >
+                  <DollarSign size={13} className="text-orange-400" />
+                  Ads Sync
+                </button>
+              </div>
+            </div>
             <Link
               href="/insights"
               className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-[13px] font-semibold transition-all"
@@ -456,15 +485,11 @@ export function DashboardContent() {
 
       </div>
       {AlertModal}
-      <ScanProgressModal
-        projectId={projectId}
-        taskId={activeTaskId}
+      <ScanModal
         isOpen={isScanModalOpen}
         onClose={() => setIsScanModalOpen(false)}
-        onComplete={() => {
-          setIsScanModalOpen(false);
-          window.location.reload();
-        }}
+        projectId={activeProject?.id}
+        featureType={selectedScanType}
       />
     </div>
   );
