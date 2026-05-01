@@ -78,6 +78,17 @@ class StorageService:
             logger.error("delete_file failed for %s: %s", path, exc)
             raise
 
+    def delete_project_files(self, project_id: str) -> None:
+        """Recursively delete all storage files for a project."""
+        project_dir = self.root / "projects" / project_id
+        try:
+            if project_dir.exists() and project_dir.is_dir():
+                import shutil
+                shutil.rmtree(project_dir)
+                logger.info("Deleted storage directory for project %s", project_id)
+        except Exception as exc:
+            logger.error("delete_project_files failed for %s: %s", project_id, exc)
+
     # ------------------------------------------------------------------
     # Path builders
     # ------------------------------------------------------------------

@@ -66,7 +66,7 @@ class SiteAuditIssue(Base):
         index=True,
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="site_audit_issues")
 
     __table_args__ = (
         Index("ix_audit_issues_project_severity", "project_id", "severity"),
@@ -106,7 +106,7 @@ class CrawledPage(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False, index=True
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="crawled_pages")
 
 
 # ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ class CoreWebVitals(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False, index=True
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="core_web_vitals")
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ class SchemaMarkup(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="schema_markups")
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +187,7 @@ class AnchorText(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="anchor_texts")
 
 
 # ---------------------------------------------------------------------------
@@ -211,7 +211,7 @@ class ToxicBacklink(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="toxic_backlinks")
 
 
 # ---------------------------------------------------------------------------
@@ -234,7 +234,7 @@ class LinkIntersect(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="link_intersects")
 
 
 # ---------------------------------------------------------------------------
@@ -264,7 +264,7 @@ class KeywordIdea(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="keyword_ideas")
 
 
 # ---------------------------------------------------------------------------
@@ -292,7 +292,7 @@ class SerpOverview(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False, index=True
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="serp_overviews")
 
 
 # ---------------------------------------------------------------------------
@@ -322,7 +322,7 @@ class ContentBrief(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="content_briefs")
 
 
 # ---------------------------------------------------------------------------
@@ -351,7 +351,7 @@ class ContentOptimizerScore(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="content_optimizer_scores")
 
 
 # ---------------------------------------------------------------------------
@@ -376,7 +376,7 @@ class TopicCluster(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="topic_clusters")
 
 
 # ---------------------------------------------------------------------------
@@ -404,7 +404,7 @@ class LocalCitation(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="local_citations")
 
 
 class LocalRankGrid(Base):
@@ -425,7 +425,7 @@ class LocalRankGrid(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False, index=True
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="local_rank_grids")
 
 
 # ---------------------------------------------------------------------------
@@ -448,7 +448,7 @@ class LogEvent(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False, index=True
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="log_events")
 
 
 # ---------------------------------------------------------------------------
@@ -478,4 +478,4 @@ class GeneratedReport(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False, index=True
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="generated_reports")

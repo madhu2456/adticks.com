@@ -91,7 +91,7 @@ class AEOVisibility(Base):
     )
 
     # Relationships
-    project = relationship("Project", foreign_keys=[project_id])
+    project = relationship("Project", back_populates="aeo_visibility")
     keyword = relationship("Keyword", foreign_keys=[keyword_id])
 
 
@@ -127,7 +127,7 @@ class AEOTrends(Base):
     )
 
     # Relationships
-    project = relationship("Project", foreign_keys=[project_id])
+    project = relationship("Project", back_populates="aeo_trends")
     keyword = relationship("Keyword", foreign_keys=[keyword_id])
 
 
@@ -232,7 +232,7 @@ class ContentRecommendation(Base):
     user_action: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     # Relationships
-    project = relationship("Project", foreign_keys=[project_id])
+    project = relationship("Project", back_populates="content_recommendations")
     keyword = relationship("Keyword", foreign_keys=[keyword_id])
 
 
@@ -272,6 +272,6 @@ class GeneratedFAQ(Base):
     )
 
     # Relationships
-    project = relationship("Project", foreign_keys=[project_id])
+    project = relationship("Project", back_populates="generated_faqs")
     keyword = relationship("Keyword", foreign_keys=[keyword_id])
     paa = relationship("PAA", foreign_keys=[paa_id])

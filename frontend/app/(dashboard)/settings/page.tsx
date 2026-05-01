@@ -4,9 +4,9 @@ import {
   User, FolderOpen, Link2, CreditCard, Key,
   CheckCircle, XCircle, Copy, RefreshCw, Eye, EyeOff,
   Plus, X, ChevronDown, BarChart2, Megaphone, TrendingUp,
-  Zap, Crown, Loader2, Database,
+  Zap, Crown, Loader2, Database, Trash2,
 } from "lucide-react";
-import { useActiveProject, useUpdateProject } from "@/hooks/useProject";
+import { useActiveProject, useUpdateProject, useDeleteProject } from "@/hooks/useProject";
 import { useUsage } from "@/hooks/useUsage";
 import { useAlertModal } from "@/hooks/useAlertModal";
 import { useQueryClient } from "@tanstack/react-query";
@@ -294,6 +294,7 @@ function ProfileTab() {
 function ProjectTab() {
   const { activeProject } = useActiveProject();
   const updateProject = useUpdateProject();
+  const deleteProject = useDeleteProject();
   const { showAlert, AlertModal } = useAlertModal();
   
   const [form, setForm] = useState({ 
@@ -307,6 +308,7 @@ function ProjectTab() {
   const [newComp, setNewComp] = useState("");
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   React.useEffect(() => {
     if (activeProject) {
@@ -357,6 +359,37 @@ function ProjectTab() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleDeleteProject() {
+    if (!activeProject) return;
+
+    showAlert({
+      title: "Delete Project?",
+      message: `This will permanently delete the project "${activeProject.brand_name || activeProject.domain}" and ALL its associated data (keywords, rankings, scans, etc.). This action cannot be undone.`,
+      type: "warning",
+      confirmText: "Delete Permanently",
+      cancelText: "Cancel",
+      onConfirm: async () => {
+        setDeleting(true);
+        try {
+          await deleteProject.mutateAsync(activeProject.id);
+          showAlert({
+            title: "Project Deleted",
+            message: "Project has been successfully removed.",
+            type: "success",
+          });
+        } catch (err) {
+          showAlert({
+            title: "Delete Failed",
+            message: "Failed to delete the project. Please try again.",
+            type: "error",
+          });
+        } finally {
+          setDeleting(false);
+        }
+      }
+    });
   }
 
   const industries = [
@@ -457,6 +490,22 @@ function ProjectTab() {
       </div>
 
       <SaveButton onClick={handleSave} saved={saved} />
+
+      {/* Danger Zone */}
+      <div className="pt-6 border-t border-[#334155]">
+        <h3 className="text-sm font-semibold text-[#ef4444] mb-1">Danger Zone</h3>
+        <p className="text-xs text-[#94a3b8] mb-4">Permanently delete this project and all its data.</p>
+        
+        <button
+          onClick={handleDeleteProject}
+          disabled={deleting}
+          className="flex items-center gap-2 bg-[#ef4444]/10 hover:bg-[#ef4444]/20 text-[#ef4444] border border-[#ef4444]/20 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+        >
+          {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+          {deleting ? "Deleting..." : "Delete Project"}
+        </button>
+      </div>
+
       {AlertModal}
     </div>
   );

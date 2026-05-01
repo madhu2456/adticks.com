@@ -61,6 +61,18 @@ export function useUpdateProject() {
   });
 }
 
+export function useDeleteProject() {
+  const queryClient = useQueryClient();
+  const setActiveId = useProjectStore((state) => state.setActiveId);
+  return useMutation({
+    mutationFn: (id: string) => api.projects.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      setActiveId(null); // Reset active project after deletion
+    },
+  });
+}
+
 export function useActiveProject() {
   const activeId = useProjectStore((state) => state.activeId);
   const setActiveId = useProjectStore((state) => state.setActiveId);

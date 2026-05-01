@@ -48,7 +48,7 @@ class KeywordCannibalization(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False, index=True,
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="keyword_cannibalizations")
 
 
 # ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ class InternalLink(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False,
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="internal_links_graph")
 
 
 class OrphanPage(Base):
@@ -91,7 +91,7 @@ class OrphanPage(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False,
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="orphan_pages")
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +114,7 @@ class DomainComparison(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False, index=True,
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="domain_comparisons")
 
 
 # ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ class BulkAnalysisJob(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False, index=True,
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="bulk_analysis_jobs")
 
 
 class BulkAnalysisItem(Base):
@@ -176,7 +176,7 @@ class SitemapGeneration(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False, index=True,
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="sitemap_generations")
 
 
 class RobotsValidation(Base):
@@ -198,7 +198,7 @@ class RobotsValidation(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False,
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="robots_validations")
 
 
 # ---------------------------------------------------------------------------
@@ -221,7 +221,7 @@ class SchemaTemplate(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False,
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="schema_templates")
 
 
 # ---------------------------------------------------------------------------
@@ -245,7 +245,7 @@ class OutreachCampaign(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False,
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="outreach_campaigns")
 
 
 class OutreachProspect(Base):
@@ -292,7 +292,7 @@ class FeaturedSnippetWatch(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False,
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="featured_snippet_watches")
 
 
 class PAAQuestion(Base):
@@ -312,7 +312,7 @@ class PAAQuestion(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False,
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="paa_questions_tracked")
 
 
 # ---------------------------------------------------------------------------
@@ -336,4 +336,4 @@ class SerpVolatilityEvent(Base):
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc), nullable=False, index=True,
     )
 
-    project = relationship("Project")
+    project = relationship("Project", back_populates="serp_volatility_events")

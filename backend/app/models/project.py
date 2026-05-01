@@ -65,9 +65,6 @@ class Project(Base):
     gsc_data = relationship(
         "GSCData", back_populates="project", cascade="all, delete-orphan"
     )
-    clusters = relationship(
-        "Cluster", back_populates="project", cascade="all, delete-orphan"
-    )
     audit_history = relationship(
         "SiteAuditHistory", back_populates="project", cascade="all, delete-orphan"
     )
@@ -118,4 +115,106 @@ class Project(Base):
     )
     broken_links = relationship(
         "BrokenLink", back_populates="project", cascade="all, delete-orphan"
+    )
+
+    # Advanced SEO Suite Relationships
+    site_audit_issues = relationship(
+        "SiteAuditIssue", back_populates="project", cascade="all, delete-orphan"
+    )
+    crawled_pages = relationship(
+        "CrawledPage", back_populates="project", cascade="all, delete-orphan"
+    )
+    core_web_vitals = relationship(
+        "CoreWebVitals", back_populates="project", cascade="all, delete-orphan"
+    )
+    schema_markups = relationship(
+        "SchemaMarkup", back_populates="project", cascade="all, delete-orphan"
+    )
+    anchor_texts = relationship(
+        "AnchorText", back_populates="project", cascade="all, delete-orphan"
+    )
+    toxic_backlinks = relationship(
+        "ToxicBacklink", back_populates="project", cascade="all, delete-orphan"
+    )
+    link_intersects = relationship(
+        "LinkIntersect", back_populates="project", cascade="all, delete-orphan"
+    )
+    keyword_ideas = relationship(
+        "KeywordIdea", back_populates="project", cascade="all, delete-orphan"
+    )
+    serp_overviews = relationship(
+        "SerpOverview", back_populates="project", cascade="all, delete-orphan"
+    )
+    content_briefs = relationship(
+        "ContentBrief", back_populates="project", cascade="all, delete-orphan"
+    )
+    content_optimizer_scores = relationship(
+        "ContentOptimizerScore", back_populates="project", cascade="all, delete-orphan"
+    )
+    topic_clusters = relationship(
+        "TopicCluster", back_populates="project", cascade="all, delete-orphan"
+    )
+    local_citations = relationship(
+        "LocalCitation", back_populates="project", cascade="all, delete-orphan"
+    )
+    local_rank_grids = relationship(
+        "LocalRankGrid", back_populates="project", cascade="all, delete-orphan"
+    )
+    log_events = relationship(
+        "LogEvent", back_populates="project", cascade="all, delete-orphan"
+    )
+    generated_reports = relationship(
+        "GeneratedReport", back_populates="project", cascade="all, delete-orphan"
+    )
+
+    # Extra SEO Features
+    keyword_cannibalizations = relationship(
+        "KeywordCannibalization", back_populates="project", cascade="all, delete-orphan"
+    )
+    internal_links_graph = relationship(
+        "InternalLink", back_populates="project", cascade="all, delete-orphan"
+    )
+    orphan_pages = relationship(
+        "OrphanPage", back_populates="project", cascade="all, delete-orphan"
+    )
+    domain_comparisons = relationship(
+        "DomainComparison", back_populates="project", cascade="all, delete-orphan"
+    )
+    bulk_analysis_jobs = relationship(
+        "BulkAnalysisJob", back_populates="project", cascade="all, delete-orphan"
+    )
+    sitemap_generations = relationship(
+        "SitemapGeneration", back_populates="project", cascade="all, delete-orphan"
+    )
+    robots_validations = relationship(
+        "RobotsValidation", back_populates="project", cascade="all, delete-orphan"
+    )
+    schema_templates = relationship(
+        "SchemaTemplate", back_populates="project", cascade="all, delete-orphan"
+    )
+    outreach_campaigns = relationship(
+        "OutreachCampaign", back_populates="project", cascade="all, delete-orphan"
+    )
+    featured_snippet_watches = relationship(
+        "FeaturedSnippetWatch", back_populates="project", cascade="all, delete-orphan"
+    )
+    paa_questions_tracked = relationship(
+        "PAAQuestion", back_populates="project", cascade="all, delete-orphan"
+    )
+    serp_volatility_events = relationship(
+        "SerpVolatilityEvent", back_populates="project", cascade="all, delete-orphan"
+    )
+
+    # AEO Relationships
+    aeo_visibility = relationship(
+        "AEOVisibility", back_populates="project", cascade="all, delete-orphan"
+    )
+    aeo_trends = relationship(
+        "AEOTrends", back_populates="project", cascade="all, delete-orphan"
+    )
+    content_recommendations = relationship(
+        "ContentRecommendation", back_populates="project", cascade="all, delete-orphan"
+    )
+    generated_faqs = relationship(
+        "GeneratedFAQ", back_populates="project", cascade="all, delete-orphan"
     )

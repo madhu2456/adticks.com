@@ -20,6 +20,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.core.transactions import with_transaction
 from app.core.caching import invalidate_cache
+from app.core.storage import storage
 from app.models.project import Project
 from app.models.competitor import Competitor
 from app.models.user import User
@@ -221,8 +222,19 @@ async def delete_project(
     - 404 Not Found: Project not found or not owned by user
     """
     project = await _get_project_or_404(project_id, current_user, db)
+    
+    # 1. Delete physical files associated with the project
+    try:
+        storage.delete_project_files(str(project_id))
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Failed to delete files for project {project_id}: {e}")
+
+    # 2. Delete project from DB (Cascades handled by SQLAlchemy and DB constraints)
     await db.delete(project)
     await db.flush()
     
-    # Invalidate project cache
+    # 3. Invalidate project cache
     await invalidate_cache(f"cache:list_projects:*{current_user.id}*")
+    await invalidate_cache(f"cache:get_rankings:{project_id}:*")
+    await invalidate_cache(f"cache:get_sov_stats:{project_id}*")
