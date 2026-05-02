@@ -22,7 +22,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.api import (
     auth, projects, seo, ai, gsc, ads, insights, scores, aeo, seo_suite, geo,
-    progress, cache, clusters
+    progress, cache, clusters, seo_competitive
 )
 from app.api import seo_meta_tags, seo_content_analysis, seo_technical, seo_advanced, seo_extra
 from app.core.config import settings
@@ -299,6 +299,7 @@ app.include_router(geo.router, prefix=API_PREFIX)
 app.include_router(clusters.router, prefix=API_PREFIX)
 app.include_router(progress.router, prefix=API_PREFIX)
 app.include_router(cache.router, prefix=API_PREFIX)
+app.include_router(seo_competitive.router, prefix=API_PREFIX)
 
 
 # ---------------------------------------------------------------------------

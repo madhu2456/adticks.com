@@ -8,6 +8,7 @@ import {
   Insight, InsightsSummary, Recommendation, DashboardStats,
   ChannelPerformance, ActivityItem, LoginRequest, RegisterRequest,
   PaginatedResponse, ApiResponse,
+  TrafficAnalyticsResponse, PPCResearchResponse, BrandMonitorResponse, ContentExplorerResponse,
 } from "./types";
 
 // Use relative URL when frontend and backend are on same domain (production)
@@ -526,6 +527,18 @@ export const api = {
       axiosInstance.post<any[]>(`/seo/projects/${projectId}/volatility/scan`, { rank_diffs, drop_threshold, rise_threshold }).then(unwrap),
     listVolatility: (projectId: string, direction?: "up" | "down") =>
       axiosInstance.get<any[]>(`/seo/projects/${projectId}/volatility${direction ? `?direction=${direction}` : ""}`).then(unwrap),
+  },
+
+  // Competitive Intelligence
+  seoCompetitive: {
+    getTraffic: (domain: string) =>
+      axiosInstance.get<TrafficAnalyticsResponse>(`/competitive/traffic/${domain}`).then(unwrap),
+    getPPC: (domain: string) =>
+      axiosInstance.get<PPCResearchResponse>(`/competitive/ppc/${domain}`).then(unwrap),
+    getBrandMentions: (projectId: string) =>
+      axiosInstance.get<BrandMonitorResponse>(`/competitive/brand/${projectId}`).then(unwrap),
+    exploreContent: (query: string) =>
+      axiosInstance.get<ContentExplorerResponse>(`/competitive/content?q=${encodeURIComponent(query)}`).then(unwrap),
   },
 
   // Cache

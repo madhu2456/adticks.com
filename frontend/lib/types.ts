@@ -400,3 +400,85 @@ export interface PaginatedResponse<T> {
   limit: number;
   has_more: boolean;
 }
+
+// Competitive Intelligence
+export interface TrafficEngagement {
+  bounce_rate: number;
+  avg_visit_duration_sec: number;
+  pages_per_visit: number;
+  total_visits: number;
+}
+
+export interface TopPage {
+  url: string;
+  traffic_share: number;
+  avg_duration_sec: number;
+}
+
+export interface TrafficAnalyticsResponse {
+  domain: string;
+  monthly_visits: number;
+  organic_share: number;
+  paid_share: number;
+  engagement: TrafficEngagement;
+  top_countries: Array<{ country: string; share: number }>;
+  top_pages: TopPage[];
+  timestamp: string;
+}
+
+export interface PaidKeyword {
+  keyword: string;
+  position: number;
+  cpc_usd: number;
+  traffic_share: number;
+  url: string;
+}
+
+export interface AdCopy {
+  title: string;
+  description: string;
+  visible_url: string;
+}
+
+export interface PPCResearchResponse {
+  domain: string;
+  est_monthly_spend_usd: number;
+  paid_keywords_count: number;
+  top_paid_keywords: PaidKeyword[];
+  sample_ads: AdCopy[];
+  timestamp: string;
+}
+
+export interface BrandMention {
+  id: string;
+  source_name: string;
+  source_url: string;
+  snippet: string;
+  domain_authority: number;
+  sentiment: "positive" | "neutral" | "negative";
+  is_linked: boolean;
+  published_at: string;
+}
+
+export interface BrandMonitorResponse {
+  project_id: string;
+  mentions: BrandMention[];
+  total_mentions: number;
+}
+
+export interface ContentArticle {
+  id: string;
+  title: string;
+  url: string;
+  author?: string;
+  published_at: string;
+  social_shares: Record<string, number>;
+  referring_domains: number;
+  est_organic_traffic: number;
+}
+
+export interface ContentExplorerResponse {
+  query: string;
+  articles: ContentArticle[];
+  total_results: number;
+}

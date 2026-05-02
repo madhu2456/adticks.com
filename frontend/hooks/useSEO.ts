@@ -583,3 +583,38 @@ export function useScanVolatility() {
     onSuccess: (_, { projectId }) => qc.invalidateQueries({ queryKey: ["volatility", projectId] }),
   });
 }
+
+// --- Competitive Intelligence Hooks ---
+
+export function useTrafficAnalytics(domain: string | null) {
+  return useQuery({
+    queryKey: ["competitive", "traffic", domain],
+    queryFn: () => (domain ? api.seoCompetitive.getTraffic(domain) : Promise.reject("No domain provided")),
+    enabled: !!domain,
+  });
+}
+
+export function useCompetitorPPC(domain: string | null) {
+  return useQuery({
+    queryKey: ["competitive", "ppc", domain],
+    queryFn: () => (domain ? api.seoCompetitive.getPPC(domain) : Promise.reject("No domain provided")),
+    enabled: !!domain,
+  });
+}
+
+export function useBrandMonitor(projectId: string) {
+  return useQuery({
+    queryKey: ["competitive", "brand", projectId],
+    queryFn: () => api.seoCompetitive.getBrandMentions(projectId),
+    enabled: !!projectId,
+  });
+}
+
+export function useContentExplorer(query: string | null) {
+  return useQuery({
+    queryKey: ["competitive", "content", query],
+    queryFn: () => (query ? api.seoCompetitive.exploreContent(query) : Promise.reject("No query provided")),
+    enabled: !!query,
+  });
+}
+
