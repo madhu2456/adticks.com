@@ -5,6 +5,7 @@ Analyzes backlinks and domain authority for projects.
 
 import logging
 import random
+import uuid
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone, timedelta
 from uuid import UUID

@@ -11,6 +11,8 @@ POST /auth/logout    — logout (client-side token invalidation)
 """
 
 import uuid
+import random
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, Request, status, File, UploadFile, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
@@ -65,7 +67,6 @@ async def register(request: Request, payload: UserCreate, db: AsyncSession = Dep
             raise ConflictError("Email already registered")
         
         # Create user
-        from datetime import datetime, timedelta, timezone
         user = User(
             email=payload.email,
             hashed_password=hash_password(payload.password),
@@ -247,7 +248,6 @@ async def usage(
     **Returns:**
     - Usage object with scans, keywords, competitors, and trial status
     """
-    from datetime import datetime, timezone
     from sqlalchemy import func
     from app.models.project import Project
     from app.models.keyword import Keyword

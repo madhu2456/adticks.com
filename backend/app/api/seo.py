@@ -1,4 +1,5 @@
 """AdTicks SEO router."""
+import uuid
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
