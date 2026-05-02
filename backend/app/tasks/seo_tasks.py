@@ -484,11 +484,11 @@ async def _run_seo_audit_impl_inner(project_id: str, url: str | None, audit_type
         "on_page": on_page,
         "technical": technical,
         "overall_score": (
-            (on_page.get("overall_score", 0) + technical.get("score", 0)) // 2
+            (on_page.get("overall_score", 0) + technical.get("health_score", 0)) // 2
         ),
         "total_issues": (
             on_page.get("issues_count", len(on_page.get("issues", [])))
-            + len(technical.get("issues", []))
+            + technical.get("issues_count", 0)
         ),
     }
     
@@ -524,13 +524,10 @@ async def _run_seo_audit_impl_inner(project_id: str, url: str | None, audit_type
             url=target_url,
             score=audit["overall_score"],
             total_errors=sum(1 for i in on_page.get("issues", []) if isinstance(i, dict) and i.get("severity") == "error") + 
-                         sum(1 for i in technical.get("issues", []) if isinstance(i, dict) and i.get("severity") == "error") +
-                         sum(1 for i in on_page.get("issues", []) if isinstance(i, str) and "CRITICAL" in i.upper()) +
-                         sum(1 for i in technical.get("issues", []) if isinstance(i, str) and "CRITICAL" in i.upper()),
+                         sum(1 for i in technical.get("all_issues", []) if isinstance(i, str) and "CRITICAL" in i.upper()),
             total_warnings=sum(1 for i in on_page.get("issues", []) if isinstance(i, dict) and i.get("severity") == "warning") +
-                           sum(1 for i in technical.get("issues", []) if isinstance(i, dict) and i.get("severity") == "warning") +
                            sum(1 for i in on_page.get("issues", []) if isinstance(i, str) and "CRITICAL" not in i.upper()) +
-                           sum(1 for i in technical.get("issues", []) if isinstance(i, str) and "CRITICAL" not in i.upper()),
+                           sum(1 for i in technical.get("all_issues", []) if isinstance(i, str) and "CRITICAL" not in i.upper()),
             pages_crawled=1, # Initial basic crawler
             crawl_depth=1,
             timestamp=datetime.now(timezone.utc)
@@ -544,8 +541,8 @@ async def _run_seo_audit_impl_inner(project_id: str, url: str | None, audit_type
         "url": target_url,
         "overall_score": audit["overall_score"],
         "total_issues": audit["total_issues"],
-        "on_page_score": on_page.get("score", 0),
-        "technical_score": technical.get("score", 0),
+        "on_page_score": on_page.get("overall_score", 0),
+        "technical_score": technical.get("health_score", 0),
         "status": "completed",
     }
 
