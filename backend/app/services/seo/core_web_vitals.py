@@ -21,7 +21,20 @@ import httpx
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
-...
+
+PSI_ENDPOINT = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
+
+def _audit_value(audits: dict, key: str) -> int | None:
+    """Extract numeric value from audit."""
+    audit = audits.get(key, {})
+    num = audit.get("numericValue")
+    return int(num) if num is not None else None
+
+
+async def run_pagespeed(url: str, strategy: str = "mobile", categories: list[str] | None = None, api_key: str | None = None) -> dict[str, Any]:
+    """
+    Run PageSpeed Insights analysis on a URL.
+    
     Requires PSI_API_KEY environment variable (from Google Cloud Console).
     Without it, limited to 5 req/sec (free tier quota).
     """

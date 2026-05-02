@@ -43,7 +43,8 @@ MAX_RESPONSE_BYTES = 5 * 1024 * 1024  # 5 MiB cap per page
 # Ideal ranges -- adjust if you want to be stricter
 TITLE_MIN, TITLE_MAX = 30, 60
 META_DESC_MIN, META_DESC_MAX = 70, 160
-THIN_CONTENT_THRESHOLD = 250  # words
+THIN_CONTENT_THRESHOLD = 250  # words (for regular content pages)
+THIN_CONTENT_THRESHOLD_LISTING = 80  # words (for listing/archive pages)
 SLOW_RESPONSE_MS = 3000
 LARGE_PAGE_BYTES = 1_500_000  # 1.5 MiB
 
@@ -108,6 +109,55 @@ def _classify_text(text: str) -> str:
     if not text:
         return ""
     return re.sub(r"\s+", " ", text).strip()
+
+
+def _is_listing_page(url: str, soup: BeautifulSoup) -> bool:
+    """
+    Detect if a page is a listing/archive page (tags, series, categories, posts list, etc).
+    
+    Heuristics:
+    - URL contains listing keywords: /tags/, /series/, /categories/, /archive/, /search/, /posts/
+    - Page has multiple links to other content (nav list > 5 links)
+    - Minimal unique content (mostly navigation/list structure)
+    """
+    path = urlparse(url).path.lower()
+    
+    # Check URL patterns
+    listing_patterns = [
+        r'/tags?(?:/|$)',
+        r'/series?(?:/|$)',
+        r'/categor(?:y|ies)(?:/|$)',
+        r'/archive(?:/|$)',
+        r'/search(?:/|$)',
+        r'/(?:all-)?posts?(?:/|$)',
+        r'/blog(?:/|$)',
+    ]
+    
+    for pattern in listing_patterns:
+        if re.search(pattern, path):
+            return True
+    
+    # Check for listing structure: many links with minimal unique body text
+    # This catches pages like /blog, /posts, etc that aren't explicitly in URL pattern
+    try:
+        # Count links (usually high on listing pages)
+        all_links = soup.find_all('a', href=True)
+        
+        # Count unique content blocks (usually low on listing pages)
+        # Heuristic: count <article>, <li>, <div class="post">, etc
+        content_items = (
+            soup.find_all('article') +
+            soup.find_all('div', class_=re.compile(r'post|item|entry|card', re.I)) +
+            soup.find_all('li', class_=re.compile(r'post|item|entry|card', re.I))
+        )
+        
+        # If high link count and content structure indicates listing, mark as listing
+        if len(all_links) > 10 and len(content_items) > 3:
+            return True
+    except Exception:
+        pass
+    
+    return False
 
 
 class SiteCrawler:
@@ -420,10 +470,16 @@ class SiteCrawler:
         # Word count + thin content
         text = soup.get_text(" ")
         page.word_count = _word_count(text)
-        if page.word_count < THIN_CONTENT_THRESHOLD:
-            self._issue(url, "content", "warning", "thin-content",
+        
+        # Determine if this is a listing page and apply appropriate threshold
+        is_listing = _is_listing_page(url, soup)
+        threshold = THIN_CONTENT_THRESHOLD_LISTING if is_listing else THIN_CONTENT_THRESHOLD
+        
+        if page.word_count < threshold:
+            severity = "notice" if is_listing else "warning"
+            self._issue(url, "content", severity, "thin-content",
                         f"Thin content ({page.word_count} words)",
-                        f"Aim for at least {THIN_CONTENT_THRESHOLD} words of unique copy")
+                        f"Aim for at least {threshold} words of unique copy")
 
         # Canonical
         canon = soup.find("link", attrs={"rel": "canonical"})

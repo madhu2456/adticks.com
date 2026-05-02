@@ -474,8 +474,13 @@ async def get_technical_seo(
     # Transform technical data to frontend TechnicalCheck objects
     formatted_checks = []
     
+    # Access nested structure from check_technical()
+    checks = technical.get("checks", {})
+    crawlability = checks.get("crawlability", {})
+    security = checks.get("security", {})
+    
     # 1. Robots.txt
-    robots = technical.get("robots_txt", {})
+    robots = crawlability.get("robots_txt", {})
     if robots.get("present"):
         if robots.get("disallows_all"):
             formatted_checks.append({
@@ -499,7 +504,7 @@ async def get_technical_seo(
         })
         
     # 2. Sitemap
-    sitemap = technical.get("sitemap", {})
+    sitemap = crawlability.get("sitemap", {})
     if sitemap.get("present"):
         if sitemap.get("url_count", 0) > 0 or sitemap.get("is_sitemap_index"):
             formatted_checks.append({
@@ -523,7 +528,7 @@ async def get_technical_seo(
         })
         
     # 3. HTTPS
-    https = technical.get("https", {})
+    https = security.get("https", {})
     if https.get("https_available"):
         if https.get("http_redirects_to_https"):
             formatted_checks.append({
@@ -547,7 +552,7 @@ async def get_technical_seo(
         })
         
     # 4. WWW/Non-WWW Redirects
-    www = technical.get("www_redirect", {})
+    www = security.get("www_redirect", {})
     if www.get("consistent"):
         formatted_checks.append({
             "check": "WWW Resolution",
@@ -563,7 +568,7 @@ async def get_technical_seo(
         })
         
     # 5. Performance
-    perf = technical.get("performance", {})
+    perf = checks.get("performance", {})
     issues = perf.get("issues", [])
     ttfb = perf.get("ttfb_ms", 0)
     
