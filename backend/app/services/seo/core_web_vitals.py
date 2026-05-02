@@ -42,8 +42,9 @@ async def run_pagespeed(url: str, strategy: str = "mobile", categories: list[str
         api_key = settings.PSI_API_KEY
     
     params = [("url", url), ("strategy", strategy)]
-    for c in categories:
-        params.append(("category", c))
+    if categories:
+        for c in categories:
+            params.append(("category", c))
     if api_key:
         params.append(("key", api_key))
 

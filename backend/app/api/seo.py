@@ -493,7 +493,8 @@ async def get_technical_seo(
             formatted_checks.append({
                 "check": "Robots.txt",
                 "status": "pass",
-                "description": "robots.txt is present and properly configured."
+                "description": "robots.txt is present and properly configured.",
+                "fix": None
             })
     else:
         formatted_checks.append({
@@ -510,7 +511,8 @@ async def get_technical_seo(
             formatted_checks.append({
                 "check": "XML Sitemap",
                 "status": "pass",
-                "description": f"Valid XML sitemap found with {sitemap.get('url_count', 0)} URLs."
+                "description": f"Valid XML sitemap found with {sitemap.get('url_count', 0)} URLs.",
+                "fix": None
             })
         else:
             formatted_checks.append({
@@ -534,7 +536,8 @@ async def get_technical_seo(
             formatted_checks.append({
                 "check": "HTTPS Encryption",
                 "status": "pass",
-                "description": "Website is correctly served over HTTPS with proper HTTP redirects."
+                "description": "Website is correctly served over HTTPS with proper HTTP redirects.",
+                "fix": None
             })
         else:
             formatted_checks.append({
@@ -557,7 +560,8 @@ async def get_technical_seo(
         formatted_checks.append({
             "check": "WWW Resolution",
             "status": "pass",
-            "description": f"Successfully redirects to a single canonical version ({www.get('canonical_version')})."
+            "description": f"Successfully redirects to a single canonical version ({www.get('canonical_version')}).",
+            "fix": None
         })
     else:
         formatted_checks.append({
@@ -576,7 +580,8 @@ async def get_technical_seo(
         formatted_checks.append({
             "check": "Performance",
             "status": "pass",
-            "description": f"Page loaded quickly (TTFB: {ttfb}ms). Compression and Cache-Control are active."
+            "description": f"Page loaded quickly (TTFB: {ttfb}ms). Compression and Cache-Control are active.",
+            "fix": None
         })
     else:
         formatted_checks.append({
