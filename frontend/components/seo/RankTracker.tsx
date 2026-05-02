@@ -5,7 +5,8 @@ import { Select, SelectItem } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useKeywords, useRankHistory, useSOV } from "@/hooks/useSEO";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, Smartphone, Monitor } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface RankTrackerProps {
   projectId: string;
@@ -15,10 +16,11 @@ export function RankTracker({ projectId }: RankTrackerProps) {
   const { data } = useKeywords(projectId);
   const keywords = data?.data ?? [];
   const [selectedId, setSelectedId] = useState("");
+  const [device, setDevice] = useState("desktop");
 
   const activeKeywordId = selectedId || keywords[0]?.keyword_id || "";
 
-  const { data: historyResponse, isLoading } = useRankHistory(projectId, activeKeywordId);
+  const { data: historyResponse, isLoading } = useRankHistory(projectId, activeKeywordId, 30, 0, 50, device);
   const { data: sovData } = useSOV(projectId);
   
   const rawHistoryData = historyResponse?.data || [];
@@ -62,11 +64,25 @@ export function RankTracker({ projectId }: RankTrackerProps) {
             </div>
           )}
         </div>
-        <Select value={activeKeywordId} onValueChange={setSelectedId} className="w-64">
-          {keywords.map((k) => (
-            <SelectItem key={k.id} value={k.keyword_id}>{k.keyword || "Unknown"}</SelectItem>
-          ))}
-        </Select>
+        <div className="flex items-center gap-3">
+          <Tabs value={device} onValueChange={setDevice} className="hidden sm:block">
+            <TabsList className="h-9">
+              <TabsTrigger value="desktop" className="gap-1.5 px-3">
+                <Monitor size={14} />
+                Desktop
+              </TabsTrigger>
+              <TabsTrigger value="mobile" className="gap-1.5 px-3">
+                <Smartphone size={14} />
+                Mobile
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Select value={activeKeywordId} onValueChange={setSelectedId} className="w-64">
+            {keywords.map((k) => (
+              <SelectItem key={k.id} value={k.keyword_id}>{k.keyword || "Unknown"}</SelectItem>
+            ))}
+          </Select>
+        </div>
       </CardHeader>
       <CardContent>
         {isLoading ? (

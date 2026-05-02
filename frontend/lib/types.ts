@@ -482,3 +482,32 @@ export interface ContentExplorerResponse {
   articles: ContentArticle[];
   total_results: number;
 }
+
+// Domain Overview
+export interface DomainOverviewResponse {
+  domain: string;
+  authority_score: number;
+  organic_traffic: number;
+  organic_keywords: number;
+  backlinks_count: number;
+  referring_domains: number;
+  paid_traffic: number;
+  paid_keywords: number;
+  display_ads: number;
+  main_competitors: string[];
+  timestamp: string;
+}
+
+// Bulk Keyword
+export interface KeywordMetric {
+  keyword: string;
+  volume: number;
+  difficulty: number;
+  cpc_usd: number;
+  intent: string;
+}
+
+export interface BulkKeywordResponse {
+  results: KeywordMetric[];
+  timestamp: string;
+}

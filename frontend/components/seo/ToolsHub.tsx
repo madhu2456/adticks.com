@@ -7,29 +7,41 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   FileCode2, ShieldQuestion, Map, Layers3, RefreshCw, FileDown,
-  Globe, Megaphone, Bell, FileSearch, ChevronRight
+  Globe, Megaphone, Bell, FileSearch, ChevronRight, Presentation, Zap, Network
 } from "lucide-react";
 import {
   useGenerateSitemap, useValidateRobots, useGenerateSchema, useSchemaTemplates,
   useRunBulk, useBulkJobs, useBulkItems,
+  useClusters, useBuildCluster, useDeleteCluster,
 } from "@/hooks/useSEO";
 import { TrafficAnalytics } from "./TrafficAnalytics";
 import { PPCResearch } from "./PPCResearch";
 import { BrandMonitor } from "./BrandMonitor";
 import { ContentExplorer } from "./ContentExplorer";
+import { DomainOverview } from "./DomainOverview";
+import { BulkKeywordChecker } from "./BulkKeywordChecker";
+import { TopicClusters } from "./TopicClusters";
 
-type ToolId = "traffic" | "ppc" | "brand" | "content" | "bulk" | "sitemap" | "robots" | "schema";
+type ToolId = "traffic" | "ppc" | "brand" | "content" | "bulk" | "sitemap" | "robots" | "schema" | "overview" | "bulk-kw" | "clusters";
 
 export function ToolsHub({ projectId }: { projectId: string }) {
-  const [activeTool, setActiveTool] = useState<ToolId>("traffic");
+  const [activeTool, setActiveTool] = useState<ToolId>("overview");
 
   const categories = [
     {
       name: "Competitive Intelligence",
       tools: [
+        { id: "overview", name: "Site Explorer", icon: Presentation, desc: "Deep dive into any domain" },
         { id: "traffic", name: "Traffic Analytics", icon: Globe, desc: "Estimate domain traffic & engagement" },
         { id: "ppc", name: "PPC Research", icon: Megaphone, desc: "Spy on competitor ad spend & keywords" },
         { id: "content", name: "Content Explorer", icon: FileSearch, desc: "Find most shared content by topic" },
+      ]
+    },
+    {
+      name: "Keyword Strategy",
+      tools: [
+        { id: "bulk-kw", name: "Bulk Checker", icon: Zap, desc: "Check volume/KD for keyword lists" },
+        { id: "clusters", name: "Topic Clusters", icon: Network, desc: "Group keywords semantically" },
       ]
     },
     {
@@ -51,10 +63,13 @@ export function ToolsHub({ projectId }: { projectId: string }) {
 
   const renderActiveTool = () => {
     switch (activeTool) {
+      case "overview": return <DomainOverview projectId={projectId} />;
       case "traffic": return <TrafficAnalytics projectId={projectId} />;
       case "ppc": return <PPCResearch projectId={projectId} />;
       case "brand": return <BrandMonitor projectId={projectId} />;
       case "content": return <ContentExplorer projectId={projectId} />;
+      case "bulk-kw": return <BulkKeywordChecker projectId={projectId} />;
+      case "clusters": return <TopicClusters projectId={projectId} />;
       case "bulk": return <BulkTab projectId={projectId} />;
       case "sitemap": return <SitemapTab projectId={projectId} />;
       case "robots": return <RobotsTab projectId={projectId} />;

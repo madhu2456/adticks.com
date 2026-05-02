@@ -1078,10 +1078,19 @@ async def hub_overview(
     briefs = (await db.execute(
         select(func.count(ContentBrief.id)).where(ContentBrief.project_id == project_id)
     )).scalar() or 0
+    clusters = (await db.execute(
+        select(func.count(TopicCluster.id)).where(TopicCluster.project_id == project_id)
+    )).scalar() or 0
+
+    from app.models.aeo import AEOVisibility
+    mentions = (await db.execute(
+        select(func.count(AEOVisibility.id)).where(AEOVisibility.project_id == project_id)
+    )).scalar() or 0
 
     errors = sum(1 for i in issues if i.severity == "error")
     warnings = sum(1 for i in issues if i.severity == "warning")
     score = max(0, 100 - min(100, errors * 5 + warnings * 2 + sum(1 for i in issues if i.severity == "notice")))
+    
     return {
         "site_score": score,
         "pages_crawled": pages_count,
@@ -1096,4 +1105,8 @@ async def hub_overview(
         "core_web_vitals_score": int(cwv) if cwv else None,
         "citations": citations,
         "content_briefs": briefs,
+        "clusters": clusters,
+        "mentions": mentions,
+        "authority_score": 78,  # Mocked
+        "share_of_voice": 12.5  # Mocked
     }

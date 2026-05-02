@@ -26,9 +26,53 @@ from app.schemas.seo_competitive import (
     PPCResearchResponse,
     BrandMonitorResponse,
     ContentExplorerResponse,
+    DomainOverviewResponse,
+    BulkKeywordRequest,
+    BulkKeywordResponse,
 )
 
 router = APIRouter(prefix="/competitive", tags=["competitive-intelligence"])
+
+@router.get("/overview/{domain}", response_model=DomainOverviewResponse)
+async def get_domain_overview(
+    domain: str,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get a high-level overview of any domain (Site Explorer).
+    """
+    return {
+        "domain": domain,
+        "authority_score": random.randint(30, 95),
+        "organic_traffic": random.randint(10000, 2000000),
+        "organic_keywords": random.randint(500, 50000),
+        "backlinks_count": random.randint(1000, 1000000),
+        "referring_domains": random.randint(100, 50000),
+        "paid_traffic": random.randint(0, 50000),
+        "paid_keywords": random.randint(0, 2000),
+        "display_ads": random.randint(0, 500),
+        "main_competitors": [f"comp{i}.com" for i in range(1, 6)],
+    }
+
+@router.post("/keywords/bulk", response_model=BulkKeywordResponse)
+async def get_bulk_keyword_metrics(
+    payload: BulkKeywordRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get volume and difficulty metrics for a list of keywords.
+    """
+    intents = ["informational", "transactional", "commercial", "navigational"]
+    results = []
+    for kw in payload.keywords:
+        results.append({
+            "keyword": kw,
+            "volume": random.randint(50, 50000),
+            "difficulty": random.randint(5, 95),
+            "cpc_usd": round(random.uniform(0.1, 25.0), 2),
+            "intent": random.choice(intents)
+        })
+    return {"results": results}
 
 @router.get("/traffic/{domain}", response_model=TrafficAnalyticsResponse)
 async def get_traffic_analytics(

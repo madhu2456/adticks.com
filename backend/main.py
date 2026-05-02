@@ -30,9 +30,9 @@ from app.core.database import Base, engine
 from app.core.exceptions import AdTicksException
 from app.core.logging import get_logger, set_request_id, setup_logging
 from app.core.caching import get_redis_client, close_redis_client
+from app.core.limiter import limiter
 
 logger = get_logger(__name__)
-limiter = Limiter(key_func=get_remote_address)
 
 
 # Initialize Sentry for error tracking

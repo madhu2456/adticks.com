@@ -618,3 +618,17 @@ export function useContentExplorer(query: string | null) {
   });
 }
 
+export function useDomainOverview(domain: string | null) {
+  return useQuery({
+    queryKey: ["competitive", "overview", domain],
+    queryFn: () => (domain ? api.seoCompetitive.getOverview(domain) : Promise.reject("No domain provided")),
+    enabled: !!domain,
+  });
+}
+
+export function useBulkKeywordMetrics() {
+  return useMutation({
+    mutationFn: (keywords: string[]) => api.seoCompetitive.getBulkKeywordMetrics(keywords),
+  });
+}
+

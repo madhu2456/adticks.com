@@ -82,3 +82,34 @@ class ContentExplorerResponse(BaseModel):
     query: str
     articles: List[ContentArticle]
     total_results: int
+
+# --- Domain Overview (Site Explorer) ---
+
+class DomainOverviewResponse(BaseModel):
+    domain: str
+    authority_score: int
+    organic_traffic: int
+    organic_keywords: int
+    backlinks_count: int
+    referring_domains: int
+    paid_traffic: int
+    paid_keywords: int
+    display_ads: int
+    main_competitors: List[str]
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+# --- Bulk Keyword Analysis ---
+
+class BulkKeywordRequest(BaseModel):
+    keywords: List[str]
+
+class KeywordMetric(BaseModel):
+    keyword: str
+    volume: int
+    difficulty: int
+    cpc_usd: float
+    intent: str
+
+class BulkKeywordResponse(BaseModel):
+    results: List[KeywordMetric]
+    timestamp: datetime = Field(default_factory=datetime.utcnow)

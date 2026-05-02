@@ -33,6 +33,8 @@ from app.core.security import (
 from app.models.user import User
 from app.schemas.user import RefreshTokenRequest, Token, UserCreate, UserLogin, UserResponse, UserUpdate
 
+from app.core.limiter import limiter
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = get_logger(__name__)
 
@@ -48,7 +50,8 @@ async def get_token(token: str = Depends(_oauth2_scheme)) -> str:
 
 
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
-async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def register(request: Request, payload: UserCreate, db: AsyncSession = Depends(get_db)):
     """
     Register a new user account.
     

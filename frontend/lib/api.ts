@@ -9,6 +9,7 @@ import {
   ChannelPerformance, ActivityItem, LoginRequest, RegisterRequest,
   PaginatedResponse, ApiResponse,
   TrafficAnalyticsResponse, PPCResearchResponse, BrandMonitorResponse, ContentExplorerResponse,
+  DomainOverviewResponse, BulkKeywordResponse,
 } from "./types";
 
 // Use relative URL when frontend and backend are on same domain (production)
@@ -44,7 +45,10 @@ const axiosInstance: AxiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
   (config) => {
     const token = getAccessToken();
-    console.log(`[API] Request to ${config.url}, token present: ${!!token}`);
+    // Only log API requests in development
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[API] Request to ${config.url}, token present: ${!!token}`);
+    }
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -57,16 +61,18 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
-    // Explicitly log every API error to the console with details
-    const status = error.response?.status;
-    const url = error.config?.url;
-    const method = error.config?.method?.toUpperCase();
-    const errorData = error.response?.data;
-    
-    console.error(`[API Error] ${method} ${url} | Status: ${status}`, {
-      data: errorData,
-      message: error.message
-    });
+    // Only log errors in development or if they are significant
+    if (process.env.NODE_ENV === "development") {
+      const status = error.response?.status;
+      const url = error.config?.url;
+      const method = error.config?.method?.toUpperCase();
+      const errorData = error.response?.data;
+      
+      console.error(`[API Error] ${method} ${url} | Status: ${status}`, {
+        data: errorData,
+        message: error.message
+      });
+    }
 
     const originalRequest = error.config;
     const isLoginRequest = originalRequest.url?.includes("/auth/login");
@@ -531,6 +537,10 @@ export const api = {
 
   // Competitive Intelligence
   seoCompetitive: {
+    getOverview: (domain: string) =>
+      axiosInstance.get<DomainOverviewResponse>(`/competitive/overview/${domain}`).then(unwrap),
+    getBulkKeywordMetrics: (keywords: string[]) =>
+      axiosInstance.post<BulkKeywordResponse>("/competitive/keywords/bulk", { keywords }).then(unwrap),
     getTraffic: (domain: string) =>
       axiosInstance.get<TrafficAnalyticsResponse>(`/competitive/traffic/${domain}`).then(unwrap),
     getPPC: (domain: string) =>
