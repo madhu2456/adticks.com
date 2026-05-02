@@ -38,6 +38,10 @@ async def run_pagespeed(url: str, strategy: str = "mobile", categories: list[str
     Requires PSI_API_KEY environment variable (from Google Cloud Console).
     Without it, limited to 5 req/sec (free tier quota).
     """
+    # Ensure URL has a scheme (Google API requires it)
+    if not url.startswith(("http://", "https://")):
+        url = f"https://{url}"
+
     if api_key is None:
         api_key = settings.PSI_API_KEY
     
@@ -71,7 +75,13 @@ async def run_pagespeed(url: str, strategy: str = "mobile", categories: list[str
                         logger.warning("PSI returned 429 for %s after %d retries. Try setting PSI_API_KEY.", url, max_retries)
                         return _empty_result(url, strategy)
                 elif resp.status_code != 200:
-                    logger.warning("PSI returned %s for %s", resp.status_code, url)
+                    error_detail = "No detail"
+                    try:
+                        error_json = resp.json()
+                        error_detail = error_json.get("error", {}).get("message", str(error_json))
+                    except:
+                        error_detail = resp.text[:200]
+                    logger.warning("PSI returned %s for %s: %s", resp.status_code, url, error_detail)
                     return _empty_result(url, strategy)
                 data = resp.json()
                 break
