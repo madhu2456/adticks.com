@@ -47,9 +47,11 @@ async def run_pagespeed(url: str, strategy: str = "mobile", categories: list[str
             params.append(("category", c))
     if api_key:
         params.append(("key", api_key))
+    else:
+        logger.warning("Running PSI without API key. This may lead to 429 rate limits.")
 
-    max_retries = 3
-    base_delay = 1.0
+    max_retries = 5
+    base_delay = 2.0
     
     for attempt in range(max_retries):
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -57,12 +59,16 @@ async def run_pagespeed(url: str, strategy: str = "mobile", categories: list[str
                 resp = await client.get(PSI_ENDPOINT, params=params)
                 if resp.status_code == 429:
                     if attempt < max_retries - 1:
-                        delay = base_delay * (2 ** attempt)
+                        # Exponential backoff with jitter
+                        import random
+                        delay = (base_delay * (2 ** attempt)) + random.uniform(0.5, 1.5)
                         logger.warning("PSI rate limited (429) for %s. Retrying in %.1f seconds (attempt %d/%d)", url, delay, attempt + 1, max_retries)
+                        if not api_key:
+                            logger.info("Tip: Set PSI_API_KEY in your .env file to get higher rate limits.")
                         await asyncio.sleep(delay)
                         continue
                     else:
-                        logger.warning("PSI returned 429 for %s after %d retries", url, max_retries)
+                        logger.warning("PSI returned 429 for %s after %d retries. Try setting PSI_API_KEY.", url, max_retries)
                         return _empty_result(url, strategy)
                 elif resp.status_code != 200:
                     logger.warning("PSI returned %s for %s", resp.status_code, url)
