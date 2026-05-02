@@ -44,7 +44,7 @@ MAX_RESPONSE_BYTES = 5 * 1024 * 1024  # 5 MiB cap per page
 TITLE_MIN, TITLE_MAX = 30, 60
 META_DESC_MIN, META_DESC_MAX = 70, 160
 THIN_CONTENT_THRESHOLD = 250  # words (for regular content pages)
-THIN_CONTENT_THRESHOLD_LISTING = 80  # words (for listing/archive pages)
+THIN_CONTENT_THRESHOLD_LISTING = 50  # words (for listing/archive pages)
 SLOW_RESPONSE_MS = 3000
 LARGE_PAGE_BYTES = 1_500_000  # 1.5 MiB
 

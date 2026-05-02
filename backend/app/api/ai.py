@@ -51,6 +51,7 @@ async def get_scan_status(task_id: str, current_user: User = Depends(get_current
     """
     from app.core.celery_app import celery_app
     from app.core.progress import ScanProgress
+    import json
 
     try:
         # Check Celery state
@@ -73,11 +74,30 @@ async def get_scan_status(task_id: str, current_user: User = Depends(get_current
                 # successfully launched the chain, but the chain is still running.
                 state = "STARTED"
 
+        # Ensure result is JSON-serializable
+        task_result = None
+        if result.successful() and result.result:
+            try:
+                # Try to JSON-serialize to ensure frontend compatibility
+                json.dumps(result.result)
+                task_result = result.result
+            except (TypeError, ValueError):
+                # If not serializable, convert to string
+                task_result = str(result.result)
+        
+        # Ensure error is a string
+        task_error = None
+        if result.failed():
+            try:
+                task_error = str(result.info)
+            except Exception:
+                task_error = "Unknown error occurred"
+
         return {
             "task_id": task_id,
             "status": state,
-            "result": result.result if result.successful() else None,
-            "error": str(result.info) if result.failed() else None,
+            "result": task_result,
+            "error": task_error,
             "progress": progress_data
         }
 
