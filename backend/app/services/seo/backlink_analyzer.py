@@ -17,41 +17,12 @@ logger = logging.getLogger(__name__)
 async def analyze_backlinks(project_id: str, domain: str) -> List[Dict[str, Any]]:
     """
     Perform backlink analysis for a domain.
-    Returns a list of backlink dicts.
+    
+    Feature not yet implemented.
+    Returns: Empty list
     """
-    logger.info(f"Analyzing backlinks for {domain}")
-    
-    # In a real app, this would call Ahrefs/Moz/Majestic API
-    # Here we generate realistic simulated data
-    
-    backlinks = []
-    
-    # Generate 15-30 backlinks
-    count = random.randint(15, 30)
-    
-    link_types = ["blog post", "news article", "directory", "resource page", "forum"]
-    statuses = ["active", "active", "active", "active", "lost"]
-    
-    # Common referring domains based on industry could be added here
-    
-    for i in range(count):
-        authority = random.randint(10, 95)
-        days_ago = random.randint(1, 90)
-        timestamp = datetime.now(timezone.utc) - timedelta(days=days_ago)
-        
-        status = random.choice(statuses)
-        
-        backlinks.append({
-            "referring_domain": f"site-{i+1}.{random.choice(['com', 'org', 'net', 'io'])}",
-            "target_url": f"https://{domain}/" + (random.choice(["", "blog", "about", "product"]) if random.random() > 0.5 else ""),
-            "anchor_text": random.choice(["click here", domain, "best solution", "learn more", "SEO tool"]),
-            "authority_score": float(authority),
-            "status": status,
-            "first_seen": timestamp,
-            "last_seen": datetime.now(timezone.utc) if status == "active" else timestamp + timedelta(days=random.randint(1, 30))
-        })
-    
-    return backlinks
+    logger.info(f"Backlink analysis not yet implemented for {domain}", extra={"feature": "analyze_backlinks"})
+    return []
 
 async def sync_backlinks(project_id: str, domain: str) -> int:
     """

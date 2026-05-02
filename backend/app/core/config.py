@@ -28,12 +28,18 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Database
     # ------------------------------------------------------------------
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/adticks"
+    DATABASE_URL: str = Field(
+        default="postgresql+asyncpg://postgres:postgres@localhost:5432/adticks",
+        description="Database connection URL - override with env variable for production"
+    )
 
     # ------------------------------------------------------------------
     # Redis / Celery
     # ------------------------------------------------------------------
-    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_URL: str = Field(
+        default="redis://localhost:6379/0",
+        description="Redis connection URL - override with env variable for production"
+    )
 
     # ------------------------------------------------------------------
     # Security
@@ -46,8 +52,8 @@ class Settings(BaseSettings):
     # CORS Configuration
     # ------------------------------------------------------------------
     ALLOWED_ORIGINS: list[str] = Field(
-        default_factory=lambda: ["https://adticks.com", "http://localhost:3002"],
-        description="CORS allowed origins"
+        default_factory=lambda: [],
+        description="CORS allowed origins - MUST be set from environment variable in production"
     )
 
     # ------------------------------------------------------------------
@@ -55,8 +61,8 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     STORAGE_ROOT: str = "data"
     BASE_URL: str = Field(
-        default="https://adticks.com",
-        description="Base URL for generating file URLs"
+        default="",
+        description="Base URL for generating file URLs - MUST be set from environment variable in production"
     )
 
     # ------------------------------------------------------------------
@@ -66,13 +72,23 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
 
     # ------------------------------------------------------------------
-    # Google OAuth / Search Console
+    # Google OAuth / Search Console / Analytics
     # ------------------------------------------------------------------
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = Field(
-        default="https://adticks.com/gsc-callback",
-        description="Google OAuth callback URL (frontend route)"
+        default="",
+        description="Google OAuth callback URL - MUST be set from environment variable in production"
+    )
+
+    # ------------------------------------------------------------------
+    # Bing Webmaster Tools OAuth
+    # ------------------------------------------------------------------
+    BING_CLIENT_ID: str = ""
+    BING_CLIENT_SECRET: str = ""
+    BING_REDIRECT_URI: str = Field(
+        default="",
+        description="Bing OAuth callback URL - MUST be set from environment variable in production"
     )
 
     # ------------------------------------------------------------------
@@ -119,12 +135,54 @@ class Settings(BaseSettings):
         """Validate CORS origins in production."""
         environment = info.data.get("ENVIRONMENT", "development")
         if environment == "production":
+            if not v or len(v) == 0:
+                raise ValueError(
+                    "ALLOWED_ORIGINS must be set from environment variable in production. "
+                    "Example: ALLOWED_ORIGINS='[\"https://adticks.com\"]'"
+                )
             # Check for localhost/development origins
             dev_origins = [o for o in v if "localhost" in o or "127.0.0.1" in o]
             if dev_origins:
                 raise ValueError(
                     f"Development origins not allowed in production CORS: {dev_origins}"
                 )
+        return v
+
+    @field_validator("BASE_URL")
+    @classmethod
+    def validate_base_url(cls, v: str, info):
+        """Validate BASE_URL in production."""
+        environment = info.data.get("ENVIRONMENT", "development")
+        if environment == "production" and not v:
+            raise ValueError(
+                "BASE_URL must be set from environment variable in production. "
+                "Example: BASE_URL='https://adticks.com'"
+            )
+        return v
+
+    @field_validator("GOOGLE_REDIRECT_URI")
+    @classmethod
+    def validate_google_redirect(cls, v: str, info):
+        """Validate Google redirect URI in production."""
+        environment = info.data.get("ENVIRONMENT", "development")
+        if environment == "production" and not v:
+            raise ValueError(
+                "GOOGLE_REDIRECT_URI must be set from environment variable in production. "
+                "Example: GOOGLE_REDIRECT_URI='https://adticks.com/gsc-callback'"
+            )
+        return v
+
+    @field_validator("BING_REDIRECT_URI")
+    @classmethod
+    def validate_bing_redirect(cls, v: str, info):
+        """Validate Bing redirect URI in production."""
+        environment = info.data.get("ENVIRONMENT", "development")
+        if environment == "production" and not v:
+            raise ValueError(
+                "BING_REDIRECT_URI must be set from environment variable in production. "
+                "Example: BING_REDIRECT_URI='https://adticks.com/bing-callback'"
+            )
+        return v
         return v
 
 

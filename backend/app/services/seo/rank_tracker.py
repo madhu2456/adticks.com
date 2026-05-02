@@ -85,23 +85,6 @@ def _get_random_ua() -> str:
     return random.choice(USER_AGENTS)
 
 
-def _mock_position(keyword: str, domain: str) -> Optional[int]:
-    """
-    Deterministic mock ranking for when no API key is available.
-    Returns a position 1-100 or None (not ranking).
-    """
-    seed = hash(f"{keyword}:{domain}") % 1000
-    if seed < 150:
-        return None  # Not ranking
-    if seed < 250:
-        return random.randint(1, 10)
-    if seed < 450:
-        return random.randint(11, 30)
-    if seed < 700:
-        return random.randint(31, 70)
-    return random.randint(71, 100)
-
-
 async def _check_via_serpapi(keyword: str, domain: str, api_key: str) -> Optional[int]:
     """
     Query SerpAPI for a keyword and return the domain's position (1-100) or None.

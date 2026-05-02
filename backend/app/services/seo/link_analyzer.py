@@ -24,8 +24,6 @@ GONE_STATUSES = {410}
 # Link quality indicators (simplified PageRank-like scoring)
 TOXIC_DOMAINS = {
     'bit.ly', 'tinyurl.com', 'ow.ly', 'goo.gl',  # URL shorteners
-    'example.com', 'test.com', 'localhost',  # Test domains
-    'placeholder.com', 'dummy.com',
 }
 
 QUALITY_DOMAINS = {

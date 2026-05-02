@@ -41,31 +41,8 @@ class AIVisibilityService:
 
         Returns: (is_mentioned, mention_context, position, confidence)
         """
-        if not self.chatgpt_api_key:
-            logger.warning("ChatGPT API key not configured")
-            return False, None, None, 0.0
-
-        try:
-            # Simulate ChatGPT API call (for MVP, would use actual API)
-            # Real implementation would call OpenAI API
-            
-            # This is a mock implementation - real version would call OpenAI
-            is_mentioned = self._mock_api_call(keyword, brand_name)
-            confidence = 0.85 if is_mentioned else 0.90
-
-            if is_mentioned:
-                mention_text = f"Mentioned {brand_name} in context of {keyword}"
-                position = 1  # Would extract actual position from response
-                logger.info("chatgpt_mention_found", extra={"keyword": keyword, "brand": brand_name})
-            else:
-                mention_text = None
-                position = None
-
-            return is_mentioned, mention_text, position, confidence
-
-        except Exception as e:
-            logger.error("chatgpt_visibility_check_failed", extra={"error": str(e)})
-            return False, None, None, 0.0
+        logger.info("AI visibility checking not yet implemented", extra={"feature": "chatgpt_visibility"})
+        return False, None, None, 0.0
 
     async def check_perplexity_visibility(
         self,
@@ -74,27 +51,8 @@ class AIVisibilityService:
         domain: str
     ) -> tuple[bool, Optional[str], Optional[int], float]:
         """Check if domain is mentioned in Perplexity response."""
-        if not self.perplexity_api_key:
-            logger.warning("Perplexity API key not configured")
-            return False, None, None, 0.0
-
-        try:
-            # Mock implementation
-            is_mentioned = self._mock_api_call(keyword, brand_name, model="perplexity")
-            confidence = 0.82 if is_mentioned else 0.88
-
-            if is_mentioned:
-                mention_text = f"Mentioned {brand_name} in Perplexity search results"
-                position = 2
-            else:
-                mention_text = None
-                position = None
-
-            return is_mentioned, mention_text, position, confidence
-
-        except Exception as e:
-            logger.error("perplexity_visibility_check_failed", extra={"error": str(e)})
-            return False, None, None, 0.0
+        logger.info("AI visibility checking not yet implemented", extra={"feature": "perplexity_visibility"})
+        return False, None, None, 0.0
 
     async def check_claude_visibility(
         self,
@@ -103,40 +61,10 @@ class AIVisibilityService:
         domain: str
     ) -> tuple[bool, Optional[str], Optional[int], float]:
         """Check if domain is mentioned in Claude response."""
-        if not self.claude_api_key:
-            logger.warning("Claude API key not configured")
-            return False, None, None, 0.0
+        logger.info("AI visibility checking not yet implemented", extra={"feature": "claude_visibility"})
+        return False, None, None, 0.0
 
-        try:
-            # Mock implementation
-            is_mentioned = self._mock_api_call(keyword, brand_name, model="claude")
-            confidence = 0.88 if is_mentioned else 0.92
-
-            if is_mentioned:
-                mention_text = f"Mentioned {brand_name} in response about {keyword}"
-                position = 1
-            else:
-                mention_text = None
-                position = None
-
-            return is_mentioned, mention_text, position, confidence
-
-        except Exception as e:
-            logger.error("claude_visibility_check_failed", extra={"error": str(e)})
-            return False, None, None, 0.0
-
-    def _mock_api_call(
-        self,
-        keyword: str,
-        brand_name: str,
-        model: str = "chatgpt"
-    ) -> bool:
-        """Mock API call for MVP - returns random mention based on keyword characteristics."""
-        # In production, this would call the actual API
-        # For MVP, we'll simulate based on keyword properties
-        popular_keywords = ["seo", "digital marketing", "content", "analytics", "optimization"]
-        has_popular_keyword = any(word in keyword.lower() for word in popular_keywords)
-        return has_popular_keyword and len(brand_name) > 0
+    # Removed _mock_api_call() method - replaced with explicit logging
 
     async def store_visibility_check(
         self,

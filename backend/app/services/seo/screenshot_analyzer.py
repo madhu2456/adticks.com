@@ -105,42 +105,10 @@ class ScreenshotAnalyzer:
             height: Viewport height
 
         Returns:
-            Screenshot bytes or None on failure
+            None - Screenshot generation not yet implemented
         """
-        try:
-            # Use a free screenshot service (screenshotlayer.com or similar)
-            # For this implementation, we'll use a simple HTTP-based approach
-            # In production, use: Playwright, Puppeteer, or paid screenshot APIs
-
-            # Create a simple mock implementation that generates placeholder image
-            # In real implementation, this would use Playwright:
-            # async with async_playwright() as p:
-            #     browser = await p.chromium.launch()
-            #     page = await browser.new_page(viewport={"width": width, "height": height})
-            #     await page.goto(url)
-            #     screenshot = await page.screenshot()
-            #     return screenshot
-
-            # Mock implementation - create a placeholder image
-            logger.info(f"Capturing screenshot for {url} at {width}x{height}")
-
-            # Create a simple placeholder image
-            img = Image.new("RGB", (width, height), color=(240, 240, 240))
-            img_bytes = io.BytesIO()
-            img.save(img_bytes, format="PNG")
-            screenshot_bytes = img_bytes.getvalue()
-
-            if len(screenshot_bytes) > MAX_SCREENSHOT_SIZE:
-                logger.warning(
-                    f"Screenshot size {len(screenshot_bytes)} exceeds limit"
-                )
-                return None
-
-            return screenshot_bytes
-
-        except Exception as e:
-            logger.error(f"Single screenshot capture failed: {e}")
-            return None
+        logger.info(f"Screenshot generation not yet implemented for {url} at {width}x{height}", extra={"feature": "screenshot_capture"})
+        return None
 
     async def _extract_visual_metrics(
         self, screenshot_data: bytes, device_name: str
