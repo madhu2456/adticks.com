@@ -31,11 +31,23 @@ export const useBackgroundScans = create<BackgroundScansStore>()(
           scans: [...state.scans, scan],
         })),
       updateScan: (id, updates) =>
-        set((state) => ({
-          scans: state.scans.map((scan) =>
-            scan.id === id ? { ...scan, ...updates } : scan
-          ),
-        })),
+        set((state) => {
+          const scan = state.scans.find((s) => s.id === id)
+          if (!scan) return state
+
+          // Check if any value actually changed to avoid unnecessary re-renders
+          const hasChanges = Object.entries(updates).some(
+            ([key, value]) => scan[key as keyof BackgroundScan] !== value
+          )
+
+          if (!hasChanges) return state
+
+          return {
+            scans: state.scans.map((s) =>
+              s.id === id ? { ...s, ...updates } : s
+            ),
+          }
+        }),
       removeScan: (id) =>
         set((state) => ({
           scans: state.scans.filter((scan) => scan.id !== id),

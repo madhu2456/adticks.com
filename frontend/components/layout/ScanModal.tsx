@@ -24,6 +24,7 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'ai', url 
   const [error, setError] = useState<string | null>(null)
   const [fromCache, setFromCache] = useState(false)
   const [pollProgress, setPollProgress] = useState(0)
+  const [currentScanId, setCurrentScanId] = useState<string | null>(null)
   const { addScan, updateScan, scans } = useBackgroundScans()
   const { toast } = useToast()
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -43,18 +44,14 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'ai', url 
 
   // Sync WebSocket progress with the background scan store
   useEffect(() => {
-    if (taskId && wsProgress > 0) {
-      // Find the active scan that matches this task
-      const activeScan = scans.find(s => s.id.startsWith(projectId || '') && s.status === 'scanning');
-      if (activeScan) {
-        updateScan(activeScan.id, {
-          progress: wsProgress,
-          stage: stage || 'Scanning...',
-          message: message || '',
-        });
-      }
+    if (currentScanId && wsProgress > 0) {
+      updateScan(currentScanId, {
+        progress: wsProgress,
+        stage: stage || 'Scanning...',
+        message: message || '',
+      });
     }
-  }, [wsProgress, stage, message, taskId, projectId, updateScan, scans]);
+  }, [wsProgress, stage, message, currentScanId, updateScan]);
 
   const featureLabels = {
     seo: 'SEO Scan',
@@ -126,6 +123,7 @@ export function ScanModal({ isOpen, onClose, projectId, featureType = 'ai', url 
           setTaskId(newTaskId)
           setFromCache(cached)
           addScan(newScan)
+          setCurrentScanId(scanId)
           
           // If results are from cache, show them immediately
           if (cached) {
