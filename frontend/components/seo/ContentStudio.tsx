@@ -11,7 +11,7 @@ import {
   FileText, Sparkles, Layers, Edit3, RefreshCw,
 } from "lucide-react";
 import {
-  useBriefs, useCreateBrief, useOptimizeContent, useTopicClusters, useBuildCluster,
+  useBriefs, useCreateBrief, useOptimizeContent, useClusters, useBuildCluster,
 } from "@/hooks/useSEO";
 
 export function ContentStudio({ projectId }: { projectId: string }) {
@@ -159,7 +159,8 @@ function OptimizerTab({ projectId }: { projectId: string }) {
 
 function ClustersTab({ projectId }: { projectId: string }) {
   const [pillar, setPillar] = useState("");
-  const { data: clusters, isLoading } = useTopicClusters(projectId);
+  const { data: clustersResponse, isLoading } = useClusters(projectId);
+  const clusters = clustersResponse?.data || [];
   const build = useBuildCluster();
 
   return (

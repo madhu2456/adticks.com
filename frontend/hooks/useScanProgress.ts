@@ -22,27 +22,36 @@ export interface UseScanProgressReturn {
   error: string | null
 }
 
-const getBaseWSUrl = () => {
-  if (typeof window === 'undefined') return ''
+const getBaseUrls = () => {
+  if (typeof window === 'undefined') return { ws: '', http: '' }
   
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const isHttps = window.location.protocol === 'https:'
+  const wsProtocol = isHttps ? 'wss:' : 'ws:'
+  const httpProtocol = isHttps ? 'https:' : 'http:'
+  
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || window.location.origin
   
-  // Parse API URL to get host
   try {
     const url = new URL(apiUrl)
-    return `${protocol}//${url.host}/api`
+    const host = url.host
+    // API URL usually includes /api suffix, we want to preserve it if present
+    const path = url.pathname.replace(/\/$/, '')
+    
+    return {
+      ws: `${wsProtocol}//${host}${path}`,
+      http: `${httpProtocol}//${host}${path}`
+    }
   } catch {
-    return `${protocol}//${window.location.host}/api`
+    return {
+      ws: `${wsProtocol}//${window.location.host}/api`,
+      http: `${httpProtocol}//${window.location.host}/api`
+    }
   }
 }
 
 /**
  * Hook to connect to real-time scan progress via WebSocket.
  * Falls back to polling via HTTP if WebSocket fails.
- * 
- * Usage:
- *   const { progress, stage, message, isConnected } = useScanProgress(taskId, token)
  */
 export function useScanProgress(
   taskId: string | null,
@@ -58,35 +67,37 @@ export function useScanProgress(
   
   const wsRef = useRef<WebSocket | null>(null)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const { ws: baseWS, http: baseHTTP } = getBaseUrls()
 
-  // Try WebSocket first, fallback to polling
   useEffect(() => {
-    if (!taskId || !authToken) return
+    if (!taskId) {
+      setProgress(0)
+      setStage('')
+      setMessage('')
+      return
+    }
 
-    let wsAttempted = false
-    let pollFallback = false
+    let pollFallbackActive = false
 
-    // Try WebSocket connection
     const connectWebSocket = () => {
       try {
-        const wsUrl = `${getBaseWSUrl()}/ws/scan/progress/${taskId}`
+        const wsUrl = `${baseWS}/ws/scan/progress/${taskId}`
+        console.log('Connecting to WebSocket:', wsUrl)
         const ws = new WebSocket(wsUrl)
 
         ws.onopen = () => {
-          console.log('WebSocket connected for progress updates')
           setIsConnected(true)
           setError(null)
-          wsAttempted = true
         }
 
         ws.onmessage = (event) => {
           try {
-            const data: ScanProgressData = JSON.parse(event.data)
-            
-            if (data.type === 'progress') {
+            const data = JSON.parse(event.data)
+            // Backend sends 'connected' and 'progress' types
+            if (data.progress !== undefined) {
               setProgress(data.progress)
-              setStage(data.stage)
-              setMessage(data.message)
+              setStage(data.stage || '')
+              setMessage(data.message || '')
               setElapsedSeconds(data.elapsed_seconds || 0)
               setEstimatedCompletionAt(data.estimated_completion_at || null)
             }
@@ -96,86 +107,68 @@ export function useScanProgress(
         }
 
         ws.onerror = (event) => {
-          console.warn('WebSocket error, falling back to polling:', event)
-          ws.close()
-          wsRef.current = null
-          
-          // Fallback to HTTP polling
-          if (!pollFallback) {
-            pollFallback = true
-            pollHTTP()
+          console.warn('WebSocket error, switching to polling')
+          if (!pollFallbackActive) {
+            pollFallbackActive = true
+            startPolling()
           }
         }
 
         ws.onclose = () => {
-          console.log('WebSocket closed')
           setIsConnected(false)
-          wsRef.current = null
+          if (!pollFallbackActive) {
+            pollFallbackActive = true
+            startPolling()
+          }
         }
 
         wsRef.current = ws
       } catch (e) {
-        console.error('WebSocket connection error:', e)
-        setError('Failed to connect to progress stream')
-        
-        // Fallback to HTTP polling
-        if (!pollFallback) {
-          pollFallback = true
-          pollHTTP()
+        console.error('WS setup error:', e)
+        if (!pollFallbackActive) {
+          pollFallbackActive = true
+          startPolling()
         }
       }
     }
 
-    // Fallback: HTTP polling every 2 seconds
-    const pollHTTP = () => {
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      }
-      if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`
-      }
+    const startPolling = () => {
+      const headers: HeadersInit = { 'Accept': 'application/json' }
+      if (authToken) headers['Authorization'] = `Bearer ${authToken}`
 
       const poll = async () => {
         try {
-          const response = await fetch(
-            `${getBaseWSUrl()}/ws/scan/progress/${taskId}`,
-            { headers }
-          )
-          
-          if (response.ok) {
-            const data = await response.json()
-            setProgress(data.progress || 0)
+          const res = await fetch(`${baseHTTP}/ws/scan/progress/${taskId}`, { headers })
+          if (res.ok) {
+            const data = await res.json()
+            setProgress(data.progress ?? 0)
             setStage(data.stage || '')
             setMessage(data.message || '')
             setElapsedSeconds(data.elapsed_seconds || 0)
             setEstimatedCompletionAt(data.estimated_completion_at || null)
             setIsConnected(true)
-            setError(null)
+            
+            // If completed, stop polling
+            if (data.progress === 100 || data.status === 'completed') {
+              if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+            }
           }
         } catch (e) {
-          console.warn('HTTP polling error:', e)
-          setError('Unable to fetch progress updates')
+          setError('Polling failed')
         }
       }
 
-      poll() // Poll immediately
-      pollIntervalRef.current = setInterval(poll, 2000)
+      poll()
+      pollIntervalRef.current = setInterval(poll, 2500)
     }
 
     connectWebSocket()
 
     return () => {
-      // Cleanup
-      if (wsRef.current) {
-        wsRef.current.close()
-        wsRef.current = null
-      }
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current)
-        pollIntervalRef.current = null
-      }
+      if (wsRef.current) wsRef.current.close()
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
     }
-  }, [taskId, authToken])
+  }, [taskId, authToken, baseWS, baseHTTP])
 
   return {
     progress,

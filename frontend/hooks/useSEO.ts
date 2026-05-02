@@ -293,20 +293,25 @@ export function useOptimizeContent() {
   });
 }
 
-export function useTopicClusters(projectId: string) {
-  return useQuery({
-    queryKey: ["topicClusters", projectId],
-    queryFn: () => api.seoAdvanced.listClusters(projectId),
-    enabled: !!projectId,
-  });
-}
-
 export function useBuildCluster() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ projectId, pillar }: { projectId: string; pillar: string }) =>
       api.seoAdvanced.buildCluster(projectId, pillar),
-    onSuccess: (_, { projectId }) => qc.invalidateQueries({ queryKey: ["topicClusters", projectId] }),
+    onSuccess: (_, { projectId }) => {
+      qc.invalidateQueries({ queryKey: ["clusters", projectId] });
+    },
+  });
+}
+
+export function useDeleteCluster() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId, clusterId }: { projectId: string; clusterId: string }) =>
+      api.clusters.delete(projectId, clusterId),
+    onSuccess: (_, { projectId }) => {
+      qc.invalidateQueries({ queryKey: ["clusters", projectId] });
+    },
   });
 }
 

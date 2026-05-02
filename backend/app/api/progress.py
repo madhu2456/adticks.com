@@ -67,72 +67,61 @@ manager = ConnectionManager()
 async def websocket_progress_endpoint(websocket: WebSocket, task_id: str):
     """
     WebSocket endpoint for real-time scan progress.
-    
-    Clients connect and receive progress updates as the scan runs.
-    
-    Message Format:
-    {
-        "type": "progress",
-        "task_id": "uuid",
-        "project_id": "uuid",
-        "stage": "rank_tracking",
-        "progress": 45,
-        "message": "Checked 45/100 keywords",
-        "elapsed_seconds": 320,
-        "estimated_completion_at": "2026-04-24T22:30:00Z"
-    }
     """
-    await manager.connect(task_id, websocket)
+    await websocket.accept()
+    logger.info(f"WebSocket client connected for task {task_id}")
     
     try:
-        # Send initial message
+        # Send initial connection confirmation
         await websocket.send_json({
             "type": "connected",
             "task_id": task_id,
             "message": "Connected to progress stream"
         })
         
-        # Poll for progress updates every 2 seconds
+        last_progress = -1
+        
+        # Poll Redis for this specific task's progress
         while True:
             try:
-                # Get current progress
                 progress_data = await ScanProgress.get_progress_for_task(task_id)
                 
                 if progress_data:
-                    # Send to all clients listening to this task
-                    await manager.broadcast(task_id, {
+                    current_progress = progress_data.get("progress", 0)
+                    # Only send if progress changed or it's a heartbeat (every 5 polls)
+                    await websocket.send_json({
                         "type": "progress",
                         **progress_data
                     })
+                    last_progress = current_progress
+                    
+                    if current_progress == 100 or progress_data.get("stage") == "completed":
+                        logger.info(f"Task {task_id} completed, closing WebSocket")
+                        break
                 
                 # Wait before next poll
-                await asyncio.sleep(2)
+                await asyncio.sleep(1.5)
                 
-                # Check for client disconnect (this will raise if client closed)
-                # We do this by trying to receive with a timeout
+                # Check if client is still there by trying to receive
                 try:
-                    data = await asyncio.wait_for(
-                        websocket.receive_text(),
-                        timeout=0.1
-                    )
-                    # If we get here, client sent a message (shouldn't happen)
-                    # but we can handle ping/pong or other commands here
+                    await asyncio.wait_for(websocket.receive_text(), timeout=0.01)
                 except asyncio.TimeoutError:
-                    # This is expected - no message from client
                     pass
                     
-            except asyncio.CancelledError:
+            except (asyncio.CancelledError, WebSocketDisconnect):
                 break
             except Exception as e:
-                logger.warning(f"Error in progress polling: {e}")
+                logger.warning(f"Error in progress WebSocket loop: {e}")
                 break
     
-    except WebSocketDisconnect:
-        await manager.disconnect(task_id, websocket)
-        logger.info(f"WebSocket disconnected: {task_id}")
     except Exception as e:
-        logger.error(f"WebSocket error: {e}")
-        await manager.disconnect(task_id, websocket)
+        logger.error(f"WebSocket error for task {task_id}: {e}")
+    finally:
+        try:
+            await websocket.close()
+        except:
+            pass
+        logger.info(f"WebSocket connection finished for task {task_id}")
 
 
 @router.get("/progress/{task_id}")
