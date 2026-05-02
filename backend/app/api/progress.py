@@ -88,11 +88,22 @@ async def websocket_progress_endpoint(websocket: WebSocket, task_id: str):
                 
                 if progress_data:
                     current_progress = progress_data.get("progress", 0)
-                    # Only send if progress changed or it's a heartbeat (every 5 polls)
-                    await websocket.send_json({
+                    
+                    # Ensure progress_data is JSON-serializable before sending
+                    safe_data = {
                         "type": "progress",
-                        **progress_data
-                    })
+                        "task_id": progress_data.get("task_id", task_id),
+                        "project_id": progress_data.get("project_id"),
+                        "stage": str(progress_data.get("stage", "")),
+                        "progress": int(progress_data.get("progress", 0)),
+                        "message": str(progress_data.get("message", "")),
+                        "started_at": str(progress_data.get("started_at", "")),
+                        "updated_at": str(progress_data.get("updated_at", "")),
+                        "estimated_completion_at": str(progress_data.get("estimated_completion_at", "")) if progress_data.get("estimated_completion_at") else None,
+                        "elapsed_seconds": int(progress_data.get("elapsed_seconds", 0)) if progress_data.get("elapsed_seconds") else None,
+                    }
+                    
+                    await websocket.send_json(safe_data)
                     last_progress = current_progress
                     
                     if current_progress == 100 or progress_data.get("stage") == "completed":
@@ -147,10 +158,20 @@ async def get_scan_progress(
     progress_data = await ScanProgress.get_progress_for_task(task_id)
     
     if progress_data:
-        return {
+        # Ensure all fields are JSON-serializable
+        safe_data = {
             "status": "in_progress",
-            **progress_data
+            "task_id": progress_data.get("task_id", task_id),
+            "project_id": progress_data.get("project_id"),
+            "stage": str(progress_data.get("stage", "")),
+            "progress": int(progress_data.get("progress", 0)),
+            "message": str(progress_data.get("message", "")),
+            "started_at": str(progress_data.get("started_at", "")),
+            "updated_at": str(progress_data.get("updated_at", "")),
+            "estimated_completion_at": str(progress_data.get("estimated_completion_at", "")) if progress_data.get("estimated_completion_at") else None,
+            "elapsed_seconds": int(progress_data.get("elapsed_seconds", 0)) if progress_data.get("elapsed_seconds") else None,
         }
+        return safe_data
     else:
         return {
             "status": "not_found",

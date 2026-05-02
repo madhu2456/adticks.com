@@ -92,13 +92,33 @@ async def get_scan_status(task_id: str, current_user: User = Depends(get_current
                 task_error = str(result.info)
             except Exception:
                 task_error = "Unknown error occurred"
+        
+        # Ensure progress_data is JSON-serializable
+        safe_progress_data = None
+        if progress_data:
+            try:
+                json.dumps(progress_data)
+                safe_progress_data = progress_data
+            except (TypeError, ValueError):
+                # If progress data has non-serializable objects, convert to safe dict
+                safe_progress_data = {
+                    "task_id": progress_data.get("task_id"),
+                    "project_id": progress_data.get("project_id"),
+                    "stage": str(progress_data.get("stage", "")),
+                    "progress": int(progress_data.get("progress", 0)),
+                    "message": str(progress_data.get("message", "")),
+                    "started_at": str(progress_data.get("started_at", "")),
+                    "updated_at": str(progress_data.get("updated_at", "")),
+                    "estimated_completion_at": str(progress_data.get("estimated_completion_at", "")) if progress_data.get("estimated_completion_at") else None,
+                    "elapsed_seconds": int(progress_data.get("elapsed_seconds", 0)) if progress_data.get("elapsed_seconds") else None,
+                }
 
         return {
             "task_id": task_id,
             "status": state,
             "result": task_result,
             "error": task_error,
-            "progress": progress_data
+            "progress": safe_progress_data
         }
 
     except Exception as e:
