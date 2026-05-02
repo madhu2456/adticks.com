@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.core.logging import get_logger
 from app.models.project import Project
 from app.models.user import User
 from app.models.keyword import Keyword
@@ -70,7 +71,7 @@ from app.schemas.seo_advanced import (
     GeneratedReportResponse,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 router = APIRouter(prefix="/seo", tags=["seo-advanced"])
 
 
@@ -288,7 +289,7 @@ async def run_cwv(
 ):
     await _get_project_or_404(project_id, current_user, db)
     from app.services.seo.core_web_vitals import run_pagespeed
-    psi_api_key = os.environ.get("PSI_API_KEY")
+    psi_api_key = settings.PSI_API_KEY
     data = await run_pagespeed(url=url, strategy=strategy, api_key=psi_api_key)
     row = CoreWebVitals(
         project_id=project_id,

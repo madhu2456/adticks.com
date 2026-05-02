@@ -32,8 +32,9 @@ from app.models.seo_content import (
     URLRedirect,
     BrokenLink,
 )
+from app.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 # ============================================================================

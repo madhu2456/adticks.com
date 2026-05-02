@@ -13,8 +13,9 @@ import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from app.models.user import User
 from app.core.progress import ScanProgress
+from app.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/ws/scan", tags=["websocket"])
 

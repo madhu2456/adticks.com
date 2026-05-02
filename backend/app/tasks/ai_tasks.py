@@ -19,8 +19,9 @@ from app.models.score import Score
 from app.services.ai.ai_service import run_ai_visibility_scan
 from app.services.ai.prompt_generator import generate_prompts
 from app.services.ai.mention_extractor import extract_mentions
+from app.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 storage = StorageService()
 
 

@@ -1,25 +1,28 @@
 """
-AdTicks — SERP Analyzer.
+AdTicks — SERP Analyzer (DuckDuckGo Optimized).
 
 Captures the top 10 organic results plus SERP feature presence for a keyword.
-By default uses DuckDuckGo's HTML SERP (no API key, no quota) and falls back
-to SerpAPI when SERPAPI_KEY is configured. Results are normalized into
-the SerpOverview schema.
+Optimized for high-performance scraping of DuckDuckGo's HTML interface
+to provide a 100% free "one-stop" search intelligence experience.
 """
 from __future__ import annotations
 
 import logging
-import os
 import re
+import random
+import asyncio
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 
 import httpx
 from bs4 import BeautifulSoup
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Primary DDG endpoints
 DDG_HTML = "https://html.duckduckgo.com/html/"
+DDG_LITE = "https://duckduckgo.com/lite/"
 
 
 def _domain(url: str) -> str:
@@ -29,81 +32,97 @@ def _domain(url: str) -> str:
         return ""
 
 
-async def _via_serpapi(keyword: str, location: str, device: str, api_key: str) -> dict[str, Any]:
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        params = {
-            "engine": "google",
-            "q": keyword,
-            "gl": location,
-            "device": device,
-            "api_key": api_key,
-        }
-        resp = await client.get("https://serpapi.com/search", params=params)
-        if resp.status_code != 200:
-            return {}
-        return resp.json()
-
-
-def _features_from_serpapi(data: dict[str, Any]) -> list[str]:
-    features: list[str] = []
-    if "answer_box" in data:
-        features.append("featured_snippet")
-    if "related_questions" in data:
-        features.append("people_also_ask")
-    if "knowledge_graph" in data:
-        features.append("knowledge_panel")
-    if "ads" in data or "shopping_results" in data:
-        features.append("ads")
-    if "local_results" in data:
-        features.append("local_pack")
-    if "videos" in data:
-        features.append("video")
-    if "images_results" in data:
-        features.append("images")
-    return features
-
-
 async def _via_duckduckgo(keyword: str) -> tuple[list[dict[str, Any]], list[str]]:
-    """Free fallback when no SerpAPI key. Returns (results, features)."""
+    """
+    Robust scraping of DuckDuckGo's HTML search engine.
+    Returns a list of results and detected SERP features.
+    """
+    # Rotating user agents for better resilience
+    user_agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    ]
+    
     headers = {
-        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 AdTicksSERP/1.0",
+        "User-Agent": random.choice(user_agents),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Referer": "https://duckduckgo.com/",
+        "Origin": "https://duckduckgo.com",
     }
-    async with httpx.AsyncClient(timeout=15.0, headers=headers, follow_redirects=True) as client:
-        resp = await client.post(DDG_HTML, data={"q": keyword})
-        if resp.status_code != 200:
-            return [], []
-        soup = BeautifulSoup(resp.text, "html.parser")
-
+    
     results: list[dict[str, Any]] = []
-    for i, item in enumerate(soup.select(".result")[:10]):
-        a = item.select_one(".result__a")
-        snippet_el = item.select_one(".result__snippet")
-        if not a:
-            continue
-        url = a.get("href", "")
-        # DDG wraps URLs in /l/?uddg=...
-        m = re.search(r"uddg=([^&]+)", url)
-        if m:
-            from urllib.parse import unquote
-            url = unquote(m.group(1))
-        title = a.get_text(strip=True)
-        snippet = snippet_el.get_text(strip=True) if snippet_el else ""
-        results.append({
-            "position": i + 1,
-            "url": url,
-            "title": title,
-            "snippet": snippet,
-            "domain": _domain(url),
-            "domain_authority": _da_estimate(_domain(url)),
-        })
-
     features: list[str] = []
-    if soup.select_one(".zci__answer"):
-        features.append("featured_snippet")
-    if soup.select_one(".module--images"):
-        features.append("images")
-    if soup.select_one(".module--videos"):
-        features.append("video")
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as client:
+            # We use the HTML version as it's the easiest to parse without JavaScript
+            resp = await client.post(DDG_HTML, data={"q": keyword})
+            
+            # If HTML is blocked, try LITE version
+            if resp.status_code != 200:
+                logger.warning(f"DDG HTML returned {resp.status_code}, trying LITE...")
+                resp = await client.get(DDG_LITE, params={"q": keyword})
+            
+            if resp.status_code != 200:
+                logger.error(f"DuckDuckGo search failed for '{keyword}' with status {resp.status_code}")
+                return [], []
+            
+            soup = BeautifulSoup(resp.text, "html.parser")
+
+        # Parse organic results
+        # DDG HTML uses .result selector
+        items = soup.select(".result") or soup.select("tr") # Lite uses tr
+        
+        for i, item in enumerate(items[:10]):
+            a = item.select_one(".result__a") or item.select_one(".result-link")
+            snippet_el = item.select_one(".result__snippet") or item.select_one(".result-snippet")
+            
+            if not a:
+                continue
+                
+            url = a.get("href", "")
+            
+            # DDG HTML wraps internal redirect URLs in /l/?uddg=...
+            if "/l/?uddg=" in url:
+                m = re.search(r"uddg=([^&]+)", url)
+                if m:
+                    url = unquote(m.group(1))
+            
+            # Clean up double slashes if any
+            if url.startswith("//"):
+                url = "https:" + url
+                
+            title = a.get_text(strip=True)
+            snippet = snippet_el.get_text(strip=True) if snippet_el else ""
+            
+            # Filter out internal DDG links
+            if "duckduckgo.com" in url or not url.startswith("http"):
+                continue
+
+            results.append({
+                "position": len(results) + 1,
+                "url": url,
+                "title": title,
+                "snippet": snippet,
+                "domain": _domain(url),
+                "domain_authority": _da_estimate(_domain(url)),
+            })
+
+        # Detect SERP features
+        if soup.select_one(".zci__answer") or soup.select_one(".zero-click"):
+            features.append("featured_snippet")
+        if soup.select_one(".module--images") or "Images" in resp.text:
+            features.append("images")
+        if soup.select_one(".module--videos") or "Videos" in resp.text:
+            features.append("video")
+        if "Related searches" in resp.text:
+            features.append("people_also_ask")
+
+    except Exception as e:
+        logger.exception(f"Error scraping DuckDuckGo for '{keyword}': {e}")
+    
     return results, features
 
 
@@ -116,47 +135,41 @@ _KNOWN_AUTHORITY = {
 
 
 def _da_estimate(domain: str) -> float:
-    """Cheap DA estimate by TLD + known list."""
+    """Calculates a heuristic-based Domain Authority estimate."""
     if not domain:
         return 0.0
     if domain in _KNOWN_AUTHORITY:
         return float(_KNOWN_AUTHORITY[domain])
+    
     # tld weighting
     tld = domain.rsplit(".", 1)[-1] if "." in domain else ""
     base = {"gov": 70, "edu": 65, "org": 40, "com": 25, "io": 20, "co": 20}.get(tld, 10)
-    # Length / hyphen heuristic
-    return float(base + min(20, 30 - len(domain)))
+    
+    # Length / hyphen heuristic (shorter, no-hyphen domains tend to have more authority)
+    bonus = min(20, 30 - len(domain))
+    if "-" in domain:
+        bonus -= 5
+        
+    return float(max(1, min(100, base + bonus)))
 
 
 async def analyze_serp(
     keyword: str,
     location: str = "us",
     device: str = "desktop",
-    serpapi_key: str | None = None,
+    **kwargs,
 ) -> dict[str, Any]:
-    """Return SERP overview for the given keyword."""
-    serpapi_key = serpapi_key or os.environ.get("SERPAPI_KEY", "")
-    results: list[dict[str, Any]] = []
-    features: list[str] = []
+    """
+    Primary entry point for SERP analysis. 
+    Now strictly uses DuckDuckGo to provide a cost-free experience.
+    """
+    logger.info(f"Analyzing SERP for '{keyword}' via DuckDuckGo")
+    
+    results, features = await _via_duckduckgo(keyword)
 
-    if serpapi_key:
-        try:
-            data = await _via_serpapi(keyword, location, device, serpapi_key)
-            for item in data.get("organic_results", [])[:10]:
-                url = item.get("link", "")
-                results.append({
-                    "position": item.get("position"),
-                    "url": url,
-                    "title": item.get("title", ""),
-                    "snippet": item.get("snippet", ""),
-                    "domain": _domain(url),
-                    "domain_authority": _da_estimate(_domain(url)),
-                })
-            features = _features_from_serpapi(data)
-        except Exception as e:
-            logger.warning("SerpAPI failed (%s); falling back to DDG", e)
-
+    # If results are empty, provide a small delay and retry once to handle transient network issues
     if not results:
+        await asyncio.sleep(1.0)
         results, features = await _via_duckduckgo(keyword)
 
     return {

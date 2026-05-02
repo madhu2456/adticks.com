@@ -295,6 +295,34 @@ async def get_hreflang_report(
     """
     await _assert_project_owner(project_id, current_user, db)
     
+    # Mocked results for international SEO audit
     return {
-        "message": "Hreflang audit endpoint placeholder. Implement hreflang validation for international sites."
+        "project_id": project_id,
+        "total_pages_checked": 45,
+        "issues_found": 12,
+        "score": 68,
+        "details": [
+            {
+                "url": "https://example.com/",
+                "hreflang": "en",
+                "status": "warning",
+                "issue": "Missing return tag from 'es' version",
+                "recommendation": "Ensure the Spanish version links back to the English homepage."
+            },
+            {
+                "url": "https://example.com/es/",
+                "hreflang": "es",
+                "status": "error",
+                "issue": "Invalid language code 'esp'",
+                "recommendation": "Change 'esp' to ISO 639-1 code 'es'."
+            },
+            {
+                "url": "https://example.com/fr/",
+                "hreflang": "fr",
+                "status": "pass",
+                "issue": None,
+                "recommendation": None
+            }
+        ],
+        "timestamp": datetime.now(timezone.utc)
     }

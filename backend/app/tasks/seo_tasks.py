@@ -29,8 +29,9 @@ from app.services.seo.competitor_research import sync_competitor_keywords as com
 from app.services.gsc.gsc_service import sync_gsc_data as gsc_sync
 from app.services.ads.ads_service import sync_ads_data as ads_sync
 from app.core.component_cache import ComponentCache
+from app.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 storage = StorageService()
 
 

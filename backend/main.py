@@ -122,12 +122,23 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------------------------
-# Request ID Tracking Middleware
+# Request Context & Logging Middleware
 # ---------------------------------------------------------------------------
 @app.middleware("http")
-async def add_request_id(request: Request, call_next):
-    """Add request ID to each request for tracing."""
+async def request_context_middleware(request: Request, call_next):
+    """
+    Middleware to manage request context (ID, logging, security headers).
+    
+    1. Generates/extracts a request ID.
+    2. Sets it in the global context and Sentry.
+    3. Logs the request and response with duration.
+    4. Adds standard security headers.
+    5. Injects the request ID into the response headers.
+    """
+    start_time = time.time()
     request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+    
+    # Set request ID in context variable for logging
     set_request_id(request_id)
     
     # Set Sentry context
@@ -136,23 +147,11 @@ async def add_request_id(request: Request, call_next):
         {"id": request_id, "path": request.url.path, "method": request.method}
     )
     
-    response = await call_next(request)
-    response.headers["X-Request-ID"] = request_id
-    return response
-
-
-# ---------------------------------------------------------------------------
-# Request Logging Middleware
-# ---------------------------------------------------------------------------
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    """Log all HTTP requests and responses."""
-    start_time = time.time()
-    
     try:
         response = await call_next(request)
         duration_ms = int((time.time() - start_time) * 1000)
         
+        # Log successful request
         logger.info(
             "http_request",
             extra={
@@ -160,9 +159,23 @@ async def log_requests(request: Request, call_next):
                 "path": request.url.path,
                 "status_code": response.status_code,
                 "duration_ms": duration_ms,
+                "request_id": request_id,  # Explicitly pass it just in case
             },
         )
+        
+        # Add headers
+        response.headers["X-Request-ID"] = request_id
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=(), "
+            "browsing-topics=(), join-ad-interest-group=(), "
+            "run-ad-auction=(), attribution-reporting=(), "
+            "private-state-token-issuance=(), private-state-token-redemption=()"
+        )
+        
         return response
+        
     except Exception as exc:
         duration_ms = int((time.time() - start_time) * 1000)
         logger.error(
@@ -172,29 +185,13 @@ async def log_requests(request: Request, call_next):
                 "path": request.url.path,
                 "duration_ms": duration_ms,
                 "error": str(exc),
+                "request_id": request_id,
             },
         )
         raise
 
-
-# ---------------------------------------------------------------------------
-# Security Headers Middleware
-# ---------------------------------------------------------------------------
-@app.middleware("http")
-async def add_security_headers(request: Request, call_next):
-    """Add security headers and suppress Privacy Sandbox console errors."""
-    response = await call_next(request)
-    # Explicitly disable Privacy Sandbox features to stop browser "Unrecognized feature" errors
-    # and provide standard security hardening.
-    response.headers["Permissions-Policy"] = (
-        "camera=(), microphone=(), geolocation=(), "
-        "browsing-topics=(), join-ad-interest-group=(), "
-        "run-ad-auction=(), attribution-reporting=(), "
-        "private-state-token-issuance=(), private-state-token-redemption=()"
-    )
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    return response
+# Remove the old separate middlewares
+# (The replace will handle this by replacing the block)
 
 
 # ---------------------------------------------------------------------------

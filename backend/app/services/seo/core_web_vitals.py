@@ -18,33 +18,15 @@ import os
 from typing import Any
 
 import httpx
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
-
-PSI_ENDPOINT = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
-
-
-def _audit_value(audits: dict, key: str) -> Any:
-    a = audits.get(key, {}).get("numericValue")
-    return a
-
-
-async def run_pagespeed(
-    url: str,
-    strategy: str = "mobile",
-    api_key: str | None = None,
-    categories: tuple[str, ...] = ("performance", "seo", "accessibility", "best-practices"),
-) -> dict[str, Any]:
-    """Run PageSpeed Insights against a URL.
-
-    Returns a dict shaped to fit the CoreWebVitals model.
-    Implements exponential backoff for rate limiting (429 responses).
-    
+...
     Requires PSI_API_KEY environment variable (from Google Cloud Console).
     Without it, limited to 5 req/sec (free tier quota).
     """
     if api_key is None:
-        api_key = os.environ.get("PSI_API_KEY", "")
+        api_key = settings.PSI_API_KEY
     
     params = [("url", url), ("strategy", strategy)]
     for c in categories:

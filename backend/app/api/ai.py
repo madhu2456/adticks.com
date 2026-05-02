@@ -10,9 +10,9 @@ from app.models.prompt import Mention, Prompt, Response
 from app.models.user import User
 from app.schemas.common import PaginatedResponse
 from app.schemas.prompt import MentionResponse, ResponseResponse
-import logging
+from app.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter(tags=["ai"])
 

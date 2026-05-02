@@ -21,6 +21,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
+from app.models.project import Project
+from app.core.logging import get_logger
+from sqlalchemy import select
 from app.schemas.seo_competitive import (
     TrafficAnalyticsResponse,
     PPCResearchResponse,
@@ -32,6 +35,7 @@ from app.schemas.seo_competitive import (
 )
 
 router = APIRouter(prefix="/competitive", tags=["competitive-intelligence"])
+logger = get_logger(__name__)
 
 @router.get("/overview/{domain}", response_model=DomainOverviewResponse)
 async def get_domain_overview(
@@ -152,8 +156,12 @@ async def get_brand_monitoring(
     """
     Track unlinked mentions of the brand across the web.
     """
-    # Verify project exists and belongs to user
-    # (In a real app, we'd fetch this from the DB)
+    # Ownership check
+    res = await db.execute(
+        select(Project.id).where(Project.id == project_id, Project.user_id == current_user.id)
+    )
+    if not res.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
     
     mentions = [
         {

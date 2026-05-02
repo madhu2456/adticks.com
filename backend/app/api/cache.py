@@ -19,8 +19,9 @@ from app.core.scan_cache import get_cache_status, invalidate_scan_cache
 from app.core.component_cache import ComponentCache
 from app.models.project import Project
 from app.core.security import get_current_user
+from app.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 router = APIRouter(prefix="/cache", tags=["cache"])
 
 @router.post("/purge-all", name="Purge system-wide cache")

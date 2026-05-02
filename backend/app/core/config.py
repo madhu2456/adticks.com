@@ -97,6 +97,12 @@ class Settings(BaseSettings):
     SENTRY_DSN: str = ""
 
     # ------------------------------------------------------------------
+    # SEO API Keys
+    # ------------------------------------------------------------------
+    PSI_API_KEY: str = Field(default="", description="PageSpeed Insights API Key")
+    SERPAPI_KEY: str = Field(default="", description="SerpApi Key")
+
+    # ------------------------------------------------------------------
     # Runtime
     # ------------------------------------------------------------------
     ENVIRONMENT: str = "development"

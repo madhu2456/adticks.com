@@ -41,6 +41,7 @@ google-auth-oauthlib>=1.2.0
 google-api-python-client>=2.150.0
 
 # Utilities
+Pillow>=10.3.0
 python-dotenv>=1.0.1
 email-validator>=2.2.0
 

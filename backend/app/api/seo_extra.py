@@ -39,8 +39,9 @@ from app.schemas.seo_extra import (
     FeaturedSnippetResponse, PAAQuestionResponse,
     SerpVolatilityEventResponse, SerpVolatilityScanRequest,
 )
+from app.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 router = APIRouter(prefix="/seo", tags=["seo-extra"])
 
 
