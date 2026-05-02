@@ -163,58 +163,62 @@ class SiteCrawler:
             follow_redirects=False,
             headers=self.headers,
         ) as client:
-            if self.on_progress:
-                await self.on_progress(5, "Performing site-level checks (robots.txt, sitemap)...")
-            await self._site_level_checks(client)
-            
-            queue: deque[tuple[str, int]] = deque()
-            normalized = _normalize(self.start_url)
-            queue.append((normalized, 0))
-            self.queued.add(normalized)
-
-            while queue and len(self.visited) < self.max_pages:
-                # Progress calculation: 10% to 90%
+            try:
                 if self.on_progress:
-                    percent = 10 + int((len(self.visited) / self.max_pages) * 80)
-                    await self.on_progress(percent, f"Crawling pages... ({len(self.visited)}/{self.max_pages} found)")
+                    await self.on_progress(5, "Performing site-level checks (robots.txt, sitemap)...")
+                await self._site_level_checks(client)
+                
+                queue: deque[tuple[str, int]] = deque()
+                normalized = _normalize(self.start_url)
+                queue.append((normalized, 0))
+                self.queued.add(normalized)
 
-                batch: list[tuple[str, int]] = []
-                # take up to `concurrency` items per batch
-                while queue and len(batch) < 5 and len(self.visited) + len(batch) < self.max_pages:
-                    batch.append(queue.popleft())
-                if not batch:
-                    break
-                pages = await asyncio.gather(
-                    *(self._fetch_and_parse(client, u, d) for u, d in batch),
-                    return_exceptions=True,
-                )
-                for item in pages:
-                    if isinstance(item, Exception):
-                        logger.warning("crawler error: %s", item)
-                        continue
-                    if item is None:
-                        continue
-                    page, links = item
-                    self.result.pages.append(page)
-                    if page.depth < self.max_depth:
-                        for link in links:
-                            normalized_link = _normalize(link)
-                            if normalized_link in self.visited or normalized_link in self.queued:
-                                continue
-                            if not self._should_crawl(normalized_link):
-                                continue
-                            queue.append((normalized_link, page.depth + 1))
-                            self.queued.add(normalized_link)
+                while queue and len(self.visited) < self.max_pages:
+                    # Progress calculation: 10% to 90%
+                    if self.on_progress:
+                        percent = 10 + int((len(self.visited) / self.max_pages) * 80)
+                        await self.on_progress(percent, f"Crawling pages... ({len(self.visited)}/{self.max_pages} found)")
 
-            if self.on_progress:
-                await self.on_progress(95, "Running post-crawl deduplication checks...")
-            self._post_crawl_dedupe_checks()
-            
-            if self.on_progress:
-                await self.on_progress(100, "Audit logic complete.")
+                    batch: list[tuple[str, int]] = []
+                    # take up to `concurrency` items per batch
+                    while queue and len(batch) < 5 and len(self.visited) + len(batch) < self.max_pages:
+                        batch.append(queue.popleft())
+                    if not batch:
+                        break
+                    
+                    pages = await asyncio.gather(
+                        *(self._fetch_and_parse(client, u, d) for u, d in batch),
+                        return_exceptions=True,
+                    )
+                    for item in pages:
+                        if isinstance(item, Exception):
+                            logger.warning("crawler error: %s", item)
+                            continue
+                        if item is None:
+                            continue
+                        page, links = item
+                        self.result.pages.append(page)
+                        if page.depth < self.max_depth:
+                            for link in links:
+                                normalized_link = _normalize(link)
+                                if normalized_link in self.visited or normalized_link in self.queued:
+                                    continue
+                                if not self._should_crawl(normalized_link):
+                                    continue
+                                queue.append((normalized_link, page.depth + 1))
+                                self.queued.add(normalized_link)
+            except Exception as e:
+                logger.error(f"Critical error in crawler loop: {e}")
+            finally:
+                if self.on_progress:
+                    await self.on_progress(95, "Running post-crawl deduplication checks...")
+                self._post_crawl_dedupe_checks()
+                
+                if self.on_progress:
+                    await self.on_progress(100, "Audit logic complete.")
 
-            self.result.summary = self._build_summary()
-            return self.result
+                self.result.summary = self._build_summary()
+                return self.result
 
     # ---- site-level checks (robots, sitemap, security) ---------------------
     async def _site_level_checks(self, client: httpx.AsyncClient) -> None:
@@ -338,8 +342,14 @@ class SiteCrawler:
                             f"Page size {page.page_size_bytes // 1024} KiB exceeds {LARGE_PAGE_BYTES // 1024} KiB",
                             "Compress assets, lazy-load images")
 
-            soup = BeautifulSoup(content, "html.parser")
-            return self._extract_signals(url, soup, page), self._extract_links(url, soup)
+            soup = await asyncio.get_event_loop().run_in_executor(
+                None, BeautifulSoup, content, "html.parser"
+            )
+            
+            signals, links = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: (self._extract_signals(url, soup, page), self._extract_links(url, soup))
+            )
+            return signals, links
 
     # ---- signal extraction + per-page issue rules -------------------------
     def _extract_signals(

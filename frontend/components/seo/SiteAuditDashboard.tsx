@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import {
-  AlertCircle, AlertTriangle, Info, CheckCircle2, Play, RefreshCw, Search, Globe,
+  AlertCircle, AlertTriangle, Info, CheckCircle2, Play, RefreshCw, Search, Globe, ChevronDown, Check, X
 } from "lucide-react";
 import { useAuditSummary, useAuditIssues, useRunSiteAudit, useCrawledPages } from "@/hooks/useSEO";
 import { useScanProgress } from "@/hooks/useScanProgress";
@@ -34,12 +34,12 @@ export function SiteAuditDashboard({ projectId, defaultUrl = "" }: Props) {
   const [maxPages, setMaxPages] = useState(50);
   const [severity, setSeverity] = useState<string>("");
   const [category, setCategory] = useState<string>("all");
-  const [urlFilter, setUrlFilter] = useState<string>("");
+  const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
   const [taskId, setTaskId] = useState<string | null>(null);
 
   const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } = useAuditSummary(projectId);
   const { data: issues, isLoading: issuesLoading, refetch: refetchIssues } =
-    useAuditIssues(projectId, severity || undefined, category === "all" ? undefined : category, urlFilter || undefined);
+    useAuditIssues(projectId, severity || undefined, category === "all" ? undefined : category, selectedUrls);
   const { data: pages, refetch: refetchPages } = useCrawledPages(projectId);
   const runAudit = useRunSiteAudit();
 
@@ -104,11 +104,11 @@ export function SiteAuditDashboard({ projectId, defaultUrl = "" }: Props) {
           {taskId && progress < 100 && (
             <div className="space-y-2 pt-2 animate-in fade-in slide-in-from-top-1">
               <div className="flex justify-between text-xs font-medium">
-                <span className="text-primary uppercase tracking-wider">{stage || "Crawling"}</span>
-                <span>{progress}%</span>
+                <span className="text-primary uppercase tracking-wider">{stage || "Crawl"}</span>
+                <span>{progress === 0 ? "Initializing" : `${progress}%`}</span>
               </div>
-              <Progress value={progress} className="h-2" />
-              <p className="text-[10px] text-muted-foreground italic">{message || "Initializing crawler..."}</p>
+              <Progress value={progress === 0 ? 5 : progress} className="h-2" />
+              <p className="text-[10px] text-muted-foreground italic">{message || "Connecting to crawler engine..."}</p>
             </div>
           )}
 
@@ -180,18 +180,15 @@ export function SiteAuditDashboard({ projectId, defaultUrl = "" }: Props) {
 
       {/* Issue list */}
       <Card>
-        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <CardHeader className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <CardTitle>Issues</CardTitle>
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-64">
-              <Search className="absolute left-2 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Filter by page URL..."
-                value={urlFilter}
-                onChange={(e) => setUrlFilter(e.target.value)}
-                className="pl-7 h-8 text-xs bg-card"
-              />
-            </div>
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+            <URLMultiSelect 
+              options={pages?.map(p => p.url) || []} 
+              selected={selectedUrls} 
+              onChange={setSelectedUrls} 
+            />
+            
             <select
               value={severity}
               onChange={(e) => setSeverity(e.target.value)}
@@ -291,6 +288,97 @@ export function SiteAuditDashboard({ projectId, defaultUrl = "" }: Props) {
             </div>
           </CardContent>
         </Card>
+      )}
+    </div>
+  );
+}
+
+function URLMultiSelect({ options, selected, onChange }: { options: string[], selected: string[], onChange: (val: string[]) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const uniqueOptions = Array.from(new Set(options));
+  const filteredOptions = uniqueOptions.filter(o => o.toLowerCase().includes(search.toLowerCase())).slice(0, 50);
+
+  const toggle = (opt: string) => {
+    if (selected.includes(opt)) {
+      onChange(selected.filter(s => s !== opt));
+    } else {
+      onChange([...selected, opt]);
+    }
+  };
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between gap-2 px-3 h-8 bg-card border rounded-md text-xs min-w-[200px] hover:bg-accent transition-colors"
+      >
+        <span className="truncate max-w-[150px]">
+          {selected.length === 0 ? "Filter by URL..." : `${selected.length} URLs selected`}
+        </span>
+        <ChevronDown size={14} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 w-[320px] bg-card border rounded-lg shadow-xl z-50 p-2 animate-in fade-in zoom-in duration-150">
+          <div className="relative mb-2">
+            <Search className="absolute left-2 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search URLs..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 h-8 text-xs bg-background"
+              autoFocus
+            />
+          </div>
+          
+          <div className="max-h-[250px] overflow-auto space-y-0.5 custom-scrollbar">
+            {filteredOptions.length === 0 ? (
+              <p className="text-[10px] text-muted-foreground text-center py-4">No URLs found</p>
+            ) : (
+              filteredOptions.map((opt) => {
+                const isSel = selected.includes(opt);
+                return (
+                  <button
+                    key={opt}
+                    onClick={() => toggle(opt)}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-[10px] text-left transition-colors ${isSel ? "bg-primary/10 text-primary" : "hover:bg-accent"}`}
+                  >
+                    <div className={`w-3.5 h-3.5 border rounded flex items-center justify-center ${isSel ? "bg-primary border-primary" : "border-muted-foreground/30"}`}>
+                      {isSel && <Check size={10} className="text-white" />}
+                    </div>
+                    <span className="truncate flex-1">{opt.replace(/^https?:\/\//, "")}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          {selected.length > 0 && (
+            <div className="mt-2 pt-2 border-t flex justify-between items-center px-1">
+              <span className="text-[9px] text-muted-foreground">{selected.length} selected</span>
+              <button 
+                onClick={() => onChange([])}
+                className="text-[9px] text-primary hover:underline font-medium flex items-center gap-1"
+              >
+                <X size={10} /> Clear all
+              </button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

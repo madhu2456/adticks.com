@@ -140,9 +140,9 @@ class ScanProgress:
                 json.dumps(state, default=str)
             )
             
-            logger.debug(f"Progress: {stage_str} {progress}% - {message}")
+            logger.info(f"Progress Updated [Task:{self.task_id}]: {stage_str} {progress}% - {message}")
         except Exception as e:
-            logger.warning(f"Error updating progress: {e}")
+            logger.error(f"Failed to update progress in Redis for task {self.task_id}: {e}")
     
     async def get_status(self) -> Optional[Dict[str, Any]]:
         """Get current progress status."""
@@ -167,29 +167,19 @@ class ScanProgress:
     async def cleanup(self) -> None:
         """Remove progress tracking from Redis."""
         redis_client = await self._get_redis()
-        if not redis_client:
-            return
-        
         try:
             await redis_client.delete(self.redis_key)
         except Exception as e:
             logger.warning(f"Error cleaning up progress: {e}")
     
     @staticmethod
-    async def _get_redis() -> Optional[redis.Redis]:
-        """Get Redis client."""
-        try:
-            client = await redis.from_url(
-                settings.REDIS_URL,
-                encoding="utf-8",
-                decode_responses=True,
-                socket_connect_timeout=5,
-            )
-            await client.ping()
-            return client
-        except Exception as e:
-            logger.warning(f"Redis unavailable: {e}")
-            return None
+    async def _get_redis() -> redis.Redis:
+        """Get Redis client from a shared pool (via app.core.caching)."""
+        from app.core.caching import get_redis_client
+        client = await get_redis_client()
+        if not client:
+            raise RuntimeError("Redis is required for progress tracking but is unavailable.")
+        return client
     
     @staticmethod
     async def get_progress_for_task(task_id: str) -> Optional[Dict[str, Any]]:
@@ -202,11 +192,8 @@ class ScanProgress:
         Returns:
             Progress dict or None if not found
         """
-        redis_client = await ScanProgress._get_redis()
-        if not redis_client:
-            return None
-        
         try:
+            redis_client = await ScanProgress._get_redis()
             redis_key = f"progress:{task_id}"
             status_str = await redis_client.get(redis_key)
             if status_str:

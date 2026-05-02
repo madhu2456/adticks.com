@@ -363,11 +363,13 @@ export const api = {
       axiosInstance.post<any>(`/seo/projects/${projectId}/audit/run`, { url, max_pages, max_depth }).then(unwrap),
     getAuditSummary: (projectId: string) =>
       axiosInstance.get<any>(`/seo/projects/${projectId}/audit/summary`).then(unwrap),
-    getAuditIssues: (projectId: string, params?: { severity?: string; category?: string; url?: string; limit?: number }) => {
+    getAuditIssues: (projectId: string, params?: { severity?: string; category?: string; urls?: string[]; limit?: number }) => {
       const qs = new URLSearchParams();
       if (params?.severity) qs.set("severity", params.severity);
       if (params?.category) qs.set("category", params.category);
-      if (params?.url) qs.set("url", params.url);
+      if (params?.urls && params.urls.length > 0) {
+        params.urls.forEach(u => qs.append("urls", u));
+      }
       if (params?.limit) qs.set("limit", String(params.limit));
       return axiosInstance.get<any[]>(`/seo/projects/${projectId}/audit/issues?${qs}`).then(unwrap);
     },
