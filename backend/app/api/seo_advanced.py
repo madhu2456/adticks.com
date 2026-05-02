@@ -106,21 +106,33 @@ async def run_site_audit(
     """Run a fresh site crawl + audit in the background. Persists pages + issues to the DB."""
     await _get_project_or_404(project_id, current_user, db)
 
+    # Generate a task ID for tracking progress
+    task_id = str(uuid.uuid4())
+    from app.core.progress import ScanProgress, ScanStage
+    progress = ScanProgress(str(project_id), task_id)
+    await progress.initialize()
+
     async def _audit_task_impl():
         # Inner function to run in background
         from app.core.database import AsyncSessionLocal
         from app.services.seo.site_crawler import crawl_site
         from app.models.seo_advanced import SiteAuditIssue, CrawledPage, SchemaMarkup
         
+        async def on_progress(percent: int, msg: str):
+            await progress.update(ScanStage.TECHNICAL_AUDIT, percent, msg)
+
         async with AsyncSessionLocal() as session:
             try:
+                await on_progress(0, "Starting site crawl...")
                 result = await crawl_site(
                     payload.url, 
                     max_pages=payload.max_pages, 
                     max_depth=payload.max_depth,
-                    stay_within_path=payload.stay_within_path
+                    stay_within_path=payload.stay_within_path,
+                    on_progress=on_progress
                 )
                 
+                await on_progress(90, "Saving audit results to database...")
                 # clear previous unresolved issues for the same project
                 await session.execute(delete(SiteAuditIssue).where(SiteAuditIssue.project_id == project_id))
                 await session.execute(delete(CrawledPage).where(CrawledPage.project_id == project_id))
@@ -171,15 +183,18 @@ async def run_site_audit(
                     ))
                 
                 await session.commit()
+                await progress.complete()
                 logger.info(f"Background audit completed for project {project_id}")
             except Exception as e:
+                await progress.update("failed", 0, f"Audit failed: {str(e)}")
                 logger.exception(f"Background audit failed for project {project_id}")
 
     background_tasks.add_task(_audit_task_impl)
     
     return {
         "status": "accepted",
-        "message": "Site audit started in background. Results will be available in a few moments.",
+        "task_id": task_id,
+        "message": "Site audit started in background.",
     }
 
 
@@ -229,6 +244,7 @@ async def list_audit_issues(
     project_id: UUID,
     severity: str | None = None,
     category: str | None = None,
+    url: str | None = None,
     limit: int = Query(100, le=500),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -239,6 +255,8 @@ async def list_audit_issues(
         q = q.where(SiteAuditIssue.severity == severity)
     if category:
         q = q.where(SiteAuditIssue.category == category)
+    if url:
+        q = q.where(SiteAuditIssue.url.ilike(f"%{url}%"))
     q = q.order_by(desc(SiteAuditIssue.discovered_at)).limit(limit)
     rows = (await db.execute(q)).scalars().all()
     return rows

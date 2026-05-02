@@ -1,6 +1,6 @@
 "use client";
-import React, { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,8 @@ import {
   AlertCircle, AlertTriangle, Info, CheckCircle2, Play, RefreshCw, Search, Globe,
 } from "lucide-react";
 import { useAuditSummary, useAuditIssues, useRunSiteAudit, useCrawledPages } from "@/hooks/useSEO";
+import { useScanProgress } from "@/hooks/useScanProgress";
+import { getAccessToken } from "@/lib/auth";
 
 const SEVERITY_META: Record<string, { label: string; color: string; Icon: any }> = {
   error: { label: "Errors", color: "text-red-600 bg-red-500/10 border-red-500/30", Icon: AlertCircle },
@@ -32,19 +34,39 @@ export function SiteAuditDashboard({ projectId, defaultUrl = "" }: Props) {
   const [maxPages, setMaxPages] = useState(50);
   const [severity, setSeverity] = useState<string>("");
   const [category, setCategory] = useState<string>("all");
+  const [urlFilter, setUrlFilter] = useState<string>("");
+  const [taskId, setTaskId] = useState<string | null>(null);
 
   const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } = useAuditSummary(projectId);
   const { data: issues, isLoading: issuesLoading, refetch: refetchIssues } =
-    useAuditIssues(projectId, severity || undefined, category === "all" ? undefined : category);
-  const { data: pages } = useCrawledPages(projectId);
+    useAuditIssues(projectId, severity || undefined, category === "all" ? undefined : category, urlFilter || undefined);
+  const { data: pages, refetch: refetchPages } = useCrawledPages(projectId);
   const runAudit = useRunSiteAudit();
+
+  const token = getAccessToken();
+  const { progress, stage, message, isConnected } = useScanProgress(taskId, token);
 
   const handleRun = async () => {
     if (!url) return;
-    await runAudit.mutateAsync({ projectId, url, max_pages: maxPages, max_depth: 3 });
-    refetchSummary();
-    refetchIssues();
+    setTaskId(null);
+    try {
+      const res = await runAudit.mutateAsync({ projectId, url, max_pages: maxPages, max_depth: 3 });
+      if (res.task_id) {
+        setTaskId(res.task_id);
+      }
+    } catch (e) {
+      console.error("Failed to start audit:", e);
+    }
   };
+
+  // Sync results when audit completes
+  useEffect(() => {
+    if (progress === 100) {
+      refetchSummary();
+      refetchIssues();
+      refetchPages();
+    }
+  }, [progress, refetchSummary, refetchIssues, refetchPages]);
 
   const score = summary?.score ?? 0;
   const scoreColor = score >= 80 ? "text-emerald-600" : score >= 60 ? "text-amber-600" : "text-red-600";
@@ -55,8 +77,9 @@ export function SiteAuditDashboard({ projectId, defaultUrl = "" }: Props) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Globe size={18}/> Run Site Audit</CardTitle>
+          <CardDescription>Crawl your domain to find technical and on-page SEO issues.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="flex flex-col md:flex-row gap-3">
             <Input
               placeholder="https://example.com"
@@ -71,11 +94,24 @@ export function SiteAuditDashboard({ projectId, defaultUrl = "" }: Props) {
               onChange={(e) => setMaxPages(Number(e.target.value) || 50)}
               className="w-32"
             />
-            <Button onClick={handleRun} disabled={!url || runAudit.isPending} className="gap-2">
-              {runAudit.isPending ? <RefreshCw size={16} className="animate-spin"/> : <Play size={16}/>}
-              {runAudit.isPending ? "Crawling…" : "Run Audit"}
+            <Button onClick={handleRun} disabled={!url || runAudit.isPending || (!!taskId && progress < 100)} className="gap-2">
+              {runAudit.isPending || (!!taskId && progress < 100) ? <RefreshCw size={16} className="animate-spin"/> : <Play size={16}/>}
+              {runAudit.isPending ? "Starting…" : (!!taskId && progress < 100) ? "Crawling…" : "Run Audit"}
             </Button>
           </div>
+
+          {/* Real-time Progress Bar */}
+          {taskId && progress < 100 && (
+            <div className="space-y-2 pt-2 animate-in fade-in slide-in-from-top-1">
+              <div className="flex justify-between text-xs font-medium">
+                <span className="text-primary uppercase tracking-wider">{stage || "Crawling"}</span>
+                <span>{progress}%</span>
+              </div>
+              <Progress value={progress} className="h-2" />
+              <p className="text-[10px] text-muted-foreground italic">{message || "Initializing crawler..."}</p>
+            </div>
+          )}
+
           {runAudit.isError && (
             <p className="text-sm text-red-500 mt-2">Audit failed. Try a different URL.</p>
           )}
@@ -144,13 +180,22 @@ export function SiteAuditDashboard({ projectId, defaultUrl = "" }: Props) {
 
       {/* Issue list */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <CardTitle>Issues</CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
+              <Search className="absolute left-2 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Filter by page URL..."
+                value={urlFilter}
+                onChange={(e) => setUrlFilter(e.target.value)}
+                className="pl-7 h-8 text-xs bg-card"
+              />
+            </div>
             <select
               value={severity}
               onChange={(e) => setSeverity(e.target.value)}
-              className="text-xs px-2 py-1 rounded border bg-card"
+              className="text-xs h-8 px-2 py-1 rounded border bg-card focus:ring-1 focus:ring-primary outline-none"
             >
               <option value="">All severities</option>
               <option value="error">Errors</option>
@@ -160,9 +205,13 @@ export function SiteAuditDashboard({ projectId, defaultUrl = "" }: Props) {
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="text-xs px-2 py-1 rounded border bg-card"
+              className="text-xs h-8 px-2 py-1 rounded border bg-card focus:ring-1 focus:ring-primary outline-none"
             >
-              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c === "all" ? "All types" : c.charAt(0).toUpperCase() + c.slice(1).replace("_", " ")}
+                </option>
+              ))}
             </select>
           </div>
         </CardHeader>

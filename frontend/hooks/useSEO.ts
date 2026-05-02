@@ -141,10 +141,10 @@ export function useAuditSummary(projectId: string) {
   });
 }
 
-export function useAuditIssues(projectId: string, severity?: string, category?: string) {
+export function useAuditIssues(projectId: string, severity?: string, category?: string, url?: string) {
   return useQuery({
-    queryKey: ["auditIssues", projectId, severity, category],
-    queryFn: () => api.seoAdvanced.getAuditIssues(projectId, { severity, category, limit: 200 }),
+    queryKey: ["auditIssues", projectId, severity, category, url],
+    queryFn: () => api.seoAdvanced.getAuditIssues(projectId, { severity, category, url, limit: 200 }),
     enabled: !!projectId,
   });
 }

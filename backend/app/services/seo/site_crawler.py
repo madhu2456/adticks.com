@@ -28,7 +28,7 @@ import re
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable, Coroutine, Optional
 from urllib.parse import urljoin, urlparse, urldefrag
 
 import httpx
@@ -121,6 +121,7 @@ class SiteCrawler:
         concurrency: int = 5,
         user_agent: str = DEFAULT_USER_AGENT,
         stay_within_path: bool = False,
+        on_progress: Optional[Callable[[int, str], Coroutine[Any, Any, None]]] = None,
     ):
         if not start_url.startswith(("http://", "https://")):
             start_url = "https://" + start_url
@@ -130,6 +131,7 @@ class SiteCrawler:
         self.stay_within_path = stay_within_path
         self.max_pages = max_pages
         self.max_depth = max_depth
+        self.on_progress = on_progress
         self.semaphore = asyncio.Semaphore(concurrency)
         self.headers = {
             "User-Agent": user_agent,
@@ -161,13 +163,21 @@ class SiteCrawler:
             follow_redirects=False,
             headers=self.headers,
         ) as client:
+            if self.on_progress:
+                await self.on_progress(5, "Performing site-level checks (robots.txt, sitemap)...")
             await self._site_level_checks(client)
+            
             queue: deque[tuple[str, int]] = deque()
             normalized = _normalize(self.start_url)
             queue.append((normalized, 0))
             self.queued.add(normalized)
 
             while queue and len(self.visited) < self.max_pages:
+                # Progress calculation: 10% to 90%
+                if self.on_progress:
+                    percent = 10 + int((len(self.visited) / self.max_pages) * 80)
+                    await self.on_progress(percent, f"Crawling pages... ({len(self.visited)}/{self.max_pages} found)")
+
                 batch: list[tuple[str, int]] = []
                 # take up to `concurrency` items per batch
                 while queue and len(batch) < 5 and len(self.visited) + len(batch) < self.max_pages:
@@ -196,7 +206,13 @@ class SiteCrawler:
                             queue.append((normalized_link, page.depth + 1))
                             self.queued.add(normalized_link)
 
+            if self.on_progress:
+                await self.on_progress(95, "Running post-crawl deduplication checks...")
             self._post_crawl_dedupe_checks()
+            
+            if self.on_progress:
+                await self.on_progress(100, "Audit logic complete.")
+
             self.result.summary = self._build_summary()
             return self.result
 
@@ -575,13 +591,15 @@ async def crawl_site(
     start_url: str, 
     max_pages: int = 50, 
     max_depth: int = 3,
-    stay_within_path: bool = False
+    stay_within_path: bool = False,
+    on_progress: Optional[Callable[[int, str], Coroutine[Any, Any, None]]] = None,
 ) -> CrawlResult:
     """Convenience entrypoint."""
     crawler = SiteCrawler(
         start_url=start_url, 
         max_pages=max_pages, 
         max_depth=max_depth,
-        stay_within_path=stay_within_path
+        stay_within_path=stay_within_path,
+        on_progress=on_progress
     )
     return await crawler.run()
