@@ -19,6 +19,7 @@ from app.models.project import Project
 from app.models.competitor import Competitor
 from app.models.gsc import GSCData
 from app.models.ads import AdsData
+from app.models.seo_advanced import LogEvent
 from app.services.seo.keyword_service import generate_keywords, cluster_keywords
 from app.services.seo.rank_tracker import bulk_rank_check
 from app.services.seo.on_page_analyzer import analyze_url
@@ -961,3 +962,199 @@ async def _sync_ads_data_impl(project_id: str, task_id: str = "") -> dict:
         "summary": perf.get("summary", {}),
         "status": "completed",
     }
+
+
+# ---------------------------------------------------------------------------
+# sync_remote_logs_task
+# ---------------------------------------------------------------------------
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=300)
+def sync_remote_logs_task(self, project_id: str) -> dict:
+    """Fetch log file from remote URL and sync to DB."""
+    async def _run():
+        try:
+            return await _sync_remote_logs_impl(project_id)
+        finally:
+            await engine.dispose()
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.exception("sync_remote_logs_task failed for project %s: %s", project_id, exc)
+        raise self.retry(exc=exc)
+
+
+async def _sync_remote_logs_impl(project_id: str) -> dict:
+    import httpx
+    from app.services.seo.log_analyzer import parse_lines
+
+    async with AsyncSessionLocal() as session:
+        project = await _load_project(session, project_id)
+        if not project or not project.remote_log_url:
+            return {"project_id": project_id, "status": "skipped", "reason": "no_remote_url"}
+        
+        url = project.remote_log_url
+        logger.info("Fetching remote logs for project %s from %s", project_id, url)
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                content = resp.text
+        except Exception as e:
+            logger.error("Failed to fetch remote logs for project %s: %s", project_id, e)
+            return {"project_id": project_id, "status": "error", "error": str(e)}
+
+        result = parse_lines(content.splitlines())
+        
+        # Clear existing logs for this project
+        await session.execute(delete(LogEvent).where(LogEvent.project_id == project_id))
+        
+        # Add new logs
+        for row in result.aggregated:
+            session.add(LogEvent(
+                project_id=UUID(project_id),
+                bot=row["bot"],
+                url=row["url"],
+                status_code=row["status_code"],
+                hits=row["hits"],
+                last_crawled=row["last_crawled"] or datetime.now(timezone.utc),
+            ))
+        
+        await session.commit()
+        logger.info("Synced %d log rows for project %s", len(result.aggregated), project_id)
+
+        return {
+            "project_id": project_id,
+            "rows_synced": len(result.aggregated),
+            "summary": result.summary,
+            "status": "completed",
+        }
+
+# ---------------------------------------------------------------------------
+# crawl_and_analyze_website
+# ---------------------------------------------------------------------------
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=60)
+def crawl_and_analyze_website(
+    self,
+    project_id: str,
+    website_url: str,
+    bot_name: str = "googlebot",
+    max_urls: int = 500,
+    max_depth: int = 3,
+    task_id: str = None,
+) -> dict:
+    """Crawl website and analyze bot crawl patterns."""
+    async def _run():
+        try:
+            return await _crawl_and_analyze_impl(
+                project_id, website_url, bot_name, max_urls, max_depth, task_id
+            )
+        finally:
+            await engine.dispose()
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.exception("crawl_and_analyze_website failed for project %s: %s", project_id, exc)
+        raise self.retry(exc=exc)
+
+
+async def _crawl_and_analyze_impl(
+    project_id: str,
+    website_url: str,
+    bot_name: str,
+    max_urls: int,
+    max_depth: int,
+    task_id: str,
+) -> dict:
+    """Implementation of website crawl and analysis."""
+    from app.services.seo.web_spider import WebSpider
+    from app.services.seo.sitemap_fetcher import SitemapFetcher
+    from app.services.seo.spider_analyzer import analyze_spider_results
+
+    try:
+        # Ensure URL has scheme
+        if not website_url.startswith(("http://", "https://")):
+            website_url = f"https://{website_url}"
+
+        logger.info(
+            "Starting web crawl for project %s: %s (bot=%s, max_urls=%d, depth=%d)",
+            project_id,
+            website_url,
+            bot_name,
+            max_urls,
+            max_depth,
+        )
+
+        # Initialize spider
+        spider = WebSpider(
+            domain=website_url,
+            bot_name=bot_name,
+            max_urls=max_urls,
+            max_depth=max_depth,
+            timeout_seconds=60,
+            rate_limit_per_second=2.0,
+        )
+
+        # Perform crawl
+        crawl_results = await spider.crawl()
+        spider_stats = spider.get_stats()
+
+        logger.info(
+            "Crawl completed: %d URLs crawled, %.1f%% waste, %d errors",
+            spider_stats.total_urls_crawled,
+            spider_stats.crawl_waste_pct,
+            spider_stats.crawl_errors,
+        )
+
+        # Fetch sitemap for orphan detection
+        sitemap_urls: set[str] = set()
+        try:
+            fetcher = SitemapFetcher(website_url, timeout_seconds=30)
+            sitemap_urls = await fetcher.fetch_urls()
+            logger.info("Fetched %d URLs from sitemap", len(sitemap_urls))
+        except Exception as e:
+            logger.warning("Failed to fetch sitemap for orphan detection: %s", e)
+
+        # Analyze results
+        analysis = analyze_spider_results(crawl_results, spider_stats, sitemap_urls)
+
+        # Cache results
+        cache_data = {
+            "summary": analysis.summary,
+            "aggregated": analysis.aggregated,
+            "orphans": analysis.orphans,
+            "website_url": website_url,
+            "bot_name": bot_name,
+            "crawled_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        cache = ComponentCache(project_id)
+        await cache.set_cached_crawl_results(cache_data)
+
+        logger.info("Web crawl analysis cached for project %s", project_id)
+
+        return {
+            "project_id": project_id,
+            "website_url": website_url,
+            "bot_name": bot_name,
+            "task_id": task_id,
+            "status": "completed",
+            "summary": analysis.summary,
+            "urls_crawled": spider_stats.total_urls_crawled,
+            "unique_urls": spider_stats.unique_urls,
+            "crawl_waste_pct": spider_stats.crawl_waste_pct,
+            "orphan_pages": len(analysis.orphans.get("crawled_not_in_sitemap", [])),
+            "crawl_errors": spider_stats.crawl_errors,
+        }
+
+    except Exception as exc:
+        logger.exception("Web crawl analysis failed for project %s: %s", project_id, exc)
+        return {
+            "project_id": project_id,
+            "website_url": website_url,
+            "task_id": task_id,
+            "status": "failed",
+            "error": str(exc),
+        }

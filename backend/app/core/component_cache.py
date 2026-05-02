@@ -253,7 +253,7 @@ class ComponentCache:
             return {}
         
         stats = {}
-        components = ["keywords", "rankings", "audit", "gaps"]
+        components = ["keywords", "rankings", "audit", "gaps", "crawl_results"]
         
         for component in components:
             try:
@@ -273,3 +273,47 @@ class ComponentCache:
                 logger.warning(f"Error getting stats for {component}: {e}")
         
         return stats
+
+    async def set_cached_crawl_results(
+        self,
+        crawl_data: Dict[str, Any],
+    ) -> None:
+        """Cache web crawl results and analysis."""
+        redis = await get_redis_client()
+        if not redis:
+            logger.warning("Redis unavailable, skipping crawl results cache")
+            return
+        
+        try:
+            key = f"component:crawl_results:{self.project_id}"
+            data = {
+                **crawl_data,
+                "cached_at": datetime.now(timezone.utc).isoformat(),
+            }
+            
+            await redis.setex(
+                key,
+                AUDIT_CACHE_TTL,
+                json.dumps(data, default=str),
+            )
+            logger.info(f"Cached crawl results for project {self.project_id}")
+        except Exception as e:
+            logger.error(f"Error caching crawl results: {e}")
+
+    async def get_cached_crawl_results(self) -> Optional[Dict[str, Any]]:
+        """Retrieve cached web crawl results if valid."""
+        redis = await get_redis_client()
+        if not redis:
+            return None
+        
+        try:
+            key = f"component:crawl_results:{self.project_id}"
+            data = await redis.get(key)
+            
+            if data:
+                return json.loads(data)
+        except Exception as e:
+            logger.error(f"Error retrieving cached crawl results: {e}")
+        
+        return None
+

@@ -41,6 +41,8 @@ export interface Project {
   domain: string;
   industry?: string;
   ai_scans_enabled?: boolean;
+  remote_log_url?: string;
+  log_sync_enabled?: boolean;
   competitors: string[];
   color?: string;
   initials?: string;

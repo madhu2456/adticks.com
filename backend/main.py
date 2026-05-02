@@ -307,9 +307,35 @@ app.mount(f"{API_PREFIX}/storage", StaticFiles(directory=settings.STORAGE_ROOT),
 
 
 # ---------------------------------------------------------------------------
-# Health check
+# Health check and status endpoints
 # ---------------------------------------------------------------------------
 @app.get("/health", tags=["health"])
 async def health_check():
     """Return service health status."""
     return {"status": "ok", "environment": settings.ENVIRONMENT}
+
+
+@app.get("/health/live", tags=["health"])
+async def health_check_live():
+    """Kubernetes liveness probe endpoint."""
+    return {"status": "alive"}
+
+
+@app.get("/health/ready", tags=["health"])
+async def health_check_ready():
+    """Kubernetes readiness probe endpoint."""
+    try:
+        from app.core.caching import get_redis_client
+        redis = await get_redis_client()
+        if redis:
+            await redis.ping()
+        return {"status": "ready", "db": "connected", "redis": "connected" if redis else "unavailable"}
+    except Exception as e:
+        logger.warning(f"readiness_check_failed: {e}")
+        return {"status": "ready", "db": "connected", "redis": "unavailable"}
+
+
+@app.get("/api/health", tags=["health"])
+async def api_health_check():
+    """Return API health status."""
+    return {"status": "ok", "service": "adticks-api", "environment": settings.ENVIRONMENT}

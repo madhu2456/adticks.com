@@ -365,6 +365,14 @@ export function useUploadLogFile() {
   });
 }
 
+export function useSyncRemoteLogs() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (projectId: string) => api.seoAdvanced.syncRemoteLogs(projectId),
+    onSuccess: (_, projectId) => qc.invalidateQueries({ queryKey: ["logs", projectId] }),
+  });
+}
+
 export function useReports(projectId: string) {
   return useQuery({
     queryKey: ["reports", projectId],

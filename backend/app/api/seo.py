@@ -1,5 +1,6 @@
 """AdTicks SEO router."""
 import uuid
+import logging
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -14,6 +15,7 @@ from app.models.user import User
 from app.schemas.common import PaginatedResponse
 from app.schemas.keyword import KeywordCreate, RankingResponse
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/seo", tags=["seo"])
 
 
@@ -597,6 +599,121 @@ async def get_technical_seo(
     return {
         "project_id": str(project_id),
         "data": paginated_data,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "has_more": total > skip + limit
+    }
+
+
+@router.post("/analyze-website", status_code=status.HTTP_202_ACCEPTED)
+async def analyze_website_crawl(
+    project_id: UUID,
+    website_url: str = Query(..., description="Website URL to analyze (e.g., https://example.com)"),
+    bot_name: str = Query("googlebot", description="Bot to simulate: googlebot, bingbot, yandexbot, etc."),
+    max_urls: int = Query(500, ge=10, le=5000, description="Maximum URLs to crawl (default: 500)"),
+    max_depth: int = Query(3, ge=1, le=10, description="Max crawl depth (default: 3)"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Privacy-safe website crawl analysis - no raw logs required.
+    
+    Instead of uploading server access logs (which expose sensitive data), this endpoint
+    crawls the website directly and analyzes:
+    - Bot crawl patterns (status codes, redirects, response times)
+    - Orphan pages (crawled but not in sitemap)
+    - Crawl efficiency and waste percentage
+    
+    The analysis respects robots.txt and enforces rate limiting.
+    Results are suitable for SEO optimization and bot management.
+    
+    Args:
+        project_id: Project UUID
+        website_url: Domain to crawl (e.g., https://example.com)
+        bot_name: Bot user agent to simulate (default: googlebot)
+        max_urls: Maximum URLs to crawl (10-5000, default 500)
+        max_depth: Maximum crawl depth (1-10, default 3)
+    
+    Returns:
+        Status 202 with task ID for background processing
+    """
+    await _assert_project_owner(project_id, current_user, db)
+    
+    from app.tasks.seo_tasks import crawl_and_analyze_website
+    
+    task_id = str(uuid.uuid4())
+    
+    try:
+        crawl_and_analyze_website.delay(
+            project_id=str(project_id),
+            website_url=website_url,
+            bot_name=bot_name,
+            max_urls=max_urls,
+            max_depth=max_depth,
+            task_id=task_id,
+        )
+    except Exception as e:
+        logger.error(f"Failed to queue web crawl task: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to queue crawl task"
+        )
+    
+    return {
+        "status": "queued",
+        "task_id": task_id,
+        "project_id": str(project_id),
+        "website_url": website_url,
+        "bot": bot_name,
+        "message": "Website crawl queued. Results will be available shortly."
+    }
+
+
+@router.get("/crawl-results/{project_id}")
+async def get_crawl_results(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    skip: int = Query(0, ge=0, description="Number of items to skip"),
+    limit: int = Query(100, ge=1, le=500, description="Number of items to return (max 500)"),
+):
+    """
+    Retrieve results from the latest website crawl analysis.
+    
+    Returns crawl statistics, orphan page detection, status code distribution,
+    and detailed per-URL crawl results including response times and redirects.
+    """
+    await _assert_project_owner(project_id, current_user, db)
+    
+    cache = ComponentCache(str(project_id))
+    cached_data = await cache.get_cached_crawl_results()
+    
+    if not cached_data:
+        return {
+            "project_id": str(project_id),
+            "summary": None,
+            "aggregated": [],
+            "orphans": {"crawled_not_in_sitemap": [], "in_sitemap_not_crawled": []},
+            "total": 0,
+            "skip": skip,
+            "limit": limit,
+            "has_more": False,
+            "message": "Run /seo/analyze-website first"
+        }
+    
+    summary = cached_data.get("summary", {})
+    aggregated = cached_data.get("aggregated", [])
+    orphans = cached_data.get("orphans", {})
+    
+    total = len(aggregated)
+    paginated_data = aggregated[skip : skip + limit]
+    
+    return {
+        "project_id": str(project_id),
+        "summary": summary,
+        "aggregated": paginated_data,
+        "orphans": orphans,
         "total": total,
         "skip": skip,
         "limit": limit,

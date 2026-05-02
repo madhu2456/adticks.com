@@ -43,6 +43,8 @@ from app.tasks.seo_tasks import (
     sync_backlinks_task,
     sync_gsc_data_task,
     sync_ads_data_task,
+    sync_remote_logs_task,
+    crawl_and_analyze_website,
 )
 from app.tasks.ai_tasks import (
     generate_prompts_task,
@@ -665,16 +667,25 @@ async def _schedule_daily_scans_impl() -> dict:
         projects = result.scalars().all()
 
     scheduled = 0
+    logs_synced = 0
     for project in projects:
         try:
             run_full_scan_task.delay(project_id=str(project.id), is_scheduled=True)
             scheduled += 1
             logger.info("Scheduled full scan for project %s (%s)", project.id, project.brand_name)
-        except Exception as exc:
-            logger.warning("Could not schedule scan for project %s: %s", project.id, exc)
+            
+            # Sync remote logs if enabled
+            if project.log_sync_enabled and project.remote_log_url:
+                sync_remote_logs_task.delay(project_id=str(project.id))
+                logs_synced += 1
+                logger.info("Triggered daily log sync for project %s", project.id)
 
-    logger.info("Daily scans scheduled: %d projects", scheduled)
+        except Exception as exc:
+            logger.warning("Could not schedule scan/sync for project %s: %s", project.id, exc)
+
+    logger.info("Daily tasks scheduled: %d scans, %d log syncs", scheduled, logs_synced)
     return {
         "projects_scheduled": scheduled,
+        "logs_synced": logs_synced,
         "scheduled_at": datetime.now(timezone.utc).isoformat(),
     }

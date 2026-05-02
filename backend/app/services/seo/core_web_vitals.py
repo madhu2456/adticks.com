@@ -24,11 +24,11 @@ logger = logging.getLogger(__name__)
 
 PSI_ENDPOINT = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
 
-def _audit_value(audits: dict, key: str) -> int | None:
+def _audit_value(audits: dict, key: str) -> float | None:
     """Extract numeric value from audit."""
     audit = audits.get(key, {})
     num = audit.get("numericValue")
-    return int(num) if num is not None else None
+    return float(num) if num is not None else None
 
 
 async def run_pagespeed(url: str, strategy: str = "mobile", categories: list[str] | None = None, api_key: str | None = None) -> dict[str, Any]:
@@ -92,6 +92,23 @@ async def run_pagespeed(url: str, strategy: str = "mobile", categories: list[str
     lh = data.get("lighthouseResult", {})
     audits = lh.get("audits", {})
     cats = lh.get("categories", {})
+    
+    # Log available audit keys for debugging (using warning to ensure it shows in logs)
+    if not audits:
+        logger.warning("PSI response for %s missing audits. Keys in data: %s", url, list(data.keys()))
+    else:
+        # Check for a few expected keys to see if they exist
+        expected = ["largest-contentful-paint", "first-contentful-paint", "cumulative-layout-shift", "server-response-time"]
+        found = [k for k in expected if k in audits]
+        logger.warning("PSI audits for %s: found %d/%d expected keys. Sample keys: %s", 
+                       url, len(found), len(expected), list(audits.keys())[:10])
+
+    def _get_metric(keys: list[str]) -> float | None:
+        for k in keys:
+            val = _audit_value(audits, k)
+            if val is not None:
+                return val
+        return None
 
     # Field data (CrUX) takes priority over lab data when present
     loading = data.get("loadingExperience", {}).get("metrics", {})
@@ -102,33 +119,53 @@ async def run_pagespeed(url: str, strategy: str = "mobile", categories: list[str
     )
     field_cls_raw = loading.get("CUMULATIVE_LAYOUT_SHIFT_SCORE", {}).get("percentile")
     field_cls = (field_cls_raw / 100) if field_cls_raw is not None else None
+    field_fcp = loading.get("FIRST_CONTENTFUL_PAINT_MS", {}).get("percentile")
 
-    # opportunities
+    # metrics with fallbacks
+    lcp = field_lcp if field_lcp is not None else _get_metric(["largest-contentful-paint", "largestContentfulPaint"])
+    fcp = field_fcp if field_fcp is not None else _get_metric(["first-contentful-paint", "firstContentfulPaint"])
+    cls = field_cls if field_cls is not None else _get_metric(["cumulative-layout-shift", "cumulativeLayoutShift"])
+    ttfb = _get_metric(["server-response-time", "serverResponseTime", "network-server-latency"])
+    si = _get_metric(["speed-index", "speedIndex"])
+    tbt = _get_metric(["total-blocking-time", "totalBlockingTime"])
+
+    # opportunities and diagnostics
     opportunities = []
     for key, audit in audits.items():
-        if audit.get("details", {}).get("type") == "opportunity":
+        # Capture both 'opportunity' and 'diagnostic' types for richer detail
+        audit_type = audit.get("details", {}).get("type")
+        if audit_type in ("opportunity", "diagnostic"):
             ms = audit.get("details", {}).get("overallSavingsMs")
-            if ms and ms > 0:
+            
+            # For diagnostics, we might not have 'overallSavingsMs', so we use score
+            # or just include them if they represent an issue (score < 1)
+            score = audit.get("score")
+            
+            # Only include if there's actual potential savings or it's a failing diagnostic
+            if (ms and ms > 0) or (score is not None and score < 0.9):
                 opportunities.append({
                     "id": key,
                     "title": audit.get("title"),
-                    "description": audit.get("description"),
-                    "savings_ms": int(ms),
-                    "score": audit.get("score"),
+                    "description": audit.get("description"), # Detailed explanation with links
+                    "savings_ms": int(ms) if ms else 0,
+                    "score": score,
+                    "display_value": audit.get("displayValue"),
                 })
-    opportunities.sort(key=lambda o: -(o["savings_ms"] or 0))
-    opportunities = opportunities[:5]
+    
+    # Sort by impact: prioritize high savings, then low scores
+    opportunities.sort(key=lambda o: (-(o["savings_ms"] or 0), o["score"] if o["score"] is not None else 1))
+    opportunities = opportunities[:8] # Return top 8 for more depth
 
     return {
         "url": url,
         "strategy": strategy,
-        "lcp_ms": field_lcp if field_lcp is not None else _audit_value(audits, "largest-contentful-paint"),
+        "lcp_ms": lcp,
         "inp_ms": field_inp,
-        "cls": field_cls if field_cls is not None else _audit_value(audits, "cumulative-layout-shift"),
-        "fcp_ms": _audit_value(audits, "first-contentful-paint"),
-        "ttfb_ms": _audit_value(audits, "server-response-time"),
-        "si_ms": _audit_value(audits, "speed-index"),
-        "tbt_ms": _audit_value(audits, "total-blocking-time"),
+        "cls": cls,
+        "fcp_ms": fcp,
+        "ttfb_ms": ttfb,
+        "si_ms": si,
+        "tbt_ms": tbt,
         "performance_score": _score_to_int(cats.get("performance", {}).get("score")),
         "seo_score": _score_to_int(cats.get("seo", {}).get("score")),
         "accessibility_score": _score_to_int(cats.get("accessibility", {}).get("score")),

@@ -936,6 +936,25 @@ async def upload_log_file(
     return {"status": "ok", "summary": result.summary, "rows": len(result.aggregated)}
 
 
+@router.post("/projects/{project_id}/logs/sync")
+async def sync_remote_logs(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Trigger a manual sync from the project's remote_log_url."""
+    project = await _get_project_or_404(project_id, current_user, db)
+    if not project.remote_log_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Remote log URL not configured for this project."
+        )
+    
+    from app.tasks.seo_tasks import sync_remote_logs_task
+    task = sync_remote_logs_task.delay(str(project_id))
+    return {"task_id": task.id, "status": "pending"}
+
+
 @router.get(
     "/projects/{project_id}/logs",
     response_model=list[LogEventResponse],

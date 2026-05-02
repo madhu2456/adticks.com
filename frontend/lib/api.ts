@@ -454,6 +454,8 @@ export const api = {
     },
     getLogs: (projectId: string, bot?: string) =>
       axiosInstance.get<any[]>(`/seo/projects/${projectId}/logs${bot ? `?bot=${bot}` : ""}`).then(unwrap),
+    syncRemoteLogs: (projectId: string) =>
+      axiosInstance.post<any>(`/seo/projects/${projectId}/logs/sync`).then(unwrap),
 
     // Reports
     generateReport: (projectId: string, payload: { report_type: string; title: string; branding?: any }) =>

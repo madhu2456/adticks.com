@@ -15,6 +15,8 @@ class ProjectUpdate(BaseModel):
     domain: str | None = None
     industry: str | None = None
     ai_scans_enabled: bool | None = None
+    remote_log_url: str | None = None
+    log_sync_enabled: bool | None = None
     competitors: list[str] | None = None
 
 class ProjectResponse(BaseModel):
@@ -24,6 +26,8 @@ class ProjectResponse(BaseModel):
     domain: str
     industry: str | None
     ai_scans_enabled: bool
+    remote_log_url: str | None = None
+    log_sync_enabled: bool = False
     competitors: list[str] = []
     created_at: datetime
     

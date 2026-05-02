@@ -100,18 +100,41 @@ export function CoreWebVitalsPanel({ projectId, defaultUrl = "" }: Props) {
 
           {latest.opportunities?.length > 0 && (
             <Card>
-              <CardHeader><CardTitle>Top Performance Opportunities</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Top Performance Opportunities & Diagnostics</CardTitle></CardHeader>
               <CardContent>
-                <div className="space-y-2">
+                <div className="space-y-4">
                   {latest.opportunities.map((op: any) => (
-                    <div key={op.id} className="p-3 rounded border bg-amber-500/5">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium">{op.title}</p>
-                        <Badge className="bg-amber-500/15 text-amber-700 border-amber-500/30">
-                          Save {(op.savings_ms / 1000).toFixed(1)}s
-                        </Badge>
+                    <div key={op.id} className="p-4 rounded-lg border bg-amber-500/5 border-amber-500/10">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <p className="text-sm font-bold text-text-1">{op.title}</p>
+                        <div className="flex gap-2">
+                          {op.display_value && (
+                            <Badge variant="outline" className="text-[10px] py-0">
+                              {op.display_value}
+                            </Badge>
+                          )}
+                          {op.savings_ms > 0 && (
+                            <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30">
+                              Save {(op.savings_ms / 1000).toFixed(2)}s
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-xs text-text-muted mt-1">{op.description}</p>
+                      <p className="text-xs text-text-2 leading-relaxed opacity-90">
+                        {op.description?.replace(/\[(.*?)\]\((.*?)\)/g, '$1')}
+                      </p>
+                      {op.description?.includes('http') && (
+                        <div className="mt-2">
+                           <a 
+                             href={op.description.match(/\((https?:\/\/.*?)\)/)?.[1]} 
+                             target="_blank" 
+                             rel="noopener noreferrer"
+                             className="text-[10px] text-primary hover:underline font-medium"
+                           >
+                             Learn more in Lighthouse docs →
+                           </a>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

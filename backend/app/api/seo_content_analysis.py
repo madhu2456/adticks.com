@@ -291,7 +291,7 @@ async def get_duplicate_content(
 # SEO Recommendations Endpoints
 # ============================================================================
 
-@router.get("/recommendations/{project_id}", response_model=PaginatedResponse)
+@router.get("/recommendations/{project_id}")
 @cached(ttl=1800)
 async def get_seo_recommendations(
     project_id: UUID,
@@ -334,10 +334,11 @@ async def get_seo_recommendations(
     recommendations = result.scalars().all()
     
     return {
-        "items": [SEORecommendationResponse.from_orm(r) for r in recommendations],
+        "data": [SEORecommendationResponse.model_validate(r) for r in recommendations],
         "total": total_count,
         "skip": skip,
         "limit": limit,
+        "has_more": (skip + limit) < total_count,
     }
 
 

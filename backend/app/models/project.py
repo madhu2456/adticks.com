@@ -42,6 +42,10 @@ class Project(Base):
     # AI Settings
     ai_scans_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
+    # Log Settings
+    remote_log_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    log_sync_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     # Relationships
     owner = relationship("User", back_populates="projects")
     competitors = relationship(
