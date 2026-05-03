@@ -20,7 +20,8 @@ from uuid import UUID
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.seo import RankHistory, CompetitorKeywords, Keyword, Ranking
+from app.models.seo import RankHistory, CompetitorKeywords
+from app.models.keyword import Keyword, Ranking
 from app.models.gsc import GSCData
 from app.models.ads import AdsData
 from app.models.project import Project
