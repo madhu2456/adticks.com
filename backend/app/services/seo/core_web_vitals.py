@@ -123,11 +123,18 @@ async def run_pagespeed(url: str, strategy: str = "mobile", categories: list[str
 
     # metrics with fallbacks
     lcp = field_lcp if field_lcp is not None else _get_metric(["largest-contentful-paint", "largestContentfulPaint"])
+    inp = field_inp  # INP from CrUX only (no lab fallback available)
     fcp = field_fcp if field_fcp is not None else _get_metric(["first-contentful-paint", "firstContentfulPaint"])
     cls = field_cls if field_cls is not None else _get_metric(["cumulative-layout-shift", "cumulativeLayoutShift"])
     ttfb = _get_metric(["server-response-time", "serverResponseTime", "network-server-latency"])
     si = _get_metric(["speed-index", "speedIndex"])
     tbt = _get_metric(["total-blocking-time", "totalBlockingTime"])
+
+    # Log field data availability for debugging
+    logger.info(
+        "PSI field metrics for %s (%s): LCP=%s, INP=%s, CLS=%s, FCP=%s (CrUX available: %s)",
+        url, strategy, field_lcp, field_inp, field_cls_raw, field_fcp, bool(loading)
+    )
 
     # opportunities and diagnostics
     opportunities = []
@@ -160,7 +167,7 @@ async def run_pagespeed(url: str, strategy: str = "mobile", categories: list[str
         "url": url,
         "strategy": strategy,
         "lcp_ms": lcp,
-        "inp_ms": field_inp,
+        "inp_ms": inp,
         "cls": cls,
         "fcp_ms": fcp,
         "ttfb_ms": ttfb,

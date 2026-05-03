@@ -542,18 +542,38 @@ export const api = {
 
   // Competitive Intelligence
   seoCompetitive: {
-    getOverview: (domain: string) =>
-      axiosInstance.get<DomainOverviewResponse>(`/competitive/overview/${domain}`).then(unwrap),
+    getOverview: (domain: string, projectId?: string) => {
+      // Extract domain only (remove protocol if present)
+      const cleanDomain = domain.replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0];
+      const url = projectId 
+        ? `/competitive/overview/${cleanDomain}?project_id=${projectId}`
+        : `/competitive/overview/${cleanDomain}`;
+      return axiosInstance.get<DomainOverviewResponse>(url).then(unwrap);
+    },
     getBulkKeywordMetrics: (keywords: string[]) =>
       axiosInstance.post<BulkKeywordResponse>("/competitive/keywords/bulk", { keywords }).then(unwrap),
-    getTraffic: (domain: string) =>
-      axiosInstance.get<TrafficAnalyticsResponse>(`/competitive/traffic/${domain}`).then(unwrap),
-    getPPC: (domain: string) =>
-      axiosInstance.get<PPCResearchResponse>(`/competitive/ppc/${domain}`).then(unwrap),
+    getTraffic: (domain: string, projectId?: string) => {
+      const cleanDomain = domain.replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0];
+      const url = projectId
+        ? `/competitive/traffic/${cleanDomain}?project_id=${projectId}`
+        : `/competitive/traffic/${cleanDomain}`;
+      return axiosInstance.get<TrafficAnalyticsResponse>(url).then(unwrap);
+    },
+    getPPC: (domain: string, projectId?: string) => {
+      const cleanDomain = domain.replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0];
+      const url = projectId
+        ? `/competitive/ppc/${cleanDomain}?project_id=${projectId}`
+        : `/competitive/ppc/${cleanDomain}`;
+      return axiosInstance.get<PPCResearchResponse>(url).then(unwrap);
+    },
     getBrandMentions: (projectId: string) =>
       axiosInstance.get<BrandMonitorResponse>(`/competitive/brand/${projectId}`).then(unwrap),
-    exploreContent: (query: string) =>
-      axiosInstance.get<ContentExplorerResponse>(`/competitive/content?q=${encodeURIComponent(query)}`).then(unwrap),
+    exploreContent: (query: string, projectId?: string) => {
+      const url = projectId
+        ? `/competitive/content?q=${encodeURIComponent(query)}&project_id=${projectId}`
+        : `/competitive/content?q=${encodeURIComponent(query)}`;
+      return axiosInstance.get<ContentExplorerResponse>(url).then(unwrap);
+    },
   },
 
   // Cache

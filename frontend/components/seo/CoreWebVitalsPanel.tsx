@@ -86,6 +86,9 @@ export function CoreWebVitalsPanel({ projectId, defaultUrl = "" }: Props) {
           <Card>
             <CardHeader>
               <CardTitle>Web Vitals — {latest.strategy} — <span className="text-xs text-text-muted truncate">{latest.url}</span></CardTitle>
+              <p className="text-xs text-text-muted mt-2">
+                INP and SEO require sufficient site traffic for Google's data (CrUX). New sites may show "—" until data accumulates.
+              </p>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">

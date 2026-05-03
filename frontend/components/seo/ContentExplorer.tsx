@@ -17,7 +17,8 @@ export function ContentExplorer({ projectId }: { projectId: string }) {
   const [query, setQuery] = useState('');
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
   
-  const { data: results, isLoading, isError } = useContentExplorer(searchQuery);
+  // Pass projectId to get content from your own site
+  const { data: results, isLoading, isError } = useContentExplorer(searchQuery, projectId);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

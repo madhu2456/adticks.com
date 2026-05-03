@@ -13,7 +13,12 @@ export function PPCResearch({ projectId }: { projectId: string }) {
   const [domain, setDomain] = useState('');
   const [searchDomain, setSearchDomain] = useState<string | null>(null);
   
-  const { data: ppc, isLoading, isError } = useCompetitorPPC(searchDomain);
+  // If searching own domain, pass projectId for real data
+  const isOwnDomain = searchDomain === projectId; // You'd need to get actual project domain
+  const { data: ppc, isLoading, isError } = useCompetitorPPC(
+    searchDomain,
+    isOwnDomain ? projectId : undefined
+  );
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

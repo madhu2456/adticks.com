@@ -77,15 +77,22 @@ async def scan_cannibalization(
         gsc_rows = (await db.execute(
             select(GSCData).where(GSCData.project_id == project_id)
         )).scalars().all()
+        
+        logger.info(f"Cannibalization scan: Found {len(gsc_rows)} GSC rows for project {project_id}")
+        
         rows = [
             {"keyword": g.query, "url": g.page, "position": g.position,
              "clicks": g.clicks, "impressions": g.impressions}
             for g in gsc_rows
             if getattr(g, "query", None) and getattr(g, "page", None)
         ]
+        
+        logger.info(f"Cannibalization scan: After filtering, {len(rows)} valid rows with keyword + URL")
 
     from app.services.seo.cannibalization import detect_cannibalization
     findings = detect_cannibalization(rows or [], min_pages=payload.min_pages)
+    
+    logger.info(f"Cannibalization scan: Detected {len(findings)} cannibalization issues")
 
     await db.execute(delete(KeywordCannibalization).where(KeywordCannibalization.project_id == project_id))
     out: list[KeywordCannibalization] = []

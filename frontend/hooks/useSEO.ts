@@ -599,18 +599,18 @@ export function useScanVolatility() {
 
 // --- Competitive Intelligence Hooks ---
 
-export function useTrafficAnalytics(domain: string | null) {
+export function useTrafficAnalytics(domain: string | null, projectId?: string) {
   return useQuery({
-    queryKey: ["competitive", "traffic", domain],
-    queryFn: () => (domain ? api.seoCompetitive.getTraffic(domain) : Promise.reject("No domain provided")),
+    queryKey: ["competitive", "traffic", domain, projectId],
+    queryFn: () => (domain ? api.seoCompetitive.getTraffic(domain, projectId) : Promise.reject("No domain provided")),
     enabled: !!domain,
   });
 }
 
-export function useCompetitorPPC(domain: string | null) {
+export function useCompetitorPPC(domain: string | null, projectId?: string) {
   return useQuery({
-    queryKey: ["competitive", "ppc", domain],
-    queryFn: () => (domain ? api.seoCompetitive.getPPC(domain) : Promise.reject("No domain provided")),
+    queryKey: ["competitive", "ppc", domain, projectId],
+    queryFn: () => (domain ? api.seoCompetitive.getPPC(domain, projectId) : Promise.reject("No domain provided")),
     enabled: !!domain,
   });
 }
@@ -623,18 +623,18 @@ export function useBrandMonitor(projectId: string) {
   });
 }
 
-export function useContentExplorer(query: string | null) {
+export function useContentExplorer(query: string | null, projectId?: string) {
   return useQuery({
-    queryKey: ["competitive", "content", query],
-    queryFn: () => (query ? api.seoCompetitive.exploreContent(query) : Promise.reject("No query provided")),
+    queryKey: ["competitive", "content", query, projectId],
+    queryFn: () => (query ? api.seoCompetitive.exploreContent(query, projectId) : Promise.reject("No query provided")),
     enabled: !!query,
   });
 }
 
-export function useDomainOverview(domain: string | null) {
+export function useDomainOverview(domain: string | null, projectId?: string) {
   return useQuery({
-    queryKey: ["competitive", "overview", domain],
-    queryFn: () => (domain ? api.seoCompetitive.getOverview(domain) : Promise.reject("No domain provided")),
+    queryKey: ["competitive", "overview", domain, projectId],
+    queryFn: () => (domain ? api.seoCompetitive.getOverview(domain, projectId) : Promise.reject("No domain provided")),
     enabled: !!domain,
   });
 }

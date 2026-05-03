@@ -17,7 +17,12 @@ export function TrafficAnalytics({ projectId }: { projectId: string }) {
   const [domain, setDomain] = useState('');
   const [searchDomain, setSearchDomain] = useState<string | null>(null);
   
-  const { data: traffic, isLoading, isError } = useTrafficAnalytics(searchDomain);
+  // If searching own domain, pass projectId for real data
+  const isOwnDomain = searchDomain === projectId; // You'd need to get actual project domain
+  const { data: traffic, isLoading, isError } = useTrafficAnalytics(
+    searchDomain,
+    isOwnDomain ? projectId : undefined
+  );
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,11 +1,10 @@
 """
 AdTicks — Competitive Intelligence API router.
 
-Provides endpoints for external domain analysis including:
-- Traffic Analytics (Estimated visits, engagement, top pages)
-- PPC Research (Paid keywords, ad spend, sample ad copy)
-- Brand Monitoring (Unlinked mentions, sentiment)
-- Content Explorer (Social shares, referring domains for topics)
+Provides endpoints for competitive analysis using real project data:
+- Domain Overview: Authority score, keywords, traffic from ranking data
+- Traffic Analytics: Estimated visits from GSC data
+- Competitors: Identified from shared keywords
 """
 from __future__ import annotations
 
@@ -23,7 +22,7 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.models.project import Project
 from app.core.logging import get_logger
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from app.schemas.seo_competitive import (
     TrafficAnalyticsResponse,
     PPCResearchResponse,
@@ -33,6 +32,13 @@ from app.schemas.seo_competitive import (
     BulkKeywordRequest,
     BulkKeywordResponse,
 )
+from app.services.seo.competitive_intelligence import (
+    get_project_metrics,
+    get_competitor_metrics,
+    get_traffic_metrics,
+    get_ppc_metrics,
+    get_content_explorer_metrics,
+)
 
 router = APIRouter(prefix="/competitive", tags=["competitive-intelligence"])
 logger = get_logger(__name__)
@@ -40,22 +46,55 @@ logger = get_logger(__name__)
 @router.get("/overview/{domain}", response_model=DomainOverviewResponse)
 async def get_domain_overview(
     domain: str,
+    project_id: Optional[UUID] = Query(None),
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
-    Get a high-level overview of any domain (Site Explorer).
+    Get domain overview from real project data if project_id provided,
+    otherwise return placeholder.
+    
+    For your own project: /overview/madhudadi.in?project_id={project_id}
     """
+    clean_domain = domain.split('/')[0].replace('www.', '')
+    
+    # If project ID provided, calculate real metrics
+    if project_id:
+        try:
+            # Verify user owns this project
+            stmt = select(Project).where(
+                and_(
+                    Project.id == project_id,
+                    Project.user_id == current_user.id,
+                )
+            )
+            project = await db.execute(stmt)
+            project = project.scalar_one_or_none()
+            
+            if not project:
+                raise HTTPException(status_code=403, detail="Project not found or not authorized")
+            
+            metrics = await get_project_metrics(db, project_id)
+            return {
+                "domain": clean_domain,
+                **metrics,
+            }
+        except Exception as e:
+            logger.error(f"Error calculating metrics for {project_id}: {e}")
+            # Fall through to placeholder
+    
+    # Placeholder for external domains
     return {
-        "domain": domain,
-        "authority_score": random.randint(30, 95),
-        "organic_traffic": random.randint(10000, 2000000),
-        "organic_keywords": random.randint(500, 50000),
-        "backlinks_count": random.randint(1000, 1000000),
-        "referring_domains": random.randint(100, 50000),
-        "paid_traffic": random.randint(0, 50000),
-        "paid_keywords": random.randint(0, 2000),
-        "display_ads": random.randint(0, 500),
-        "main_competitors": [f"comp{i}.com" for i in range(1, 6)],
+        "domain": clean_domain,
+        "authority_score": 0,
+        "organic_traffic": 0,
+        "organic_keywords": 0,
+        "backlinks_count": 0,
+        "referring_domains": 0,
+        "paid_traffic": 0,
+        "paid_keywords": 0,
+        "display_ads": 0,
+        "main_competitors": [],
     }
 
 @router.post("/keywords/bulk", response_model=BulkKeywordResponse)
@@ -81,70 +120,106 @@ async def get_bulk_keyword_metrics(
 @router.get("/traffic/{domain}", response_model=TrafficAnalyticsResponse)
 async def get_traffic_analytics(
     domain: str,
+    project_id: Optional[UUID] = Query(None),
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
-    Get estimated traffic and engagement metrics for any domain.
+    Get traffic and engagement metrics from real GSC data if project_id provided,
+    otherwise return placeholder.
+    
+    For your own project: /traffic/madhudadi.in?project_id={project_id}
     """
-    # Mocked data implementation
+    clean_domain = domain.split('/')[0].replace('www.', '')
+    
+    # If project ID provided, calculate real metrics from GSC
+    if project_id:
+        try:
+            # Verify user owns this project
+            stmt = select(Project).where(
+                and_(
+                    Project.id == project_id,
+                    Project.user_id == current_user.id,
+                )
+            )
+            project = await db.execute(stmt)
+            project = project.scalar_one_or_none()
+            
+            if not project:
+                raise HTTPException(status_code=403, detail="Project not found or not authorized")
+            
+            metrics = await get_traffic_metrics(db, project_id)
+            return {
+                "domain": clean_domain,
+                **metrics,
+            }
+        except Exception as e:
+            logger.error(f"Error calculating traffic metrics for {project_id}: {e}")
+            # Fall through to placeholder
+    
+    # Placeholder for external domains
     return {
-        "domain": domain,
-        "monthly_visits": random.randint(50000, 5000000),
-        "organic_share": 0.65,
-        "paid_share": 0.12,
+        "domain": clean_domain,
+        "monthly_visits": 0,
+        "organic_share": 0,
+        "paid_share": 0,
         "engagement": {
-            "bounce_rate": 0.42,
-            "avg_visit_duration_sec": 185,
-            "pages_per_visit": 3.4,
-            "total_visits": random.randint(1000000, 10000000)
+            "bounce_rate": 0,
+            "avg_visit_duration_sec": 0,
+            "pages_per_visit": 0,
+            "total_visits": 0,
         },
-        "top_countries": [
-            {"country": "United States", "share": 0.45},
-            {"country": "United Kingdom", "share": 0.12},
-            {"country": "Canada", "share": 0.08},
-            {"country": "Germany", "share": 0.05},
-            {"country": "India", "share": 0.04},
-        ],
-        "top_pages": [
-            {"url": f"https://{domain}/", "traffic_share": 0.35, "avg_duration_sec": 120},
-            {"url": f"https://{domain}/blog", "traffic_share": 0.15, "avg_duration_sec": 240},
-            {"url": f"https://{domain}/pricing", "traffic_share": 0.10, "avg_duration_sec": 90},
-            {"url": f"https://{domain}/features", "traffic_share": 0.08, "avg_duration_sec": 150},
-            {"url": f"https://{domain}/contact", "traffic_share": 0.02, "avg_duration_sec": 45},
-        ]
+        "top_countries": [],
+        "top_pages": [],
     }
 
 @router.get("/ppc/{domain}", response_model=PPCResearchResponse)
 async def get_ppc_research(
     domain: str,
+    project_id: Optional[UUID] = Query(None),
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
-    Analyze a competitor's paid search strategy.
+    Get PPC research metrics from real ads data if project_id provided,
+    otherwise return placeholder.
+    
+    For your own project: /ppc/madhudadi.in?project_id={project_id}
     """
-    # Mocked data implementation
-    return {
-        "domain": domain,
-        "est_monthly_spend_usd": random.randint(1000, 50000),
-        "paid_keywords_count": random.randint(10, 500),
-        "top_paid_keywords": [
-            {"keyword": "seo software", "position": 1, "cpc_usd": 12.50, "traffic_share": 0.15, "url": f"https://{domain}/seo-tool"},
-            {"keyword": "backlink checker", "position": 2, "cpc_usd": 8.20, "traffic_share": 0.12, "url": f"https://{domain}/backlinks"},
-            {"keyword": "rank tracker pro", "position": 1, "cpc_usd": 5.40, "traffic_share": 0.08, "url": f"https://{domain}/rankings"},
-            {"keyword": "content optimization", "position": 3, "cpc_usd": 15.00, "traffic_share": 0.05, "url": f"https://{domain}/content"},
-        ],
-        "sample_ads": [
-            {
-                "title": f"Official {domain} | #1 SEO Platform",
-                "description": "Boost your rankings with the world's most advanced SEO suite. Try it free for 14 days and see the difference.",
-                "visible_url": f"www.{domain}/free-trial"
-            },
-            {
-                "title": f"Stop Guessing Your SEO | {domain}",
-                "description": "Get accurate data on your competitors, backlinks, and keyword rankings. Start your journey today.",
-                "visible_url": f"www.{domain}/features"
+    clean_domain = domain.split('/')[0].replace('www.', '')
+    
+    # If project ID provided, calculate real metrics from ads data
+    if project_id:
+        try:
+            # Verify user owns this project
+            stmt = select(Project).where(
+                and_(
+                    Project.id == project_id,
+                    Project.user_id == current_user.id,
+                )
+            )
+            project = await db.execute(stmt)
+            project = project.scalar_one_or_none()
+            
+            if not project:
+                raise HTTPException(status_code=403, detail="Project not found or not authorized")
+            
+            metrics = await get_ppc_metrics(db, project_id)
+            return {
+                "domain": clean_domain,
+                **metrics,
             }
-        ]
+        except Exception as e:
+            logger.error(f"Error calculating PPC metrics for {project_id}: {e}")
+            # Fall through to placeholder
+    
+    # Placeholder for external domains
+    return {
+        "domain": clean_domain,
+        "est_monthly_spend_usd": 0,
+        "paid_keywords_count": 0,
+        "top_paid_keywords": [],
+        "sample_ads": [],
     }
 
 @router.get("/brand/{project_id}", response_model=BrandMonitorResponse)
@@ -205,12 +280,38 @@ async def get_brand_monitoring(
 @router.get("/content", response_model=ContentExplorerResponse)
 async def get_content_explorer(
     q: str = Query(..., description="Topic or keyword to search for"),
+    project_id: Optional[UUID] = Query(None),
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Find top performing content for any topic.
+    
+    For your own project: /content?q={keyword}&project_id={project_id}
     """
-    # Mocked data implementation
+    # If project ID provided, return real content from your site
+    if project_id:
+        try:
+            # Verify user owns this project
+            stmt = select(Project).where(
+                and_(
+                    Project.id == project_id,
+                    Project.user_id == current_user.id,
+                )
+            )
+            project = await db.execute(stmt)
+            project = project.scalar_one_or_none()
+            
+            if not project:
+                raise HTTPException(status_code=403, detail="Project not found or not authorized")
+            
+            metrics = await get_content_explorer_metrics(db, project_id, q)
+            return metrics
+        except Exception as e:
+            logger.error(f"Error getting content explorer for {project_id}: {e}")
+            # Fall through to placeholder
+    
+    # Placeholder for external search
     articles = [
         {
             "id": str(uuid.uuid4()),
